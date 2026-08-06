@@ -20,10 +20,11 @@ cd sculptor-agent && ./install.sh --setup-dir ~/我的写作项目
 ```bash
 sculptor setup          # 自动接入：检测宿主→原生注册→装 skill→复用本机凭据（目录级）
 export SCULPTOR_LLM_API_KEY=sk-xxx   # 或让 setup 自动发现
-sculptor init && sculptor clarify
+sculptor init && sculptor interview   # 可见的需求访谈：一次一问 + 实时确认清单
 ```
 
 深度定点修改：在 md 文档里选中一句话 → `sculptor point-edit "原句" "指令" --dir 项目`（macOS 可装右键服务，见 extras/）。
+写完后交付前跑 `sculptor audience`——8 个"第一读者"的群像化感性反馈。
 
 ## 双形态
 
@@ -52,8 +53,13 @@ sculptor init && sculptor clarify
 
 ## 独特资产
 
+- **需求访谈（Interview）**：多轮一问、带建议与选项，回答后实时刷新确认清单与进度，
+  收尾打包"需求 + 风格档案 + 剩余步骤"，让"AI 在认真理解我"这件事可见。
 - **风格向量引擎**：3D 向量（个人数据集 512 维 / 写作偏离 128 维 / 注意力焦点）+ 14 维度画像 + 从每次修改中在线学习。详见 [skills/sculptor/references/style-vectors.md](skills/sculptor/references/style-vectors.md)。
 - **双风格模型**：人想写的（write-style）≠ 人想听的（read-style），分开采集、分开注入。
+- **读者群像（Audience）**：交付前模拟 8 个第一读者（老教师/挑剔编辑/中学生/挑剔评论家/
+  焦虑家长/历史爱好者/随性读者/年轻作家）第一次阅读的心理反应——在哪里停下来、哪里走神、
+  哪句记住了、最想对作者说什么。详见 [agent/README.md](agent/README.md)。
 - **感性解剖**：5 维度（立场导向 / 局限边界 / 困惑混乱 / 多视角代入 / 风格兑现度），把文本隐藏的感性结构照亮给作者。详见 [skills/sculptor/references/sensibility.md](skills/sculptor/references/sensibility.md)。
 - **反 AI 痕迹硬规则**：零容忍黑名单、重复比喻/句式禁令、人类化统计指标。详见 [skills/sculptor/references/anti-ai.md](skills/sculptor/references/anti-ai.md)。
 - **压缩守卫**：上下文压缩前把风格指纹写回 vault，记忆会丢、风格不丢。
@@ -94,6 +100,8 @@ node scripts/sculptor.mjs status .sculptor                      # 工作区摘�
 
 - "帮我写一篇演讲稿，要有我的风格" → 观察 → 动态澄清 → 大纲 → 双风格写作 → 红队 → 交付
 - "把这段改成更像我的语气" → 定点修改协议，改完吸收进风格档案
+- "我贴一段我的旧稿" → 自动落盘 + 14 维风格提取，后续写作全程带着你的风格
+- "写完了，读者第一次读会怎么想？" → 读者群像：8 个第一读者的即时心理反馈
 - "分析这篇文章的立场和情感结构" → 感性解剖报告
 
 ## 架构
@@ -109,7 +117,7 @@ Observer（观察） → Orchestrator（编排） → Requester（反求） → 
 
 1. **GitHub 开源仓库**：目录即产品，clone 即装。
 2. **Skill 市场**：Codex 个人插件、Claude Code marketplace、OpenCode registry、agentskillsindex。
-3. **一键安装**：`curl -fsSL <url>/install.sh | bash` 或 npm 包。
+3. **一键安装**：`curl -fsSL <url>/install.sh | bash`（npm 包仅含 CLI 形态，skill/安装器走仓库）。
 4. **宿主生态**：WorkBuddy 数字员工（企业场景）、Cursor 规则。
 5. **增值层**（后续）：风格金库模板市场、团队风格分析、感性解剖报告订阅。
 
@@ -118,8 +126,9 @@ Observer（观察） → Orchestrator（编排） → Requester（反求） → 
 - P0：跨平台 skill 包 + 协议层 + 安装器 ✅
 - P1（当前）：玻璃面板渲染、定点修改吸收、压缩守卫、观察者日志 ✅
 - P1 收尾：Observer 接入宿主 hooks ✅（已修复为 app 安全：默认注释，CLI 用 --hermes）
-- P2（本轮）：完整 Agent 运行时 + MCP 协作 ✅（agent/，27 项离线 e2e 全绿）
-- P3：多 Agent 交付协议、风格市场、团队风格分析
+- P2：完整 Agent 运行时 + MCP 协作 ✅（agent/，74 项离线 e2e 全绿）
+- P3（本轮）：需求访谈 + 读者群像 + 引用块 + 全程风格采集 ✅（agent/ 17 个 MCP 工具）
+- P4：多 Agent 交付协议、风格市场、团队风格分析
 
 ## License
 

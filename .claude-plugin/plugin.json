@@ -1,7 +1,7 @@
 {
   "name": "sculptor",
-  "version": "0.1.0",
-  "description": "深度协作写作 Agent：澄清、大纲、双风格写作、红队审计与感性解剖。",
+  "version": "0.4.0",
+  "description": "深度协作写作 Agent：需求访谈、大纲、双风格写作、红队审计、读者群像与感性解剖。",
   "author": {
     "name": "Sculptor Team"
   },
@@ -10,7 +10,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Sculptor 写作助手",
-    "shortDescription": "深度协作写作 Agent：双风格、感性解剖、反 AI 痕迹",
-    "longDescription": "观察主对话 → 动态澄清 → 大纲 → 双风格写作 → 红队审计 → 交付。风格向量与感性解剖是核心资产。"
+    "shortDescription": "深度协作写作 Agent：需求访谈、双风格、读者群像、反 AI 痕迹",
+    "longDescription": "可见的多轮访谈确认需求 → 大纲 → 双风格写作 → 红队审计 → 读者群像反馈 → 交付。风格向量从每句话与每次修改中在线学习，是核心资产。"
   }
 }

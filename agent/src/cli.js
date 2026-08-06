@@ -21,7 +21,7 @@ import { interviewStep, interviewInteractive, interviewSummary } from './intervi
 import { runAudience, renderAudience } from './reader-gallery.js';
 import { styleProgress, backfillFromContext, extractStyleFromSamples } from './style.js';
 
-const HELP = `Sculptor Agent v0.3 — 完整写作 Agent（独立运行 + MCP 协作）
+const HELP = `Sculptor Agent v0.4 — 完整写作 Agent（独立运行 + MCP 协作）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
@@ -31,7 +31,7 @@ const HELP = `Sculptor Agent v0.3 — 完整写作 Agent（独立运行 + MCP �
   sculptor interview --once [工作区]  单步访谈：应用 stdin 回答，输出问题+清单+进度
   sculptor interview --summary [工作区]  打包需求确认清单与剩余步骤（不消耗 LLM）
   sculptor outline [工作区]           生成大纲（素材门槛未过会报错）
-  sculptor write [--from N] [工作区]  按大纲逐节写作到 draft.md
+  sculptor write [工作区]             按大纲逐节写作到 draft.md（--force 强制重写）
   sculptor write --section N [工作区] 只写第 N 节
   sculptor redteam [--fix] [工作区]   反 AI 审计（可选 LLM 修订）
   sculptor redteam --file x.md        直接审计任意文件

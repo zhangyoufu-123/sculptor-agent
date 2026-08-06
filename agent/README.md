@@ -151,4 +151,5 @@ Sculptor 只负责写作工作流与风格——这就是"承上启下"的协作
 npm test    # 等价于 node test/e2e.mjs
 ```
 
-离线全链路：模拟 LLM 跑通 澄清→大纲→写作→红队→修订→解剖 + MCP 握手，27 项断言。
+离线全链路：模拟 LLM 跑通 访谈→澄清→大纲→写作→红队→修订→解剖→读者群像 + MCP 握手，
+74 项断言（含 interview/audience/quote/style 提取/两行引用块/17 个 MCP 工具）。

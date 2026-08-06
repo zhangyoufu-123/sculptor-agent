@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Agent e2e（离线 mock，48 项断言）
+      - name: Agent e2e（离线 mock，74 项断言）
         run: cd agent && npm test
       - name: Shell 语法
         run: |
