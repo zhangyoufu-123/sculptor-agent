@@ -127,10 +127,14 @@ node scripts/sculptor.mjs fingerprint .sculptor/vault          # 刷新压缩守
 node scripts/sculptor.mjs status .sculptor                     # 工作区摘要
 node scripts/sculptor.mjs checklist .sculptor                  # 渲染需求访谈确认清单（Q2 可见化）
 node scripts/sculptor.mjs quote "选中的原句"                    # 生成〔Sculptor 引用〕块（Q1）
+node scripts/sculptor.mjs audience .sculptor                   # 读者群像：8 个"第一读者"反馈（交付前强制，Phase 4.5）
+node scripts/sculptor.mjs restyle .sculptor --direction "更克制一点"  # 按新风格方向重写整篇（缺省用档案最近方向）
 ```
 
 详情见 references/workflow.md、references/point-edit.md、hooks/compact-guard.md。
 
+> 读者群像与重写需要 LLM（配置 `SCULPTOR_LLM_API_KEY`，默认 DeepSeek 端点）；
+> 未配置或调用失败时，读者群像自动退化为确定性兜底反馈（永不缺席），重写会给出明确提示。
 > 如果宿主环境存在独立 `sculptor` CLI（agent 形态，见包内 agent/README.md），
 > 优先让它执行工作流步骤（`sculptor interview / outline / write / redteam / audience / dissect`），
 > 宿主负责对话与工具，Sculptor 负责写作与风格——这就是承上启下的协作模型。

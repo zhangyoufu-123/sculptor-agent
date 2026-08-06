@@ -318,6 +318,26 @@ try {
   );
   r = await run(['audience', '--quick']);
   check('--quick 快速模式', r.code === 0 && r.out.includes('读者群像'));
+  // skill 形态（scripts/sculptor.mjs）也必须提供读者群像与重写命令
+  const skillScript = new URL('../../skills/sculptor/scripts/sculptor.mjs', import.meta.url)
+    .pathname;
+  const skillAud = spawnSync(process.execPath, [skillScript, 'audience', workspace, '--quick'], {
+    encoding: 'utf8',
+  });
+  check(
+    'skill 脚本 audience 可用（离线兜底）',
+    skillAud.status === 0 &&
+      skillAud.stdout.includes('读者群像') &&
+      skillAud.stdout.includes('老教师'),
+    (skillAud.stdout + skillAud.stderr).slice(0, 120),
+  );
+  const skillHelp = spawnSync(process.execPath, [skillScript, '--help'], { encoding: 'utf8' });
+  check(
+    'skill 脚本已注册 audience 与 restyle',
+    skillHelp.status === 0 &&
+      skillHelp.stdout.includes('audience') &&
+      skillHelp.stdout.includes('restyle'),
+  );
 
   // 7. dissect
   r = await run(['dissect']);
