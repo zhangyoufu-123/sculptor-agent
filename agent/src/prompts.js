@@ -46,6 +46,7 @@ export const OUTLINE_PROMPT = (
 
 【写作风格（write-style，语言层）】${ctx.writeStyle}
 【接收风格（read-style，结构层）】${ctx.readStyle}
+${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
 
 要求：
 1. 每节一句话功能（铺垫/转折/细节/收束/升华），连续段落不要做同一件事。
@@ -77,6 +78,8 @@ ${ctx.writeStyle || '（尚未充分采集，宁可用具体、私人、笨拙�
 【接收风格档案（read-style）】
 ${ctx.readStyle || '（未知，默认：节奏错落、信息密度适中、开头抓人、结尾留有余味）'}
 
+${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
+
 硬性要求：
 1. 黑名单禁用：在当今社会/随着/近年来/众所周知/毋庸置疑/不可否认/值得注意的是/不难发现/事实上/总而言之/底层逻辑/赋能 等 AI 套话一律不用。
 2. 同一个比喻只允许出现一次；"虽然…但是…""不是…而是…"这类句式不重复使用。
@@ -98,6 +101,8 @@ export const EXPAND_PROMPT = (ctx) => `你是 Sculptor 的写作者。本节字�
 【目标字数】${ctx.target} 字（中文字符）
 【当前字数】${ctx.actual} 字
 
+${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
+
 扩写要求：保持原意与风格；补充具体细节、画面、引文、场景；不注水、不重复、不堆套话。
 【原文】
 ${ctx.text}
@@ -110,6 +115,7 @@ export const REDTEAM_FIX_PROMPT = (
 
 【问题】${ctx.issues}
 【写作风格】${ctx.writeStyle || '（具体、克制、有个人痕迹）'}
+${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
 【原文】
 ${ctx.text}
 
@@ -146,3 +152,20 @@ ${sample}
 
 输出严格 JSON：
 {"dimensions":{"temperature":{"value":"","confidence":0,"evidence":[""]},"sentencePreference":{...},...},"associations":["联想/意象"],"techniques":["惯用技巧"],"attentionFocus":{"对象":0.8}}`;
+
+/** 风格少样本块：作者本人的旧稿 + 亲手修改对 + 联想库 + 反例（StyleMC 对比式注入）。 */
+export const STYLE_SHOT = (shot) => `【风格少样本 · 全部来自作者本人】
+以下内容全部来自这位作者自己的文字或亲手修改——写的时候模仿这些，而不是模仿范文或通用模板：
+
+${(shot.samples || [])
+  .map((s, i) => `— 作者旧稿片段 ${i + 1}（相关度 ${s.score}，来源 ${s.source}）—\n${s.text}`)
+  .join('\n\n')}
+${(shot.edits || [])
+  .map(
+    (e) =>
+      `— 作者亲手修改的句子（最重要的风格信号，先看原文再看修改）—\n原文：${e.original}\n修改：${e.changed}${e.intent ? `\n意图：${e.intent}` : ''}`,
+  )
+  .join('\n\n')}
+${shot.associations?.length ? `【作者的联想库】${shot.associations.join('、')}` : ''}
+${shot.techniques?.length ? `【作者惯用技巧】${shot.techniques.join('、')}` : ''}
+【反例 · 作者绝不会这样写】${(shot.negatives || []).join('；')}`;

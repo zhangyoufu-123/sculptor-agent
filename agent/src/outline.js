@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chatWithRetry, parseJsonContent } from './llm.js';
 import { OUTLINE_PROMPT } from './prompts.js';
 import * as ws from './workspace.js';
+import { buildStyleShot } from './style-memory.js';
 
 export function styleSummary(file) {
   try {
@@ -48,6 +49,10 @@ export async function generateOutline(cfg, wsDir) {
     materials: state.materials,
     writeStyle: styleSummary(path.join(workspace, 'vault', 'write-style.json')),
     readStyle: styleSummary(path.join(workspace, 'vault', 'read-style.json')),
+    styleShot: buildStyleShot(workspace, {
+      topic: state.confirmed.topic,
+      genre: state.confirmed.genre || '',
+    }),
   };
   const content = await chatWithRetry(
     cfg,

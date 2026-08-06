@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { chatWithRetry } from './llm.js';
 import { REDTEAM_FIX_PROMPT } from './prompts.js';
 import * as ws from './workspace.js';
+import { buildStyleShot } from './style-memory.js';
 
 export const BLACKLIST = [
   '在当今社会',
@@ -102,7 +103,11 @@ export function audit(text) {
   }
   for (const [v, info] of Object.entries(vehicles)) {
     if (info.count > 1)
-      report.repeatedMetaphors.push({ vehicle: v, count: info.count, sentences: info.sentences });
+      report.repeatedMetaphors.push({
+        vehicle: v,
+        count: info.count,
+        sentences: info.sentences,
+      });
   }
 
   // 重复句式
@@ -179,6 +184,14 @@ export async function redteam(cfg, wsDir, { fix = false } = {}) {
     null,
     0,
   ).slice(0, 800);
+  let state = {};
+  try {
+    state = ws.readState(workspace); // state 缺失时不影响审计（仅风格检索退化为论题为空）
+  } catch {}
+  const styleShot = buildStyleShot(workspace, {
+    topic: state.confirmed?.topic || state.outline?.title || '',
+    genre: state.confirmed?.genre || '',
+  });
   let text = fs.readFileSync(draftFile, 'utf8');
   let report = audit(text);
 
@@ -187,8 +200,14 @@ export async function redteam(cfg, wsDir, { fix = false } = {}) {
     const fixed = await chatWithRetry(
       cfg,
       [
-        { role: 'system', content: '你是修订者，用用户风格改写有 AI 痕迹的片段。' },
-        { role: 'user', content: REDTEAM_FIX_PROMPT({ issues, text, writeStyle }) },
+        {
+          role: 'system',
+          content: '你是修订者，用用户风格改写有 AI 痕迹的片段。',
+        },
+        {
+          role: 'user',
+          content: REDTEAM_FIX_PROMPT({ issues, text, writeStyle, styleShot }),
+        },
       ],
       { temperature: 0.7, maxTokens: 6000 },
     );

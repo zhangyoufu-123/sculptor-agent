@@ -6,6 +6,7 @@ import { chatWithRetry } from './llm.js';
 import { WRITE_PROMPT, EXPAND_PROMPT } from './prompts.js';
 import * as ws from './workspace.js';
 import { styleSummary } from './outline.js';
+import { buildStyleShot } from './style-memory.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -45,6 +46,11 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       previousEnd,
       writeStyle: styleSummary(path.join(workspace, 'vault', 'write-style.json')),
       readStyle: styleSummary(path.join(workspace, 'vault', 'read-style.json')),
+      styleShot: buildStyleShot(workspace, {
+        topic: outline.title || state.confirmed.topic,
+        genre: state.confirmed.genre || '',
+        section,
+      }),
     };
     const body = await chatWithRetry(
       cfg,
@@ -70,6 +76,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
               target: words,
               actual,
               text,
+              styleShot: ctx.styleShot, // 扩写同样注入少样本，防止风格漂移
             }),
           },
         ],
@@ -80,7 +87,13 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       expanded = true;
     }
     parts[i] = `## ${section.heading}\n\n${text}\n`;
-    report.push({ index: i + 1, heading: section.heading, target: words, actual, expanded });
+    report.push({
+      index: i + 1,
+      heading: section.heading,
+      target: words,
+      actual,
+      expanded,
+    });
     state.summary = `正在写第 ${i + 1}/${sections.length} 节：${section.heading}`;
     state.nextStep = i < end ? `继续写第 ${i + 2} 节` : '写完后运行 sculptor redteam';
     ws.writeState(workspace, state);

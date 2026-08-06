@@ -20,6 +20,7 @@ import { probeTask } from './observer.js';
 import { interviewStep, interviewInteractive, interviewSummary } from './interview.js';
 import { runAudience, renderAudience } from './reader-gallery.js';
 import { styleProgress, backfillFromContext, extractStyleFromSamples } from './style.js';
+import { buildStyleShot } from './style-memory.js';
 
 const HELP = `Sculptor Agent v0.4 — 完整写作 Agent（独立运行 + MCP 协作）
 
@@ -38,7 +39,8 @@ const HELP = `Sculptor Agent v0.4 — 完整写作 Agent（独立运行 + MCP �
   sculptor audience [--file x.md] [--quick] [工作区]  读者群像：8 个"第一读者"的感性反馈
   sculptor dissect [--file x.md] [工作区]  感性解剖 5 维度
   sculptor quote "<原句>"             生成可粘贴的「Sculptor 引用」块
-  sculptor style [--backfill] [--extract] [工作区]  查看风格档案进度（--backfill 回填对话日志；--extract 提取风格底稿）
+  sculptor style [--memory 查询] [--backfill] [--extract] [工作区]
+                                     风格档案进度；--memory 预览按论题检索到的旧稿与修改对；--backfill 回填对话日志；--extract 提取风格底稿
   sculptor absorb <工作区> <edit.json>   吸收定点修改进风格档案
   sculptor fingerprint <工作区>       刷新压缩守卫风格指纹
   sculptor panel [state.json]         渲染玻璃面板
@@ -120,7 +122,9 @@ export async function runCli(argv, io = {}) {
     switch (cmd) {
       case 'init': {
         const dir = flags.dir || positional[0] || '';
-        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, dir), { create: true });
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, dir), {
+          create: true,
+        });
         console.log(`Sculptor 工作区已初始化 → ${w}`);
         break;
       }
@@ -179,6 +183,25 @@ export async function runCli(argv, io = {}) {
       }
       case 'style': {
         const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, workspace));
+        if (flags.memory) {
+          const shot = buildStyleShot(w, { topic: String(flags.memory) });
+          if (!shot) {
+            console.log('（没有可检索的风格记忆：工作区还没有旧稿或编辑记录）');
+          } else {
+            console.log(`风格记忆检索「${flags.memory}」:`);
+            if (!shot.samples.length) console.log('  旧稿: （无）');
+            for (const s of shot.samples)
+              console.log(
+                `  [旧稿 ${s.score}] ${s.source}\n    ${s.text.slice(0, 80)}${s.text.length > 80 ? '…' : ''}`,
+              );
+            if (!shot.edits.length) console.log('  修改对: （无）');
+            for (const e of shot.edits)
+              console.log(
+                `  [修改 ${e.score}] ${e.original} → ${e.changed}${e.intent ? `（${e.intent}）` : ''}`,
+              );
+            if (shot.associations?.length) console.log(`  联想库: ${shot.associations.join('、')}`);
+          }
+        }
         if (flags.extract) {
           const ex = await extractStyleFromSamples(w, cfg);
           console.log(`风格底稿提取：${ex.extracted} 份已提取，${ex.skipped} 份跳过/失败`);
@@ -218,7 +241,10 @@ export async function runCli(argv, io = {}) {
       case 'write': {
         const w = ws.resolveWorkspace(cfg, workspace);
         const index = flags.section !== undefined ? Number(flags.section) : null;
-        const r = await writeSection(cfg, w, { index, force: Boolean(flags.force) });
+        const r = await writeSection(cfg, w, {
+          index,
+          force: Boolean(flags.force),
+        });
         console.log(`已写入 ${r.sections} 节 → ${r.draftFile}`);
         for (const s of r.report) {
           console.log(

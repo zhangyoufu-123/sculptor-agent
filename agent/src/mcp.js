@@ -13,6 +13,7 @@ import { probeTask } from './observer.js';
 import { interviewStep } from './interview.js';
 import { runAudience, renderAudience } from './reader-gallery.js';
 import { styleProgress } from './style.js';
+import { buildStyleShot } from './style-memory.js';
 
 const TOOLS = [
   {
@@ -23,19 +24,28 @@ const TOOLS = [
   {
     name: 'panel',
     description: '渲染玻璃面板（当前写作进度白话视图）',
-    inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } },
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' } },
+    },
   },
   {
     name: 'status',
     description: '显示工作区摘要',
-    inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } },
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' } },
+    },
   },
   {
     name: 'clarify_step',
     description: '澄清单步：传入用户最新消息，返回下一个问题（含建议与选项）',
     inputSchema: {
       type: 'object',
-      properties: { workspace: { type: 'string' }, lastInput: { type: 'string' } },
+      properties: {
+        workspace: { type: 'string' },
+        lastInput: { type: 'string' },
+      },
       required: ['lastInput'],
     },
   },
@@ -44,7 +54,10 @@ const TOOLS = [
     description: '需求访谈单步：传入用户最新消息，返回下一个问题 + 确认清单 + 进度 + 风格档案进度',
     inputSchema: {
       type: 'object',
-      properties: { workspace: { type: 'string' }, lastInput: { type: 'string' } },
+      properties: {
+        workspace: { type: 'string' },
+        lastInput: { type: 'string' },
+      },
       required: ['lastInput'],
     },
   },
@@ -72,12 +85,32 @@ const TOOLS = [
   {
     name: 'style_status',
     description: '查看风格档案进度（已学维度 + 最近证据），确认风格被读到了',
-    inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } },
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' } },
+    },
+  },
+  {
+    name: 'style_memory',
+    description:
+      '检索风格记忆：按论题/文体返回作者旧稿片段与亲手修改对（少样本注入素材），供宿主把作者原话喂给写作模型',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        topic: { type: 'string' },
+        genre: { type: 'string' },
+      },
+      required: ['topic'],
+    },
   },
   {
     name: 'outline',
     description: '生成结构化大纲（素材门槛未过会报错）',
-    inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } },
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' } },
+    },
   },
   {
     name: 'write_section',
@@ -90,7 +123,10 @@ const TOOLS = [
   {
     name: 'write_all',
     description: '按大纲写完所有节到 draft.md',
-    inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } },
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' } },
+    },
   },
   {
     name: 'redteam',
@@ -129,7 +165,10 @@ const TOOLS = [
   {
     name: 'fingerprint',
     description: '刷新压缩守卫风格指纹',
-    inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } },
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' } },
+    },
   },
   {
     name: 'point_edit',
@@ -149,7 +188,11 @@ const TOOLS = [
   {
     name: 'probe',
     description: '生态位探测：判断任务是否值得 Sculptor 主动介入（长文写作/风格/结构/定点修改）',
-    inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+    inputSchema: {
+      type: 'object',
+      properties: { text: { type: 'string' } },
+      required: ['text'],
+    },
   },
 ];
 
@@ -160,7 +203,9 @@ function wsDir(args, cfg) {
 async function callTool(name, args, cfg) {
   switch (name) {
     case 'init':
-      return { text: `工作区已初始化 → ${ws.ensureWorkspace(wsDir(args, cfg), { create: true })}` };
+      return {
+        text: `工作区已初始化 → ${ws.ensureWorkspace(wsDir(args, cfg), { create: true })}`,
+      };
     case 'panel': {
       const w = wsDir(args, cfg);
       ws.ensureWorkspace(w);
@@ -178,7 +223,9 @@ async function callTool(name, args, cfg) {
     }
     case 'interview_step': {
       const w = wsDir(args, cfg);
-      const r = await interviewStep(cfg, w, { lastInput: args.lastInput || '' });
+      const r = await interviewStep(cfg, w, {
+        lastInput: args.lastInput || '',
+      });
       return { text: JSON.stringify(r, null, 2) };
     }
     case 'audience': {
@@ -204,6 +251,17 @@ async function callTool(name, args, cfg) {
           (p.write.top[0]
             ? `最近: ${p.write.top.map((t) => `${t.dim}→${t.value}`).join('、')}`
             : '（暂无信号，继续对话/修改会自动采集）'),
+      };
+    }
+    case 'style_memory': {
+      const w = wsDir(args, cfg);
+      ws.ensureWorkspace(w);
+      const shot = buildStyleShot(w, {
+        topic: args.topic || '',
+        genre: args.genre || '',
+      });
+      return {
+        text: shot ? JSON.stringify(shot, null, 2) : '（没有可检索的风格记忆）',
       };
     }
     case 'outline': {
@@ -241,12 +299,16 @@ async function callTool(name, args, cfg) {
     case 'absorb': {
       const w = wsDir(args, cfg);
       const r = ws.absorbEdit(w, args);
-      return { text: `write ${r.writeUpdated} 维 + read ${r.readUpdated} 维已更新` };
+      return {
+        text: `write ${r.writeUpdated} 维 + read ${r.readUpdated} 维已更新`,
+      };
     }
     case 'fingerprint': {
       const w = wsDir(args, cfg);
       const fp = ws.refreshFingerprint(w);
-      return { text: `风格指纹已刷新: ${fp.highConfidenceDimensions.length} 个高置信度维度` };
+      return {
+        text: `风格指纹已刷新: ${fp.highConfidenceDimensions.length} 个高置信度维度`,
+      };
     }
     case 'point_edit': {
       const w = wsDir(args, cfg);
@@ -297,13 +359,19 @@ export async function runMcpServer({ input = process.stdin, output = process.std
         send({
           jsonrpc: '2.0',
           id: msg.id,
-          result: { content: [{ type: 'text', text: result.text }], isError: false },
+          result: {
+            content: [{ type: 'text', text: result.text }],
+            isError: false,
+          },
         });
       } catch (err) {
         send({
           jsonrpc: '2.0',
           id: msg.id,
-          result: { content: [{ type: 'text', text: `[sculptor] ${err.message}` }], isError: true },
+          result: {
+            content: [{ type: 'text', text: `[sculptor] ${err.message}` }],
+            isError: true,
+          },
         });
       }
     } else if (msg.id !== undefined) {

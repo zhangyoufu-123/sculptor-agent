@@ -9,6 +9,7 @@ import { runCli } from '../src/cli.js';
 import { runMcpServer } from '../src/mcp.js';
 import { audit } from '../src/redteam.js';
 import { applyChangeIfUnchanged } from '../src/point-edit.js';
+import { buildStyleShot } from '../src/style-memory.js';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-e2e-'));
 const work = path.join(root, 'work');
@@ -25,11 +26,15 @@ function check(name, cond, extra = '') {
 // 离线 fetch stub：所有 LLM 调用走 mock
 globalThis.fetch = async (url, opts) => {
   const body = JSON.parse(opts.body);
+  globalThis.fetchBodies = globalThis.fetchBodies || [];
+  globalThis.fetchBodies.push(body); // 捕获全部请求体，验证提示词注入
   const content = respond(body.messages);
   return {
     ok: true,
     status: 200,
-    json: async () => ({ choices: [{ message: { role: 'assistant', content } }] }),
+    json: async () => ({
+      choices: [{ message: { role: 'assistant', content } }],
+    }),
   };
 };
 
@@ -114,6 +119,17 @@ try {
     }),
   );
 
+  // 2.4 旧稿种子：模拟作者写过同题旧稿，验证写作时能按论题检索注入
+  fs.writeFileSync(
+    path.join(workspace, 'vault', 'style-samples', 'old-draft.md'),
+    '那年秋天，我第二次走进北大红楼。石阶还是旧的，被一百年的脚步磨出了光泽。窗台上积着灰，我伸手一抹，指腹上留下一道深色的痕。红砖墙在暮色里发暗，我想起课本里那句"破晓的号角"，忽然明白历史不是摆在玻璃柜里的展品，它一直等着一个人走进去。\n',
+  );
+  // 更新的无关样本：验证排序靠"相关度"而非"最新"（BM25 真的在起作用）
+  fs.writeFileSync(
+    path.join(workspace, 'vault', 'style-samples', 'unrelated-new.md'),
+    '上周我修了一个异步竞态问题，把请求合并成队列，加上了超时与重试，测试覆盖率从 78% 提到 92%。并发高峰的延迟降了一半，日志里也不再有重复报错了。\n',
+  );
+
   // 2.5 需求访谈：独立工作区跑多轮，返回确认清单与进度
   const ws2 = path.join(root, 'ws2');
   process.env.SCULPTOR_WORKSPACE = ws2;
@@ -184,6 +200,14 @@ try {
   );
   r = await run(['write', '--force']);
   check('--force 强制重写', r.code === 0, r.out.slice(0, 120));
+  const writePrompts = JSON.stringify(globalThis.fetchBodies || []);
+  check(
+    '写作提示注入了风格少样本（旧稿+反例）',
+    writePrompts.includes('风格少样本') &&
+      writePrompts.includes('破晓的号角') &&
+      writePrompts.includes('作者绝不会这样写'),
+    writePrompts.slice(0, 140),
+  );
 
   // 5. 确定性红队：直接审计植入文本，应抓到黑名单与重复比喻
   const planted = [
@@ -212,7 +236,10 @@ try {
   check(
     '复检通过（黑名单 0 / 重复比喻 0）',
     after.passed === true,
-    JSON.stringify({ blacklist: after.blacklistHits, metaphors: after.repeatedMetaphors }),
+    JSON.stringify({
+      blacklist: after.blacklistHits,
+      metaphors: after.repeatedMetaphors,
+    }),
   );
 
   // 6.5 读者群像（交付前强制环节）
@@ -250,6 +277,25 @@ try {
   );
   r = await run(['absorb', workspace, editFile]);
   check('定点修改吸收', r.code === 0 && r.out.includes('1 维'));
+  const shot = buildStyleShot(workspace, { topic: '北大红楼 历史 现场' });
+  check(
+    '风格记忆按相关度排序（同题旧稿压过更新的无关样本 + 修改对入列）',
+    shot?.samples?.[0]?.source === 'old-draft.md' &&
+      shot.samples.some((s) => s.source === 'unrelated-new.md') &&
+      shot.samples[0].score >
+        shot.samples.find((s) => s.source === 'unrelated-new.md').score &&
+      (shot?.edits?.length || 0) >= 1,
+    JSON.stringify(
+      shot?.samples?.map((s) => `${s.source}:${s.score}`).join(', ') +
+        ` edits=${shot?.edits?.length}`,
+    ),
+  );
+  r = await run(['style', '--memory', '北大红楼 历史 现场']);
+  check(
+    'style --memory 预览旧稿与修改对',
+    r.code === 0 && r.out.includes('石阶还是旧的') && r.out.includes('历史从不等候'),
+    r.out.slice(0, 160),
+  );
   r = await run(['fingerprint']);
   check(
     '压缩指纹刷新',
@@ -357,7 +403,7 @@ try {
       .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
   );
   check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'sculptor');
-  check('MCP tools/list 17 个工具', byId[2]?.result?.tools?.length === 17);
+  check('MCP tools/list 18 个工具', byId[2]?.result?.tools?.length === 18);
   check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Sculptor 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
   const mcpInput2 = Readable.from([
@@ -384,6 +430,28 @@ try {
     'MCP quote 生成引用块',
     byId2[6]?.result?.content?.[0]?.text?.includes('〔Sculptor 引用〕'),
   );
+  const mcpInput3 = Readable.from([
+    `${JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'style_memory', arguments: { workspace, topic: '北大红楼 历史' } } })}\n`,
+  ]);
+  const mcpOut3 = [];
+  const output3 = new Writable({
+    write(c, _e, cb) {
+      mcpOut3.push(c.toString());
+      cb();
+    },
+  });
+  await runMcpServer({ input: mcpInput3, output: output3 });
+  const byId3 = Object.fromEntries(
+    mcpOut3
+      .join('')
+      .trim()
+      .split('\n')
+      .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
+  );
+  check(
+    'MCP style_memory 检索到作者旧稿',
+    byId3[7]?.result?.content?.[0]?.text?.includes('破晓的号角'),
+  );
 
   // 12. 生态位探测：主动触发判断
   r = await run(['probe', '帮我写一篇关于北大红楼的演讲稿，要有我的风格']);
@@ -408,6 +476,7 @@ try {
   check('总结任务不触发', p4.triggered === false);
 } finally {
   delete globalThis.fetch;
+  delete globalThis.fetchBodies;
 }
 
 console.log(`\n${failures === 0 ? '✓ 全部通过' : `✗ ${failures} 项失败`}`);
