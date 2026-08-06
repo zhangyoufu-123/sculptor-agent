@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.0 (2026-08-06)
+
+### Added
+
+- **导演模式（Director，自主决策 · 主导对话）**：`sculptor agent`（或 MCP `agent_step`）
+  每次收到用户消息自动决定并执行下一步——澄清→大纲→逐节写作→反 AI 审计→读者群像→交付，
+  用户不用催"继续"；只在真正的用户决策点停下（主题/立场/素材/立意/论点/大纲确认/风格方向）。
+  交付后说风格方向 → 全文按新方向重写并再走一轮审计与群像。MCP 工具 19 → 20。
+- **仓库纯净化**：移除旧控制台/Web/并行 TS MCP 残留（`integration/engine-mcp`、
+  旧安装器 `scripts/install.sh`）；主仓库重组为 agent 单包（`packages/sculptor-agent` → 根）。
+- **install.sh 定位修复**：按脚本自身位置判断本地仓库，任意目录调用都成立。
+
+### Changed
+
+- 版本 0.5.0 → 0.6.0（CLI HELP / MCP serverInfo / package.json 同步）。
+- 根 package.json 增加 husky/lint-staged/commitlint，pre-commit = lint-staged + 全量 e2e。
+
 ## 0.5.0 (2026-08-06)
 
 ### Added

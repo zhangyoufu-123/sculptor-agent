@@ -170,6 +170,58 @@ try {
   );
   process.env.SCULPTOR_WORKSPACE = workspace;
 
+  // 2.8 导演模式：自主决策、主导全程（agent --once，逐条转发用户消息）
+  const ws3 = path.join(root, 'ws3');
+  process.env.SCULPTOR_WORKSPACE = ws3;
+  r = await run(['init'], {});
+  check('导演前 init', r.code === 0);
+  r = await run(['agent', '--once'], { input: '\n' });
+  let ar = JSON.parse(r.out);
+  check(
+    '导演首步提问',
+    ar.kind === 'ask' && Boolean(ar.question),
+    JSON.stringify(ar).slice(0, 100),
+  );
+  for (const a of answers) {
+    r = await run(['agent', '--once'], { input: a + '\n' });
+    ar = JSON.parse(r.out);
+  }
+  check(
+    '导演澄清完成后自动生成大纲并请求确认',
+    ar.kind === 'confirm_outline' && ar.outline?.sections?.length >= 1,
+    JSON.stringify(ar).slice(0, 140),
+  );
+  r = await run(['agent', '--once'], { input: '可以\n' });
+  ar = JSON.parse(r.out);
+  check('导演确认后自动开始写作', ar.kind === 'working' || ar.kind === 'deliver', ar.kind);
+  let dguard = 0;
+  while (ar.kind !== 'deliver' && dguard < 30) {
+    r = await run(['agent', '--once'], { input: '\n' });
+    ar = JSON.parse(r.out);
+    dguard += 1;
+  }
+  check(
+    '导演自动推进到交付（逐节写作→审计→群像→交付，无需用户催）',
+    ar.kind === 'deliver' && fs.existsSync(path.join(ws3, 'draft.md')),
+    `${ar.kind} ${String(ar.message).slice(0, 80)}`,
+  );
+  // 交付后：用户给风格方向 → 导演全文重写 → 审计 → 群像 → 再次交付
+  r = await run(['agent', '--once'], { input: '整篇更克制一点\n' });
+  ar = JSON.parse(r.out);
+  check(
+    '导演收到风格方向后自动触发重写',
+    ar.kind === 'working' && String(ar.message).includes('重写'),
+    ar.kind,
+  );
+  dguard = 0;
+  while (ar.kind !== 'deliver' && dguard < 20) {
+    r = await run(['agent', '--once'], { input: '\n' });
+    ar = JSON.parse(r.out);
+    dguard += 1;
+  }
+  check('重写后再次交付', ar.kind === 'deliver', ar.kind);
+  process.env.SCULPTOR_WORKSPACE = workspace;
+
   // 2.6 quote 引用块
   r = await run(['quote', '那扇窗沉默地注视着一切。']);
   check(
@@ -272,6 +324,25 @@ try {
     byId4[8]?.result?.content?.[0]?.text?.includes('更克制一点') &&
       byId4[8]?.result?.content?.[0]?.text?.includes('重写 3 节'),
   );
+  const mcpInput5 = Readable.from([
+    `${JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'agent_step', arguments: { workspace: ws3, lastInput: '' } } })}\n`,
+  ]);
+  const mcpOut5 = [];
+  const output5 = new Writable({
+    write(c, _e, cb) {
+      mcpOut5.push(c.toString());
+      cb();
+    },
+  });
+  await runMcpServer({ input: mcpInput5, output: output5 });
+  const byId5 = Object.fromEntries(
+    mcpOut5
+      .join('')
+      .trim()
+      .split('\n')
+      .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
+  );
+  check('MCP agent_step 返回导演决策', byId5[9]?.result?.content?.[0]?.text?.includes('kind'));
 
   // 5. 确定性红队：直接审计植入文本，应抓到黑名单与重复比喻
   const planted = [
@@ -510,7 +581,7 @@ try {
       .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
   );
   check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'sculptor');
-  check('MCP tools/list 19 个工具', byId[2]?.result?.tools?.length === 19);
+  check('MCP tools/list 20 个工具', byId[2]?.result?.tools?.length === 20);
   check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Sculptor 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
   const mcpInput2 = Readable.from([

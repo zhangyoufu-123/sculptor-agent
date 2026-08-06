@@ -44,14 +44,18 @@ export async function restyle(cfg, wsDir, { direction = '', section = null, forc
   // 命令行给的方向也记入风格档案（与对话里说"更克制"等价）。
   if (direction.trim() && stored?.phrase !== dirText) applyStyleDirection(workspace, dirText);
 
-  const parts = existing.split(/\n(?=## )/);
-  if (parts.length !== outline.sections.length) {
-    throw new Error(
-      `draft 分节数（${parts.length}）与大纲（${outline.sections.length}）不一致，无法安全重写`,
-    );
+  let parts = existing.split(/\n(?=## )/);
+  let sections = outline.sections;
+  if (parts.length !== sections.length) {
+    // 结构不匹配（例如被红队整体修订后丢了 ## 分节）→ 降级为整篇一次重写，不阻塞流程。
+    parts = [existing];
+    sections = [
+      { heading: '全文', function: '整体重写', thesis: '', words: state.targetWords || 1000 },
+    ];
   }
-  const start = section === null ? 0 : section;
-  const end = section === null ? outline.sections.length - 1 : section;
+  const fallbackWhole = sections.length === 1 && parts[0] === existing;
+  const start = fallbackWhole || section === null ? 0 : section;
+  const end = fallbackWhole || section === null ? sections.length - 1 : section;
   const report = [];
   state.phase = 'write';
   state.summary = `正在按新风格重写：${dirText}`;
@@ -59,7 +63,7 @@ export async function restyle(cfg, wsDir, { direction = '', section = null, forc
   ws.writeState(workspace, state);
 
   for (let i = start; i <= end; i++) {
-    const s = outline.sections[i];
+    const s = sections[i];
     const heading = s.heading;
     const body = parts[i]?.replace(/^## .*\n\n/, '')?.trim() || '';
     if (!body) {
@@ -93,7 +97,7 @@ export async function restyle(cfg, wsDir, { direction = '', section = null, forc
     const newLen = (rewritten.match(/[\u4e00-\u9fff]/g) || []).length;
     parts[i] = `## ${heading}\n\n${rewritten}\n`;
     report.push({ index: i + 1, heading, oldLen, newLen });
-    state.summary = `已按新风格重写第 ${i + 1}/${outline.sections.length} 节：${heading}`;
+    state.summary = `已按新风格重写第 ${i + 1}/${sections.length} 节：${heading}`;
     state.nextStep = i < end ? `继续重写第 ${i + 2} 节` : '重写完成，运行 sculptor redteam 复查';
     ws.writeState(workspace, state);
   }

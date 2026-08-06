@@ -20,14 +20,14 @@ skill 内嵌**完整 agent 引擎**，装完即用，无需单独安装 CLI。�
 ```bash
 export SCULPTOR_LLM_API_KEY=sk-xxx    # 必配：默认 DeepSeek 端点
 SCULPTOR=.codex/skills/sculptor/scripts/sculptor.mjs
-node $SCULPTOR init && node $SCULPTOR interview   # 可见的需求访谈：一次一问 + 确认清单 + 蓝图回显
-node $SCULPTOR outline && node $SCULPTOR write     # 大纲（素材门槛）→ 逐节写作（风格少样本注入）
-node $SCULPTOR redteam --fix                        # 反 AI 审计 + 按你的风格修订
-node $SCULPTOR audience                             # 交付前强制：8 个"第一读者"的群像反馈
+node $SCULPTOR init && node $SCULPTOR agent         # 导演模式：主导全程，自动推进到交付
 ```
 
-深度定点修改：在 md 文档里选中一句话 → `node $SCULPTOR point-edit "原句" "指令" --dir 项目`（macOS 可装右键服务，见 extras/）。
-风格方向变化（"整篇更克制一点"）→ `node $SCULPTOR restyle` 让整篇按新方向重写。
+导演模式（**自主决策 · 主导对话**）：每次收到你的消息，Sculptor 自己决定下一步并执行——
+澄清问完就生成大纲、大纲确认就逐节写作、写完就反 AI 审计、审完就请 8 位"第一读者"群像反馈、
+最后交付；你不需要催"继续"，只在真正的决策点（主题/立场/素材/立意/论点/大纲确认）回答。
+交付后说"整篇更克制一点"这类风格方向 → 全文自动按新方向重写并再走一轮审计与群像。
+深度定点修改：选中一句话 → `node $SCULPTOR point-edit "原句" "指令" --dir 项目`（macOS 可装右键服务，见 extras/）。
 宿主 agent（Codex / Claude Code / OpenCode）安装后可直接按 `SKILL.md` 自动调用全部流程。
 
 ## 双形态

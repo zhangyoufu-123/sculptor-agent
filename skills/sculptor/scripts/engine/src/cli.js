@@ -25,11 +25,14 @@ import { buildStyleShot } from './style-memory.js';
 import { restyle } from './restyle.js';
 import { runHook } from './hook.js';
 import { renderChecklist } from './interview.js';
+import { agentStep, agentInteractive } from './director.js';
 
-const HELP = `Sculptor Agent v0.5 — 完整写作 Agent（独立运行 + MCP 协作 + skill 内嵌引擎）
+const HELP = `Sculptor Agent v0.6 — 完整写作 Agent（导演模式 · 自主决策 · 独立运行 + MCP 协作）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
+  sculptor agent [工作区]             导演模式：我主导全程（澄清→大纲→写作→审计→群像→交付）
+  sculptor agent --once [工作区]      导演单步：应用 stdin 的回答，返回下一步决策 JSON
   sculptor clarify [工作区]           交互澄清（一次一问）
   sculptor clarify --once [工作区]    单步澄清：应用 stdin 的回答，输出下一个问题
   sculptor interview [工作区]         需求访谈：多轮一问 + 实时确认清单 + 进度
@@ -134,6 +137,16 @@ export async function runCli(argv, io = {}) {
           create: true,
         });
         console.log(`Sculptor 工作区已初始化 → ${w}`);
+        break;
+      }
+      case 'agent': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        if (flags.once) {
+          const r = await agentStep(cfg, w, { lastInput: io.input || '' });
+          console.log(JSON.stringify(r, null, 2));
+        } else {
+          await agentInteractive(cfg, w);
+        }
         break;
       }
       case 'panel': {

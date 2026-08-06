@@ -54,6 +54,15 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 
 ## 工作流
 
+### 导演模式（自主决策 · 主导对话）
+
+默认用 `node scripts/sculptor.mjs agent`（或 MCP `agent_step`）驱动：**每次收到用户消息，
+Sculptor 自己决定下一步并自动执行**——澄清问完就生成大纲、大纲确认就逐节写作、
+写完就反 AI 审计、审完就请读者群像、最后交付。用户不需要催"继续"，只在真正的决策点
+（主题/立场/素材/立意/论点/大纲确认/风格方向）停下等待。导演每一步都会回一句进度
+（"已写第 2/5 节…"），让用户全程看得见。用户说"更克制一点"等风格方向 → 全文自动重写
+并再走一轮审计与群像。
+
 ### Phase 0 观察（Observe）
 
 只整理**对话上下文**和**用户本次明确指定的素材**（用户给的文件路径或粘贴的内容）。
@@ -122,6 +131,7 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 ```bash
 # 下面的 scripts/ 指本 skill 目录下的 scripts/（如 ~/.codex/skills/sculptor/scripts/）
 node scripts/sculptor.mjs interview .sculptor                  # 需求访谈：一次一问 + 确认清单 + 蓝图回显（首选入口）
+node scripts/sculptor.mjs agent .sculptor                      # 导演模式：主导全程，自动推进到交付（推荐）
 node scripts/sculptor.mjs outline .sculptor                    # 生成大纲（素材门槛未过会报错）
 node scripts/sculptor.mjs write .sculptor                      # 逐节写作（RAG 风格少样本注入 + 最新风格方向）
 node scripts/sculptor.mjs redteam --fix .sculptor              # 反 AI 审计 + 按用户风格修订

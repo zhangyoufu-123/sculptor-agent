@@ -15,6 +15,7 @@ import { runAudience, renderAudience } from './reader-gallery.js';
 import { styleProgress } from './style.js';
 import { buildStyleShot } from './style-memory.js';
 import { restyle } from './restyle.js';
+import { agentStep } from './director.js';
 
 const TOOLS = [
   {
@@ -48,6 +49,15 @@ const TOOLS = [
         lastInput: { type: 'string' },
       },
       required: ['lastInput'],
+    },
+  },
+  {
+    name: 'agent_step',
+    description:
+      '导演单步（自主决策）：传入用户最新消息（可为空），Sculptor 自己决定下一步并执行——返回 ask（提问）/ confirm_outline（大纲待确认）/ working（自动推进进度）/ deliver（交付）。宿主只负责转发用户消息，写作流程由 Sculptor 主导。',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' }, lastInput: { type: 'string' } },
     },
   },
   {
@@ -236,6 +246,11 @@ async function callTool(name, args, cfg) {
       const r = await clarifyStep(cfg, w, { lastInput: args.lastInput || '' });
       return { text: JSON.stringify(r, null, 2) };
     }
+    case 'agent_step': {
+      const w = wsDir(args, cfg);
+      const r = await agentStep(cfg, w, { lastInput: args.lastInput || '' });
+      return { text: JSON.stringify(r, null, 2) };
+    }
     case 'interview_step': {
       const w = wsDir(args, cfg);
       const r = await interviewStep(cfg, w, {
@@ -377,7 +392,7 @@ export async function runMcpServer({ input = process.stdin, output = process.std
         result: {
           protocolVersion: '2025-03-26',
           capabilities: { tools: {} },
-          serverInfo: { name: 'sculptor', version: '0.5.0' },
+          serverInfo: { name: 'sculptor', version: '0.6.0' },
         },
       });
     } else if (

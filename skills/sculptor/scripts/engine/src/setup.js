@@ -18,14 +18,6 @@ function resolveBundledSkill() {
   return candidates.find((p) => fs.existsSync(path.join(p, 'SKILL.md'))) || candidates[0];
 }
 const BUNDLED_SKILL = resolveBundledSkill();
-const BUNDLED_ENGINE_MCP = path.resolve(
-  AGENT_ROOT,
-  '..',
-  'integration',
-  'engine-mcp',
-  'src',
-  'mcp',
-);
 const CLI_BIN = path.join(AGENT_ROOT, 'bin', 'sculptor.js');
 
 function log(msg) {
@@ -74,67 +66,8 @@ function discoverCredentials(projectDir) {
   return creds;
 }
 
-function ensureEngineMCP(engineDir, report) {
-  if (!engineDir || !fs.existsSync(engineDir)) {
-    report.push('引擎仓库: 未检测到（将使用轻量引擎 sculptor mcp）');
-    return null;
-  }
-  const serverFile = path.join(engineDir, 'src', 'mcp', 'server.ts');
-  if (fs.existsSync(serverFile)) {
-    report.push(`引擎 MCP: 已存在 ${serverFile}`);
-    return serverFile;
-  }
-  if (!fs.existsSync(BUNDLED_ENGINE_MCP)) {
-    report.push('引擎 MCP 集成包缺失，无法自动接入（将用轻量引擎）');
-    return null;
-  }
-  fs.mkdirSync(path.join(engineDir, 'src', 'mcp'), { recursive: true });
-  fs.copyFileSync(
-    path.join(BUNDLED_ENGINE_MCP, 'server.ts'),
-    path.join(engineDir, 'src', 'mcp', 'server.ts'),
-  );
-  fs.copyFileSync(
-    path.join(BUNDLED_ENGINE_MCP, 'workspace.ts'),
-    path.join(engineDir, 'src', 'mcp', 'workspace.ts'),
-  );
-  // 注册 npm script（幂等）
-  const pkgFile = path.join(engineDir, 'package.json');
-  if (fs.existsSync(pkgFile)) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
-      pkg.scripts = pkg.scripts || {};
-      if (!pkg.scripts['sculptor:mcp']) {
-        pkg.scripts['sculptor:mcp'] = 'tsx --tsconfig tsconfig.json src/mcp/server.ts';
-        fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, 2) + '\n');
-        report.push('引擎 MCP: 已复制代码并注册 npm run sculptor:mcp');
-      } else {
-        report.push('引擎 MCP: 已复制代码（script 已存在）');
-      }
-    } catch {
-      report.push('引擎 MCP: 已复制代码，但 package.json 无法解析');
-    }
-  }
-  return serverFile;
-}
-
-function mcpEntry(engineServerFile) {
-  if (
-    engineServerFile &&
-    fs.existsSync(
-      path.join(
-        path.dirname(path.dirname(path.dirname(engineServerFile))),
-        'node_modules',
-        '.bin',
-        'tsx',
-      ),
-    )
-  ) {
-    const engineDir = path.dirname(path.dirname(path.dirname(engineServerFile)));
-    return {
-      command: path.join(engineDir, 'node_modules', '.bin', 'tsx'),
-      args: ['--tsconfig', path.join(engineDir, 'tsconfig.json'), engineServerFile],
-    };
-  }
+// MCP 统一走内置轻量引擎（零依赖 Node stdio server），不再依赖任何 TS 引擎代码。
+function mcpEntry() {
   return { command: process.execPath, args: [CLI_BIN, 'mcp'] };
 }
 
@@ -274,8 +207,7 @@ export async function runSetup(flags = {}) {
   log(`项目: ${projectDir}（项目级接入，只有本项目对话可用）`);
   log('');
 
-  const serverFile = ensureEngineMCP(engineDir, report);
-  const entry = mcpEntry(serverFile);
+  const entry = mcpEntry();
   ensureCodexProjectConfig(projectDir, entry, dry, report);
   if (hosts.includes('claude')) registerClaude(entry, dry, report);
   if (hosts.includes('opencode')) registerOpencode(entry, dry, report);
