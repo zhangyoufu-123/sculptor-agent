@@ -1,0 +1,24 @@
+{
+  "projectId": "beida-honglou-speech",
+  "updatedAt": "2026-08-06T10:00:00+08:00",
+  "phase": "write",
+  "summary": "正在写第三段：北大红楼里那扇窗前的停顿",
+  "confirmed": {
+    "topic": "百年历久，北大红楼——一篇发言稿",
+    "stance": "让听众感到历史不是橱窗里的展品，而是可以站进去的现场",
+    "audience": "中学同学与老师，暑假作业汇报",
+    "style": "史铁生式：平静审视、把苦难化为对美的沉思（write-style 已注入）"
+  },
+  "materials": [
+    "北大红楼：五四策源地、马克思主义传播地（书页图片素材）",
+    "红色纪念牌结束语：百年征程波澜壮阔，百年初心历久弥坚",
+    "个人经历：在红楼门口站了很久，想象百年前青年脚步声"
+  ],
+  "pending": [],
+  "nextStep": "写完第三段 → 红队审计 → 交付",
+  "vault": {
+    "writeStyle": ".sculptor/vault/write-style.json",
+    "readStyle": ".sculptor/vault/read-style.json",
+    "fingerprint": ".sculptor/vault/style-fingerprint.json"
+  }
+}

@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>actions</key>
+	<array>
+		<dict>
+			<key>action</key>
+			<dict>
+				<key>AMAccepts</key>
+				<dict>
+					<key>Container</key>
+					<string>List</string>
+					<key>Optional</key>
+					<true/>
+					<key>Types</key>
+					<array>
+						<string>com.apple.cocoa.string</string>
+					</array>
+				</dict>
+				<key>AMAcceptsInput</key>
+				<true/>
+				<key>AMActionVersion</key>
+				<string>2.0.3</string>
+				<key>AMApplication</key>
+				<array>
+					<string>Automator</string>
+				</array>
+				<key>AMParameterProperties</key>
+				<dict/>
+				<key>actionName</key>
+				<string>Run Shell Script</string>
+				<key>actionParameters</key>
+				<dict>
+					<key>COMMAND_STRING</key>
+					<string>#!/bin/bash
+SEL="$(cat)"
+SCULPTOR_BIN="${SCULPTOR_BIN:-$HOME/.local/bin/sculptor}"
+PROJECT="${SCULPTOR_PROJECT:-$HOME/Documents}"
+INSTRUCTION="$(osascript -e 'set T to text returned of (display dialog "修改指令（例如：这句太文艺，收一点）" default answer "帮我改一下" with title "Sculptor")' 2>/dev/null)"
+if [ -x "$SCULPTOR_BIN" ]; then
+  "$SCULPTOR_BIN" point-edit "$SEL" "$INSTRUCTION" --dir "$PROJECT"
+else
+  printf '〔Sculptor 引用〕《%s》\n修改指令：%s' "$SEL" "$INSTRUCTION" | pbcopy
+  osascript -e 'display notification "引用已复制到剪贴板" with title "Sculptor"'
+fi</string>
+					<key>checkedForUserDefaultShell</key>
+					<true/>
+					<key>inputMethod</key>
+					<integer>1</integer>
+					<key>shell</key>
+					<string>/bin/bash</string>
+					<key>source</key>
+					<string>#!/bin/bash
+SEL="$(cat)"
+SCULPTOR_BIN="${SCULPTOR_BIN:-$HOME/.local/bin/sculptor}"
+PROJECT="${SCULPTOR_PROJECT:-$HOME/Documents}"
+INSTRUCTION="$(osascript -e 'set T to text returned of (display dialog "修改指令（例如：这句太文艺，收一点）" default answer "帮我改一下" with title "Sculptor")' 2>/dev/null)"
+if [ -x "$SCULPTOR_BIN" ]; then
+  "$SCULPTOR_BIN" point-edit "$SEL" "$INSTRUCTION" --dir "$PROJECT"
+else
+  printf '〔Sculptor 引用〕《%s》\n修改指令：%s' "$SEL" "$INSTRUCTION" | pbcopy
+  osascript -e 'display notification "引用已复制到剪贴板" with title "Sculptor"'
+fi</string>
+				</dict>
+				<key>actionUIControls</key>
+				<dict/>
+				<key>arguments</key>
+				<dict>
+					<key>0</key>
+					<string></string>
+				</dict>
+				<key>category</key>
+				<array>
+					<string>AMCategoryUtilities</string>
+				</array>
+				<key>class</key>
+				<string>AMRunShellScriptAction</string>
+				<key>deprecatedVersion</key>
+				<real>0</real>
+				<key>inputUUID</key>
+				<string>3A1B2C3D-0001-0002-0003-000000000001</string>
+				<key>isViewVisible</key>
+				<integer>1</integer>
+				<key>keywords</key>
+				<array>
+					<string>Shell</string>
+					<string>Script</string>
+				</array>
+				<key>outputUUID</key>
+				<string>3A1B2C3D-0001-0002-0003-000000000002</string>
+				<key>uuid</key>
+				<string>3A1B2C3D-0001-0002-0003-000000000003</string>
+				<key>version</key>
+				<real>2.0.3</real>
+			</dict>
+			<key>isViewVisible</key>
+			<true/>
+		</dict>
+	</array>
+	<key>connectionUUIDToActionUUIDMap</key>
+	<dict/>
+	<key>workflowMetaData</key>
+	<dict>
+		<key>applicationBundleIDs</key>
+		<array/>
+		<key>applicationPaths</key>
+		<array/>
+		<key>inputType</key>
+		<string>text</string>
+		<key>outputType</key>
+		<string>text</string>
+		<key>presentationMode</key>
+		<integer>1</integer>
+		<key>showInput</key>
+		<false/>
+	</dict>
+</dict>
+</plist>

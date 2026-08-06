@@ -1,0 +1,3 @@
+# 追加模式。示例：
+# {"id":"req-001","type":"ask_user","question":"有没有相关的照片或手稿？","options":["有，稍后发","没有"],"recommendation":"有的话最有帮助","status":"pending"}
+# {"id":"req-002","type":"read_image","path":"~/Desktop/手稿.png","purpose":"从手稿提取素材与语气","status":"pending"}

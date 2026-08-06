@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sculptor 写作助手"
+  short_description: "承上启下的深度协作写作 Agent：动态澄清、双风格写作、感性解剖"
+  default_prompt: "帮我写一篇演讲稿，要有我的风格"

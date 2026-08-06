@@ -1,0 +1,32 @@
+{
+  "name": "sculptor-agent",
+  "version": "0.3.0",
+  "description": "Sculptor complete agent: standalone writing workflow CLI + point-edit + MCP server for host agents (Codex/Claude Code/OpenCode)",
+  "type": "module",
+  "bin": {
+    "sculptor": "bin/sculptor.js"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sculptor-agent/sculptor-agent"
+  },
+  "author": "Sculptor Team",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node test/e2e.mjs"
+  },
+  "license": "MIT",
+  "keywords": [
+    "writing",
+    "agent",
+    "mcp",
+    "style",
+    "chinese-writing"
+  ]
+}
