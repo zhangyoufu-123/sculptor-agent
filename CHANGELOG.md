@@ -19,6 +19,12 @@
   （原文→修改→意图），BM25 中文二元组打分，相关度/时间衰减/重要性加权排序，
   以少样本 + 联想库 + 反例块注入提示词；CLI 新增 `sculptor style --memory <查询>` 预览，
   MCP 新增 `style_memory` 工具（17 → 18 个）。
+- **整篇文章蓝图（grilling 式共同理解）**：澄清全程维护蓝图（主题/为什么写/核心张力/
+  读者带走什么/结构顺序/论点/素材/情感/结尾），核心信息齐后回显整篇蓝图请用户确认，
+  修正意见带进大纲生成；追问设计师被要求"每个问题都是蓝图的下一个拼图"。
+- **风格方向与全文重写**：用户说"整篇更克制/更豪迈…"即时记录 `styleDirections` 并标记
+  需要重写；CLI/MCP 新增 `restyle`（缺省读取最近方向，全文或指定节重写，保留结构与论点）；
+  `sculptor style --export` 导出人类可读档案 `vault/style-profile.md`。MCP 工具 18 → 19。
 - MCP 新增 `interview_step / audience / quote / style_status`（13 → 17 个工具）。
 - skill 独立形态新增 `checklist / quote` 子命令（零依赖）。
 
