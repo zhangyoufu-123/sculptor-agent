@@ -5,7 +5,12 @@ import path from 'node:path';
 import { chatWithRetry, parseJsonContent } from './llm.js';
 import { QUESTIONER_PROMPT } from './prompts.js';
 import * as ws from './workspace.js';
-import { applyStyleSignals, styleProgress, extractStyleFromSamples } from './style.js';
+import {
+  applyStyleSignals,
+  applyStyleDirection,
+  styleProgress,
+  extractStyleFromSamples,
+} from './style.js';
 
 const LOW_WILL = /没(有|什么)?更多|你决定|你自己决定|就这样|先这样|可以了|够了|你看着办/;
 const NEED_LABELS = {
@@ -18,6 +23,7 @@ const NEED_LABELS = {
   emotion: '情感曲线',
   ending: '结尾姿态',
   styleSample: '风格底稿',
+  blueprintConfirm: '整篇文章蓝图确认',
 };
 
 const FALLBACK_QUESTIONS = [
@@ -81,8 +87,32 @@ export function contextOf(state) {
   return lines.join('\n');
 }
 
+/** 把目前理解的整篇文章渲染成白话蓝图（grilling 式"共同理解"的可见化）。 */
+export function renderBlueprint(state) {
+  const c = state.confirmed || {};
+  const b = state.blueprint || {};
+  const lines = [];
+  lines.push(`《${c.topic || '（主题未定）'}》`);
+  if (c.theme) lines.push(`核心立意：${c.theme}`);
+  if (c.stance) lines.push(`立场/目的：${c.stance}`);
+  if (b.article) lines.push(`整篇文章是什么：${b.article}`);
+  if (b.whyNow) lines.push(`为什么现在写：${b.whyNow}`);
+  if (b.tension) lines.push(`核心张力：${b.tension}`);
+  if (b.readerTakeaway) lines.push(`读者读完带走：${b.readerTakeaway}`);
+  if ((c.arguments || []).length)
+    lines.push(`支撑论点：${c.arguments.map((a, i) => `${i + 1}. ${a}`).join('；')}`);
+  if ((state.materials || []).length) lines.push(`素材：${state.materials.join('；')}`);
+  if (c.emotionalCurve) lines.push(`情感曲线：${c.emotionalCurve}`);
+  if (c.endingTaste) lines.push(`结尾姿态：${c.endingTaste}`);
+  if ((b.skeleton || []).length) lines.push(`结构顺序：${b.skeleton.join(' → ')}`);
+  if ((b.corrections || []).length) lines.push(`待吸收的修正：${b.corrections.join('；')}`);
+  return lines.join('\n');
+}
+
 function classifyAnswer(question, _answer) {
   const q = question || '';
+  // 蓝图回显优先识别：问题以"整篇文章"开头，不能被里面的"支撑论点"字样带偏。
+  if (/整篇文章|蓝图确认|我理解的整篇/.test(q)) return { field: 'blueprint' };
   if (/论点|支撑|理由|论证|观点/.test(q)) return { field: 'argument' };
   if (/立意|中心意思|核心意思|想表达的最核心/.test(q)) return { field: 'theme' };
   if (/情绪|情感|曲线|氛围/.test(q)) return { field: 'emotion' };
@@ -98,6 +128,27 @@ function classifyAnswer(question, _answer) {
 function applyAnswer(state, field, answer) {
   state.confirmed = state.confirmed || {};
   const a = answer.trim();
+  // 蓝图确认在低意愿早退之前处理：用户说"可以/你决定"都算确认，防死循环。
+  if (field === 'blueprint') {
+    state.blueprint = state.blueprint || {};
+    state.blueprintRounds = (state.blueprintRounds || 0) + 1;
+    const norm = a.replace(/[，。！？、,.！\s]/g, '');
+    const confirm =
+      !a ||
+      LOW_WILL.test(a) ||
+      /^(对|对的|可以|可以的|同意|没问题|就是这样|是|是的|好的|好|嗯|没错|ok|不用改|不用了)$/i.test(
+        norm,
+      ) ||
+      norm.includes('就是这样') ||
+      norm.includes('没问题');
+    if (!confirm && a) {
+      // 用户给出具体修正 → 记进蓝图（大纲生成时吸收），不重复回显
+      state.blueprint.corrections = state.blueprint.corrections || [];
+      state.blueprint.corrections.push(a);
+    }
+    state.confirmed.blueprintConfirmed = true;
+    return state;
+  }
   if (!a || LOW_WILL.test(a) || /^(没有|不知道|跳过|算了|none|na)$/i.test(a)) return state;
   if (field === 'topic') state.confirmed.topic = a;
   else if (field === 'stance') state.confirmed.stance = a;
@@ -139,6 +190,7 @@ function missingNeed(state) {
   if (!c.emotionalCurve) return 'emotion';
   if (!c.endingTaste) return 'ending';
   if (!c.styleSample) return 'styleSample';
+  if (!c.blueprintConfirmed) return 'blueprintConfirm';
   return '';
 }
 
@@ -146,6 +198,19 @@ async function askOnce(state, cfg, workspace) {
   const need = missingNeed(state);
   const coreReady = materialGate(state);
   const style = workspace ? styleProgress(workspace) : null;
+  // 蓝图回显：核心信息齐 + 风格底稿问过之后，把整篇文章回显给用户确认，再进大纲。
+  if (need === 'blueprintConfirm') {
+    const blueprintText = renderBlueprint(state);
+    return {
+      stop: false,
+      ready: materialGate(state),
+      question: `这是我目前理解的整篇文章——\n${blueprintText}\n\n对吗？哪里还要改？`,
+      recommendation: '对的话回"可以"；要改哪里直接说，我会把修正记进蓝图再进大纲。',
+      options: ['可以，就是这样'],
+      blueprint: blueprintText,
+      blueprintConfirm: true,
+    };
+  }
   const ctx = {
     context: contextOf(state),
     lastInput: state.lastInput || '（刚开始）',
@@ -153,6 +218,7 @@ async function askOnce(state, cfg, workspace) {
     stageNeed: NEED_LABELS[need] || '素材细节',
     coreReady,
     styleNote: state.confirmed.styleNote || '',
+    blueprintText: state.blueprint && renderBlueprint(state),
     styleProgress: style
       ? `write ${style.write.learned}/${style.write.total} 维 · read ${style.read.learned}/${style.read.total} 维`
       : '',
@@ -201,6 +267,7 @@ async function askOnce(state, cfg, workspace) {
       question,
       recommendation: q.recommendation,
       options: q.options || [],
+      blueprintUpdate: q.blueprintUpdate || null,
     };
   } catch (err) {
     // LLM 不可用时的确定性兜底：按缺口依次问，绝不死循环。
@@ -224,6 +291,14 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
   const workspace = ws.ensureWorkspace(wsDir);
   let state = ws.readState(workspace);
   state.phase = 'clarify';
+  state.blueprint = state.blueprint || {
+    article: '',
+    whyNow: '',
+    tension: '',
+    readerTakeaway: '',
+    skeleton: [],
+    corrections: [],
+  };
   if (lastInput) {
     state.lastInput = lastInput;
     // 答案归类到"上一个问题"的意图；提问时就推断并保存该意图。
@@ -237,6 +312,12 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
         'style',
         `被动采集到风格信号 ${style.writeUpdated} 维（write）+ ${style.readUpdated} 维（read）`,
       );
+    }
+    // 风格方向：用户说"整篇更豪迈/更克制…"→ 落档案；已有草稿则标记需要全文重写。
+    const dir = applyStyleDirection(workspace, lastInput);
+    if (dir.applied) {
+      if (fs.existsSync(path.join(workspace, 'draft.md'))) state.needsRestyle = true;
+      ws.logContext(workspace, 'style', `风格方向变化：${dir.phrase}（影响 ${dir.updated} 维）`);
     }
     // 风格底稿落盘：用户贴的长样本存进 vault，供后续 STYLE_EXTRACTION 使用。
     if (state.lastField === 'style' && lastInput.length >= 80) {
@@ -254,6 +335,18 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     ws.logContext(workspace, 'clarify', `${state.lastQuestion || '（首轮）'} → ${lastInput}`);
   }
   const next = await askOnce(state, cfg, workspace);
+  // 合并 LLM 读出的蓝图增量，让"整篇文章"在澄清中持续生长。
+  if (next.blueprintUpdate) {
+    const u = next.blueprintUpdate;
+    state.blueprint = state.blueprint || {};
+    for (const k of ['article', 'whyNow', 'tension', 'readerTakeaway']) {
+      if (typeof u[k] === 'string' && u[k].trim()) state.blueprint[k] = u[k].trim();
+    }
+    if (Array.isArray(u.skeleton)) {
+      const sk = u.skeleton.filter((x) => typeof x === 'string' && x.trim());
+      if (sk.length) state.blueprint.skeleton = sk.map((x) => x.trim()).slice(0, 8);
+    }
+  }
   if (next.question) {
     state.lastQuestion = next.question;
     state.lastField = classifyAnswer(next.question, '').field;
@@ -266,6 +359,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     phase: state.phase,
     confirmed: state.confirmed,
     materials: state.materials,
+    blueprint: state.blueprint,
     style: styleProgress(workspace),
   };
 }

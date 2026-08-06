@@ -20,7 +20,9 @@ import { probeTask } from './observer.js';
 import { interviewStep, interviewInteractive, interviewSummary } from './interview.js';
 import { runAudience, renderAudience } from './reader-gallery.js';
 import { styleProgress, backfillFromContext, extractStyleFromSamples } from './style.js';
+import { renderStyleProfile } from './style.js';
 import { buildStyleShot } from './style-memory.js';
+import { restyle } from './restyle.js';
 
 const HELP = `Sculptor Agent v0.4 — 完整写作 Agent（独立运行 + MCP 协作）
 
@@ -34,13 +36,15 @@ const HELP = `Sculptor Agent v0.4 — 完整写作 Agent（独立运行 + MCP �
   sculptor outline [工作区]           生成大纲（素材门槛未过会报错）
   sculptor write [工作区]             按大纲逐节写作到 draft.md（--force 强制重写）
   sculptor write --section N [工作区] 只写第 N 节
+  sculptor restyle [--direction 方向] [--section N] [--force] [工作区]
+                                     按新风格方向重写整篇（或指定节）；缺省用档案最近一条方向
   sculptor redteam [--fix] [工作区]   反 AI 审计（可选 LLM 修订）
   sculptor redteam --file x.md        直接审计任意文件
   sculptor audience [--file x.md] [--quick] [工作区]  读者群像：8 个"第一读者"的感性反馈
   sculptor dissect [--file x.md] [工作区]  感性解剖 5 维度
   sculptor quote "<原句>"             生成可粘贴的「Sculptor 引用」块
-  sculptor style [--memory 查询] [--backfill] [--extract] [工作区]
-                                     风格档案进度；--memory 预览按论题检索到的旧稿与修改对；--backfill 回填对话日志；--extract 提取风格底稿
+  sculptor style [--memory 查询] [--export] [--backfill] [--extract] [工作区]
+                                     风格档案进度；--memory 预览按论题检索到的旧稿与修改对；--export 导出人类可读档案（vault/style-profile.md）；--backfill 回填对话日志；--extract 提取风格底稿
   sculptor absorb <工作区> <edit.json>   吸收定点修改进风格档案
   sculptor fingerprint <工作区>       刷新压缩守卫风格指纹
   sculptor panel [state.json]         渲染玻璃面板
@@ -210,6 +214,11 @@ export async function runCli(argv, io = {}) {
           const r = backfillFromContext(w);
           console.log(`已从对话日志回填 ${r.applied} 条风格信号（跳过 ${r.skipped} 条）`);
         }
+        if (flags.export) {
+          const dest = path.join(w, 'vault', 'style-profile.md');
+          fs.writeFileSync(dest, renderStyleProfile(w) + '\n');
+          console.log(`风格档案已导出 → ${dest}`);
+        }
         const p = styleProgress(w);
         console.log(
           `风格档案进度:\n` +
@@ -252,6 +261,24 @@ export async function runCli(argv, io = {}) {
           );
         }
         console.log(`合计 ${r.total} 字（目标 ${cfg.targetWords} 字）`);
+        if (r.hint) console.log(`提示: ${r.hint}`);
+        break;
+      }
+      case 'restyle': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        const r = await restyle(cfg, w, {
+          direction: flags.direction ? String(flags.direction) : '',
+          section: flags.section !== undefined ? Number(flags.section) : null,
+          force: Boolean(flags.force),
+        });
+        console.log(`已按「${r.direction}」重写 ${r.sections} 节 → ${r.draftFile}`);
+        for (const s of r.report) {
+          if (s.skipped) {
+            console.log(`  ${s.index}. ${s.heading}：跳过（本节为空）`);
+          } else {
+            console.log(`  ${s.index}. ${s.heading}：${s.oldLen} 字 → ${s.newLen} 字`);
+          }
+        }
         break;
       }
       case 'redteam': {

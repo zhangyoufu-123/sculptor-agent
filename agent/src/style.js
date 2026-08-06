@@ -7,6 +7,165 @@ import * as ws from './workspace.js';
 import { STYLE_EXTRACTION_PROMPT } from './prompts.js';
 import { chatWithRetry, parseJsonContent } from './llm.js';
 
+// ── 风格方向（用户主动给出的整体改变方向）────────────────────────
+// 用户说"整篇更克制/更豪迈/更口语…"时，记录进 write-style.json 的 styleDirections，
+// 并提升相关维度置信。方向变化后若已有草稿，标记 needsRestyle → sculptor restyle 全文重写。
+const STYLE_DIRECTION_RULES = [
+  {
+    re: /更?克制|收敛|平静些|冷静些|内敛|不煽情|少抒情|别太抒情/,
+    phrase: '更克制收敛',
+    dims: { temperature: { value: '克制内敛' }, emotionalSpectrum: { value: '情感浓度低' } },
+    evidence: '用户要求更克制',
+  },
+  {
+    re: /更?豪迈|激昂|澎湃|有气势|大气|磅礴/,
+    phrase: '更豪迈有气势',
+    dims: { temperature: { value: '情绪昂扬' }, emotionalSpectrum: { value: '情感浓度高' } },
+    evidence: '用户要求更豪迈',
+  },
+  {
+    re: /更?口语|接地气|亲切|像聊天|生活化/,
+    phrase: '更口语化',
+    dims: { languageRegister: { value: '口语化' } },
+    evidence: '用户要求更口语',
+  },
+  {
+    re: /更?简洁|利落|干脆|精炼|短一点/,
+    phrase: '更简洁利落',
+    dims: { sentencePreference: { value: '短句为主' }, modifierDensity: { value: '修饰克制' } },
+    evidence: '用户要求更简洁',
+  },
+  {
+    re: /更?细腻|细节|画面感|具体一点/,
+    phrase: '更细腻有画面感',
+    dims: { modifierDensity: { value: '重具体细节' } },
+    evidence: '用户要求更细腻',
+  },
+  {
+    re: /更?文艺|诗意|意象|唯美/,
+    phrase: '更文艺诗意',
+    dims: { imageryTendency: { value: '善用比喻意象' } },
+    evidence: '用户要求更文艺',
+  },
+  {
+    re: /更?理性|客观|冷静分析|克制情绪/,
+    phrase: '更理性克制',
+    dims: { emotionalSpectrum: { value: '情感浓度低' }, criticalStance: { value: '立场外显' } },
+    evidence: '用户要求更理性',
+  },
+  {
+    re: /更?幽默|轻松|活泼|俏皮/,
+    phrase: '更轻松幽默',
+    dims: { temperature: { value: '轻松诙谐' }, languageRegister: { value: '口语化' } },
+    evidence: '用户要求更幽默',
+  },
+  {
+    re: /历史感|厚重|沉稳|苍茫/,
+    phrase: '更有历史厚重感',
+    dims: { timeHandling: { value: '重时间纵深' } },
+    evidence: '用户要求有历史感',
+  },
+];
+
+/** 从用户话语里识别"整体风格方向"，返回匹配到的方向（确定性、零 LLM）。 */
+export function extractStyleDirection(text) {
+  const t = String(text || '');
+  for (const rule of STYLE_DIRECTION_RULES) {
+    if (rule.re.test(t)) return { phrase: rule.phrase, dims: rule.dims, evidence: rule.evidence };
+  }
+  return null;
+}
+
+/** 把风格方向落进 write-style.json（styleDirections + 相关维度置信提升）。 */
+export function applyStyleDirection(workspace, text) {
+  const d = extractStyleDirection(text);
+  if (!d) return { applied: false };
+  const writeFile = path.join(workspace, 'vault', 'write-style.json');
+  const obj = ws.readJson(writeFile);
+  obj.styleDirections = obj.styleDirections || [];
+  obj.styleDirections.push({
+    phrase: d.phrase,
+    dims: Object.keys(d.dims),
+    ts: ws.nowIso(),
+    evidence: d.evidence,
+  });
+  if (obj.styleDirections.length > 20) obj.styleDirections = obj.styleDirections.slice(-20);
+  let updated = 0;
+  for (const [k, upd] of Object.entries(d.dims)) {
+    const dim = obj.dimensions?.[k];
+    if (!dim) continue;
+    if (upd.value) dim.value = upd.value;
+    dim.confidence = Math.min(1, (dim.confidence || 0) + 0.12);
+    dim.evidence = dim.evidence || [];
+    if (!dim.evidence.includes(d.evidence)) dim.evidence.push(d.evidence);
+    updated += 1;
+  }
+  obj.learnedFrom = obj.learnedFrom || {};
+  obj.learnedFrom.directions = (obj.learnedFrom.directions || 0) + 1;
+  obj.lastUpdated = ws.nowIso();
+  ws.writeJson(writeFile, obj);
+  return { applied: true, phrase: d.phrase, updated };
+}
+
+/** 最近一条风格方向（restyle 缺省方向来源）。 */
+export function latestStyleDirection(workspace) {
+  try {
+    const obj = ws.readJson(path.join(workspace, 'vault', 'write-style.json'));
+    const dirs = obj.styleDirections || [];
+    return dirs.length ? dirs[dirs.length - 1] : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 导出人类可读的风格档案文档（vault/style-profile.md）：维度 + 方向 + 样本 + 编辑对。 */
+export function renderStyleProfile(workspace) {
+  const vault = path.join(workspace, 'vault');
+  const write = ws.readJson(path.join(vault, 'write-style.json'));
+  const read = ws.readJson(path.join(vault, 'read-style.json'));
+  const lines = [];
+  lines.push('# 我的写作风格档案', '', `生成时间：${ws.nowIso()}`, '');
+  lines.push('## 语言层（write-style）');
+  for (const [k, d] of Object.entries(write.dimensions || {})) {
+    if (!d || !(d.confidence || 0)) continue;
+    lines.push(
+      `- ${k}：${d.value || '（未定）'}（置信 ${((d.confidence || 0) * 100).toFixed(0)}%）${
+        d.evidence?.length ? `；依据：${d.evidence.slice(-1)[0]}` : ''
+      }`,
+    );
+  }
+  lines.push('', '## 结构层（read-style）');
+  for (const [k, d] of Object.entries(read.structure || {})) {
+    if (!d || !(d.confidence || 0)) continue;
+    lines.push(
+      `- ${k}：${d.value || '（未定）'}（置信 ${((d.confidence || 0) * 100).toFixed(0)}%）`,
+    );
+  }
+  const dirs = write.styleDirections || [];
+  lines.push('', '## 风格方向变化（按时间）');
+  if (!dirs.length) lines.push('- （暂无）');
+  for (const d of dirs) lines.push(`- ${d.ts}：${d.phrase}（影响：${d.dims.join('、')}）`);
+  let samples = [];
+  try {
+    samples = fs.readdirSync(path.join(vault, 'style-samples')).filter((f) => f.endsWith('.md'));
+  } catch {}
+  lines.push('', '## 旧稿样本');
+  lines.push(samples.length ? samples.map((f) => `- ${f}`).join('\n') : '- （暂无）');
+  lines.push('', '## 亲手修改记录');
+  lines.push(
+    `- 共 ${ws.countLines(path.join(vault, 'edits.jsonl'))} 条（见 edits.jsonl，这是最强的风格信号）`,
+  );
+  const vector = write.vector || {};
+  const assoc = vector.personalDataset?.topAssociations || [];
+  const tech = vector.personalDataset?.topTechniques || [];
+  if (assoc.length || tech.length) {
+    lines.push('', '## 联想与惯用技巧');
+    if (assoc.length) lines.push(`- 联想库：${assoc.join('、')}`);
+    if (tech.length) lines.push(`- 惯用技巧：${tech.join('、')}`);
+  }
+  return lines.join('\n');
+}
+
 export function extractStyleSignals(text) {
   const t = String(text || '').trim();
   const out = { write: {}, read: {} };

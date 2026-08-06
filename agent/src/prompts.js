@@ -15,6 +15,7 @@ ${ctx.context}
 【核心字段已齐: ${ctx.coreReady ? '是（可进大纲，但风格底稿未问完不算收工）' : '否'}】
 【风格档案进度: ${ctx.styleProgress || '（尚无）'}】
 ${ctx.styleNote ? `【用户风格底稿/自述: ${ctx.styleNote}】` : ''}
+${ctx.blueprintText ? `【目前我理解的整篇文章蓝图】\n${ctx.blueprintText}` : ''}
 
 追问原则（grilling 式）：
 1. 一次只问一个方向，聚焦用户刚才的话里最值得深挖的一点。
@@ -22,15 +23,20 @@ ${ctx.styleNote ? `【用户风格底稿/自述: ${ctx.styleNote}】` : ''}
 3. 能推断或查证的事实不要问；只问具体经历、真实感受、个人判断。
 4. 从用户的话里生长，沿用用户原词，不套模板。
 5. 禁止重复问同一个问题或同一维度；问过并得到回答就换方向。
-6. 只有两种情况输出 {"stop":true}：① 用户连续两次表达"没更多了/你决定"；② 全部维度（含风格底稿询问）都走完。
+6. **每个问题都要让整篇文章的蓝图长大**：问的是"下一块能写进文章的拼图"——这部分的功能、
+   分论点之间的逻辑、素材具体怎么用、读者在哪一刻被触动——而不是泛泛的抽象维度。
+   你心里始终装着整篇文章：从哪里起笔、中间怎么转折、最后停在哪个姿态上。
+7. 只有两种情况输出 {"stop":true}：① 用户连续两次表达"没更多了/你决定"；② 全部维度（含风格底稿询问）都走完。
    核心字段确认但还没问风格底稿，不算完成——风格底稿不是强制素材，问一次即可（用户说"没有"也算完成）。
-7. **只输出一个问句**：question 字段里问号（？/?）只能出现一次。多问即违规，会被系统退回。
-8. 按阶段缺口逐项挖深：主题→立场→读者→素材→**核心立意**→**支撑论点（至少2个）**→情感曲线→结尾姿态；
+8. **只输出一个问句**：question 字段里问号（？/?）只能出现一次。多问即违规，会被系统退回。
+9. 按阶段缺口逐项挖深：主题→立场→读者→素材→**核心立意**→**支撑论点（至少2个）**→情感曲线→结尾姿态；
    立意与论点不挖透，不许进入大纲。最后补一问风格底稿（同文体旧稿），用户没有就放过。
 
 输出严格 JSON：
-{"question":"一句话追问（1-2句，含用户原词）","recommendation":"你的建议或理解","options":["可选A","可选B","可选C"],"stop":false}
-options 最多 3 个，没有明显分支时给空数组。`;
+{"question":"一句话追问（1-2句，含用户原词）","recommendation":"你的建议或理解","options":["可选A","可选B","可选C"],"blueprintUpdate":{"article":"","tension":"","readerTakeaway":"","skeleton":[""],"points":[""],"emotion":"","ending":""},"stop":false}
+options 最多 3 个，没有明显分支时给空数组。
+blueprintUpdate：从用户回答里读出的蓝图新信息，没有就不填（空字符串/空数组）。
+skeleton 是"这篇文章按什么顺序走"的简写，例如 ["从门口写起","窗前的停顿","百年之后"]。`;
 
 export const OUTLINE_PROMPT = (
   ctx,
@@ -47,6 +53,8 @@ export const OUTLINE_PROMPT = (
 【写作风格（write-style，语言层）】${ctx.writeStyle}
 【接收风格（read-style，结构层）】${ctx.readStyle}
 ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
+${ctx.corrections?.length ? `【你的修正意见】${ctx.corrections.join('；')}` : ''}
+${ctx.styleDirection ? `【最新风格方向】${ctx.styleDirection}` : ''}
 
 要求：
 1. 每节一句话功能（铺垫/转折/细节/收束/升华），连续段落不要做同一件事。
@@ -79,6 +87,7 @@ ${ctx.writeStyle || '（尚未充分采集，宁可用具体、私人、笨拙�
 ${ctx.readStyle || '（未知，默认：节奏错落、信息密度适中、开头抓人、结尾留有余味）'}
 
 ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
+${ctx.styleDirection ? `【最新风格方向】${ctx.styleDirection}——按这个方向写，让整篇文章口吻统一。` : ''}
 
 硬性要求：
 1. 黑名单禁用：在当今社会/随着/近年来/众所周知/毋庸置疑/不可否认/值得注意的是/不难发现/事实上/总而言之/底层逻辑/赋能 等 AI 套话一律不用。
@@ -108,6 +117,27 @@ ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
 ${ctx.text}
 
 只输出扩写后的正文。`;
+
+export const RESTYLE_PROMPT = (
+  ctx,
+) => `你是 Sculptor 的改写者。把下面这一节按【新风格方向】整体重写：
+保留原文的论点、素材与结构功能，只换表达方式、节奏与口吻。整篇文章都要按新方向统一，不许只有这一节变。
+
+【本节】${ctx.heading}（功能：${ctx.function}${ctx.thesis ? `；论点：${ctx.thesis}` : ''}）
+【目标字数】约 ${ctx.words} 字（中文字符，±15%）
+【新风格方向】${ctx.direction}
+${ctx.writeStyle ? `【写作风格档案】${ctx.writeStyle}` : ''}
+${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
+【原文】
+${ctx.text}
+
+重写要求：
+1. 黑名单禁用：在当今社会/随着/近年来/众所周知/值得注意的是/不难发现/总而言之/底层逻辑/赋能 等 AI 套话一律不用。
+2. 同一个比喻只允许出现一次；"虽然…但是…""不是…而是…"这类句式不重复使用。
+3. 段落长短错落，句式多样；关键情绪处保留有出处的原话与具体场景。
+4. 字数与原文相当（±15%），不许删掉内容只留空壳。
+
+只输出重写后的正文，不要标题、不要解释。`;
 
 export const REDTEAM_FIX_PROMPT = (
   ctx,

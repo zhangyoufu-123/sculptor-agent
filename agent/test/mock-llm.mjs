@@ -93,6 +93,12 @@ const EXPANDED_SECTIONS = [
   `离开时我回头，那栋楼还站在原地，红砖在暮色里暗下去，像一块烧了很久的炭。纪念牌上写着：百年征程波澜壮阔，百年初心历久弥坚。我默念了一遍，忽然觉得那句话不是写给墙的，是写给每一个走出去又回头的人。历史从不缺席，它只等一个人走进去，把百年前的脚步声重新踩亮，然后带着那点亮光，走进自己的时代。`,
 ];
 
+const RESTYLED_SECTIONS = [
+  `风从红楼门口灌进来，像一声长啸。石阶被磨亮了一百年，我踏上去，觉得每一步都踩在雷声上。门推开，木轴吱呀，像是旧朝的人替我们留着这扇门。`,
+  `沿着木梯往上，脚步放得很重，像战鼓。窗台积灰，我用指腹一抹，灰尘里露出木纹，像一道年轮。窗外树影被风压弯，我忽然想，百年前那个人也站在这里，把一页纸读了三遍。`,
+  `离开时回头，那栋楼立在暮色里，红砖像烧红的铁。纪念牌上写着：百年征程波澜壮阔，百年初心历久弥坚。我念了一遍，觉得那不是给墙看的，是给每一个走进去又回头的人看的。历史从不等候，只等人走进去，把百年前的脚步声重新踩亮。`,
+];
+
 const FIXED_TEXT = `站在北大红楼的门口，我感到历史沉默。门不一定通向过去，窗却看着我们。沿着木梯向上，脚步像旧朝宫人踏过回廊，声音在空旷里散开。人们总说历史很远，其实它就藏在窗台积灰的缝隙里，藏在你方才踩过的那一级石阶的磨损里。
 
 离开时我回头，那栋楼还站在原地。
@@ -135,7 +141,17 @@ export function respond(messages) {
     else if (!has(/^endingTaste:/m)) q = CLARIFY_QUESTIONS[9];
     else if (!has(/^styleSample:/m)) q = CLARIFY_QUESTIONS[10];
     else q = { question: null, recommendation: null, options: [], stop: true };
-    return JSON.stringify({ ...q, stop: Boolean(q.stop) });
+    // 蓝图增量：模拟 LLM 从回答里读出"整篇文章"的结构信息，随澄清逐步合并进 state.blueprint
+    return JSON.stringify({
+      ...q,
+      stop: Boolean(q.stop),
+      blueprintUpdate: {
+        article: '一篇把百年历史走成现场的散文式发言稿',
+        tension: '过去与当下之间的隔阂如何被一个人走进去打破',
+        readerTakeaway: '历史不是展品，而是可以站进去的现场',
+        skeleton: ['从门口写起', '窗前的停顿', '百年之后'],
+      },
+    });
   }
   if (userMsg.includes('第一读者') && userMsg.includes('【文章】')) {
     const name = userMsg.match(/你是「(.+?)」/)?.[1] || '读者';
@@ -177,6 +193,13 @@ export function respond(messages) {
   }
   if (userMsg.includes('修订者') && userMsg.includes('【原文】')) return FIXED_TEXT;
   if (userMsg.includes('感性解剖师')) return JSON.stringify(DISSECT);
+  if (userMsg.includes('整体重写') && userMsg.includes('【新风格方向】')) {
+    // restyle：按节返回"重写后"的正文（复用长样本，长度与风格都达标）
+    const match = userMsg.match(/【本节】(.+?)（/);
+    const heading = match ? match[1].trim() : '一、站在门口';
+    const idx = OUTLINE.sections.findIndex((s) => s.heading === heading);
+    return RESTYLED_SECTIONS[idx >= 0 ? idx : 0];
+  }
   if (userMsg.includes('当前字数') && userMsg.includes('目标字数')) {
     const match = userMsg.match(/【本节】(.+?)（/);
     const heading = match ? match[1].trim() : '一、站在门口';

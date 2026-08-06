@@ -7,6 +7,7 @@ import { WRITE_PROMPT, EXPAND_PROMPT } from './prompts.js';
 import * as ws from './workspace.js';
 import { styleSummary } from './outline.js';
 import { buildStyleShot } from './style-memory.js';
+import { latestStyleDirection } from './style.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -51,6 +52,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
         genre: state.confirmed.genre || '',
         section,
       }),
+      styleDirection: latestStyleDirection(workspace)?.phrase || '',
     };
     const body = await chatWithRetry(
       cfg,
@@ -105,5 +107,13 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
   state.nextStep = '运行 sculptor redteam 做反 AI 审计';
   ws.writeState(workspace, state);
   ws.logContext(workspace, 'write', `完成 ${end - start + 1} 节，存至 ${draftFile}`);
-  return { draftFile, sections: end - start + 1, report, total };
+  return {
+    draftFile,
+    sections: end - start + 1,
+    report,
+    total,
+    hint: state.needsRestyle
+      ? '检测到新的风格方向：可运行 sculptor restyle 让整篇按新方向重写'
+      : '',
+  };
 }

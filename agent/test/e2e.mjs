@@ -10,6 +10,7 @@ import { runMcpServer } from '../src/mcp.js';
 import { audit } from '../src/redteam.js';
 import { applyChangeIfUnchanged } from '../src/point-edit.js';
 import { buildStyleShot } from '../src/style-memory.js';
+import { applyStyleDirection } from '../src/style.js';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-e2e-'));
 const work = path.join(root, 'work');
@@ -83,6 +84,7 @@ try {
     '先好奇，再触动，最后安宁',
     '停在"心安则上"',
     '史铁生在文中将地坛视为宿命的等待，于荒芜与辉煌的落日中体悟个体生命的流逝 [1.1]。他在生死边缘选择平静审视，将死亡视为必然降临的节日，以通透的智慧将苦难化为对美的沉思',
+    '可以，就是这样',
   ];
   let last;
   r = await run(['clarify', '--once'], { input: '\n' });
@@ -96,6 +98,14 @@ try {
     '澄清挖透立意与论点',
     Boolean(last.confirmed?.theme && last.confirmed?.arguments?.length >= 2),
     JSON.stringify({ c: last.confirmed, m: last.materials }),
+  );
+  check(
+    '整篇文章蓝图已回显并确认',
+    last.confirmed?.blueprintConfirmed === true &&
+      Boolean(last.blueprint) &&
+      last.blueprint?.skeleton?.length >= 1 &&
+      Boolean(last.blueprint?.tension),
+    JSON.stringify({ b: last.blueprint, rounds: last.blueprintRounds }),
   );
   check('风格底稿问题已问并收尾', last.confirmed?.styleSample === true);
   const writeStyle = JSON.parse(
@@ -207,6 +217,60 @@ try {
       writePrompts.includes('破晓的号角') &&
       writePrompts.includes('作者绝不会这样写'),
     writePrompts.slice(0, 140),
+  );
+
+  // 4.6 风格方向 → 全文重写（restyle）：方向落档案，缺省读取最近方向，重写整篇
+  const dirRes = applyStyleDirection(workspace, '整篇更豪迈，有气势一点');
+  check(
+    '风格方向已落档案并提升维度',
+    dirRes.applied === true &&
+      JSON.parse(fs.readFileSync(path.join(workspace, 'vault', 'write-style.json'), 'utf8'))
+        .styleDirections?.length >= 1,
+    JSON.stringify(dirRes),
+  );
+  const draftBefore = fs.readFileSync(path.join(workspace, 'draft.md'), 'utf8');
+  r = await run(['restyle']);
+  check(
+    'restyle 缺省读取最近风格方向并重写全文',
+    r.code === 0 && r.out.includes('更豪迈有气势') && r.out.includes('重写 3 节'),
+    r.out.slice(0, 160),
+  );
+  const draftAfter = fs.readFileSync(path.join(workspace, 'draft.md'), 'utf8');
+  check(
+    '重写后草稿已更新且结构保留',
+    draftAfter !== draftBefore && draftAfter.includes('## 一、站在门口'),
+  );
+  r = await run(['style', '--export']);
+  check(
+    'style --export 导出人类可读风格档案',
+    r.code === 0 &&
+      fs.existsSync(path.join(workspace, 'vault', 'style-profile.md')) &&
+      fs
+        .readFileSync(path.join(workspace, 'vault', 'style-profile.md'), 'utf8')
+        .includes('风格方向变化'),
+  );
+  const mcpInput4 = Readable.from([
+    `${JSON.stringify({ jsonrpc: '2.0', id: 8, method: 'tools/call', params: { name: 'restyle', arguments: { workspace, direction: '更克制一点' } } })}\n`,
+  ]);
+  const mcpOut4 = [];
+  const output4 = new Writable({
+    write(c, _e, cb) {
+      mcpOut4.push(c.toString());
+      cb();
+    },
+  });
+  await runMcpServer({ input: mcpInput4, output: output4 });
+  const byId4 = Object.fromEntries(
+    mcpOut4
+      .join('')
+      .trim()
+      .split('\n')
+      .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
+  );
+  check(
+    'MCP restyle 按方向重写',
+    byId4[8]?.result?.content?.[0]?.text?.includes('更克制一点') &&
+      byId4[8]?.result?.content?.[0]?.text?.includes('重写 3 节'),
   );
 
   // 5. 确定性红队：直接审计植入文本，应抓到黑名单与重复比喻
@@ -402,7 +466,7 @@ try {
       .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
   );
   check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'sculptor');
-  check('MCP tools/list 18 个工具', byId[2]?.result?.tools?.length === 18);
+  check('MCP tools/list 19 个工具', byId[2]?.result?.tools?.length === 19);
   check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Sculptor 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
   const mcpInput2 = Readable.from([

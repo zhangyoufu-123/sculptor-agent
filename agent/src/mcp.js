@@ -14,6 +14,7 @@ import { interviewStep } from './interview.js';
 import { runAudience, renderAudience } from './reader-gallery.js';
 import { styleProgress } from './style.js';
 import { buildStyleShot } from './style-memory.js';
+import { restyle } from './restyle.js';
 
 const TOOLS = [
   {
@@ -126,6 +127,20 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: { workspace: { type: 'string' } },
+    },
+  },
+  {
+    name: 'restyle',
+    description:
+      '按新风格方向重写整篇草稿（或指定节）：direction 给一句话（如"更克制一点"），缺省用档案最近一条风格方向',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        direction: { type: 'string' },
+        section: { type: 'integer' },
+        force: { type: 'boolean' },
+      },
     },
   },
   {
@@ -280,6 +295,25 @@ async function callTool(name, args, cfg) {
         index: name === 'write_section' ? (args.index ?? null) : null,
       });
       return { text: `已写入 ${r.sections} 节 → ${r.draftFile}` };
+    }
+    case 'restyle': {
+      const w = wsDir(args, cfg);
+      const r = await restyle(cfg, w, {
+        direction: args.direction || '',
+        section: args.section !== undefined ? Number(args.section) : null,
+        force: Boolean(args.force),
+      });
+      return {
+        text:
+          `已按「${r.direction}」重写 ${r.sections} 节 → ${r.draftFile}\n` +
+          r.report
+            .map((s) =>
+              s.skipped
+                ? `${s.index}. ${s.heading}：跳过（空节）`
+                : `${s.index}. ${s.heading}：${s.oldLen} → ${s.newLen} 字`,
+            )
+            .join('\n'),
+      };
     }
     case 'redteam': {
       const w = wsDir(args, cfg);

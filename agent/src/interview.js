@@ -3,6 +3,7 @@
 // 复用 clarifyStep 作为唯一状态机，不另起一套逻辑（避免两套架构打架）。
 import readline from 'node:readline';
 import { clarifyStep } from './clarify.js';
+import { renderBlueprint } from './clarify.js';
 import * as ws from './workspace.js';
 import { styleProgress } from './style.js';
 
@@ -90,7 +91,11 @@ export async function interviewStep(cfg, wsDir, { lastInput = '' } = {}) {
     checklist: checklistOf(state),
     remaining,
     ready: Boolean(r.ready),
-    done: remaining.coreCount === 0 && Boolean(state.confirmed?.styleSample),
+    done:
+      remaining.coreCount === 0 &&
+      Boolean(state.confirmed?.styleSample) &&
+      Boolean(state.confirmed?.blueprintConfirmed),
+    blueprint: state.blueprint,
     summary: renderChecklist(state),
     style: styleProgress(workspace),
   };
@@ -120,6 +125,11 @@ export async function interviewSummary(cfg, wsDir) {
   if ((state.materials || []).length) {
     lines.push('素材:');
     for (const m of state.materials) lines.push(`  ✓ ${m}`);
+  }
+  if (Object.keys(state.blueprint || {}).length) {
+    lines.push('');
+    lines.push('整篇文章蓝图:');
+    lines.push(renderBlueprint(state));
   }
   lines.push('');
   lines.push(

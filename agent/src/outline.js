@@ -5,6 +5,7 @@ import { chatWithRetry, parseJsonContent } from './llm.js';
 import { OUTLINE_PROMPT } from './prompts.js';
 import * as ws from './workspace.js';
 import { buildStyleShot } from './style-memory.js';
+import { latestStyleDirection } from './style.js';
 
 export function styleSummary(file) {
   try {
@@ -53,6 +54,8 @@ export async function generateOutline(cfg, wsDir) {
       topic: state.confirmed.topic,
       genre: state.confirmed.genre || '',
     }),
+    corrections: state.blueprint?.corrections || [],
+    styleDirection: latestStyleDirection(workspace)?.phrase || '',
   };
   const content = await chatWithRetry(
     cfg,
@@ -80,6 +83,8 @@ export async function generateOutline(cfg, wsDir) {
   state.targetWords = targetWords;
   state.nextStep = '确认大纲后运行 sculptor write';
   state.outline = outline;
+  // 修正已吸收进大纲，清空避免后续重写重复应用
+  if (state.blueprint) state.blueprint.corrections = [];
   ws.writeState(workspace, state);
   const memoryFile = path.join(workspace, 'vault', 'project-memory', `outline-${Date.now()}.json`);
   fs.writeFileSync(
