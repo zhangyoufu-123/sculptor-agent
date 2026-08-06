@@ -1,24 +1,77 @@
 // 模拟 LLM 服务器：OpenAI 兼容 /v1/chat/completions，按提示词类型返回固定但真实的响应。
 // 用途：离线全链路测试，不消耗真实 API。
 const CLARIFY_QUESTIONS = [
-  { question: '关于北大红楼，你想写的主题具体是什么？', recommendation: '一句话先定个方向，比如"百年历久"四个字背后的那栋楼', options: [] },
-  { question: '写完这篇发言稿，你想让读者相信什么？立场是什么？', recommendation: '比如"历史不是橱窗里的展品，而是可以站进去的现场"', options: [] },
-  { question: '这篇文章主要给谁看？读者是谁？', recommendation: '老师、同学还是家长？这决定信息密度和语气', options: [] },
-  { question: '有没有具体的经历、画面或数据可以用进去？', recommendation: '一个小场景就很好，细节比观点更难得', options: [] },
+  {
+    question: '关于北大红楼，你想写的主题具体是什么？',
+    recommendation: '一句话先定个方向，比如"百年历久"四个字背后的那栋楼',
+    options: [],
+  },
+  {
+    question: '写完这篇发言稿，你想让读者相信什么？立场是什么？',
+    recommendation: '比如"历史不是橱窗里的展品，而是可以站进去的现场"',
+    options: [],
+  },
+  {
+    question: '这篇文章主要给谁看？读者是谁？',
+    recommendation: '老师、同学还是家长？这决定信息密度和语气',
+    options: [],
+  },
+  {
+    question: '有没有具体的经历、画面或数据可以用进去？',
+    recommendation: '一个小场景就很好，细节比观点更难得',
+    options: [],
+  },
   { question: '还有没有别的具体素材？', recommendation: '再多一条，论证才有血肉', options: [] },
-  { question: '这篇文章的立意是什么？用一句话说清核心意思。', recommendation: '立意是全文的心脏，比如"历史不是展品，而是可以站进去的现场"', options: [] },
-  { question: '围绕立意，你的第一个支撑论点是什么？', recommendation: '论点要能展开成一段', options: [] },
+  {
+    question: '这篇文章的立意是什么？用一句话说清核心意思。',
+    recommendation: '立意是全文的心脏，比如"历史不是展品，而是可以站进去的现场"',
+    options: [],
+  },
+  {
+    question: '围绕立意，你的第一个支撑论点是什么？',
+    recommendation: '论点要能展开成一段',
+    options: [],
+  },
   { question: '第二个支撑论点呢？', recommendation: '和第一个有区分度，不要重复', options: [] },
-  { question: '读者读完，情绪上应该经历怎样的曲线？', recommendation: '比如"先好奇，再触动，最后安宁"', options: [] },
-  { question: '结尾你想停在什么姿态上？', recommendation: '比如"必胜的决心/赴死的意志/心安则上/留白"', options: [] },
+  {
+    question: '读者读完，情绪上应该经历怎样的曲线？',
+    recommendation: '比如"先好奇，再触动，最后安宁"',
+    options: [],
+  },
+  {
+    question: '结尾你想停在什么姿态上？',
+    recommendation: '比如"必胜的决心/赴死的意志/心安则上/留白"',
+    options: [],
+  },
 ];
 
 const OUTLINE = {
   title: '百年历久，北大红楼',
   sections: [
-    { heading: '一、站在门口', function: '铺垫', thesis: '现场感来自具体的人，而非抽象的时间', words: 300, keyPoints: ['在红楼门口停留', '想象百年前的脚步声'], materials: ['门口的石阶', '红砖墙'] },
-    { heading: '二、窗前的停顿', function: '细节', thesis: '每一个细节都是过去的证词', words: 300, keyPoints: ['一扇窗', '窗台积灰', '历史藏在缝隙里'], materials: ['窗', '木地板的声音'] },
-    { heading: '三、百年之后', function: '升华', thesis: '历史从不缺席，只等人走进去', words: 300, keyPoints: ['自己也是历史的一环', '走出红楼'], materials: ['纪念牌', '回望'] },
+    {
+      heading: '一、站在门口',
+      function: '铺垫',
+      thesis: '现场感来自具体的人，而非抽象的时间',
+      words: 300,
+      keyPoints: ['在红楼门口停留', '想象百年前的脚步声'],
+      materials: ['门口的石阶', '红砖墙'],
+    },
+    {
+      heading: '二、窗前的停顿',
+      function: '细节',
+      thesis: '每一个细节都是过去的证词',
+      words: 300,
+      keyPoints: ['一扇窗', '窗台积灰', '历史藏在缝隙里'],
+      materials: ['窗', '木地板的声音'],
+    },
+    {
+      heading: '三、百年之后',
+      function: '升华',
+      thesis: '历史从不缺席，只等人走进去',
+      words: 300,
+      keyPoints: ['自己也是历史的一环', '走出红楼'],
+      materials: ['纪念牌', '回望'],
+    },
   ],
 };
 
@@ -44,9 +97,17 @@ const DISSECT = {
   stance: '想让读者相信历史是可走进的现场，而非橱窗里的展品',
   limits: '作者没有亲历现场，全靠想象补足；"遗憾"本身可以成为感性入口',
   perplexity: '"像旧朝宫人"的重复使用透出对历史拟人化的渴望，也暴露了想象力的边界',
-  povs: { reader: '第三段最打动人，第二段稍显重复', insider: '作为当事人，我觉得石阶那一段被一笔带过了', opponent: '我会反问：历史的"沉默"真的能靠比喻传达到吗' },
+  povs: {
+    reader: '第三段最打动人，第二段稍显重复',
+    insider: '作为当事人，我觉得石阶那一段被一笔带过了',
+    opponent: '我会反问：历史的"沉默"真的能靠比喻传达到吗',
+  },
   styleDelivery: '开头最像作者本人；"总而言之"是滑回 AI 腔的一处',
-  suggestions: ['删掉重复的比喻，保留最有力的一次', '把"遗憾"写成一段，而不是绕过去', '结尾再留一句余味'],
+  suggestions: [
+    '删掉重复的比喻，保留最有力的一次',
+    '把"遗憾"写成一段，而不是绕过去',
+    '结尾再留一句余味',
+  ],
 };
 
 export function respond(messages) {

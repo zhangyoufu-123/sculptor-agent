@@ -80,10 +80,10 @@ edit.json 格式：
 
 ## 常见修改类型速查
 
-| 用户说 | 改哪 | 吸收到 |
-| --- | --- | --- |
-| "这句太文艺了" | 意象密度/语气温度 | write-style.temperature, imageryTendency |
-| "这段读起来很平" | 节奏/段落功能 | read-style.pacing |
-| "这里像 AI 写的" | 句式/黑名单 | write-style + anti-ai 检查 |
-| "顺序不对，先讲案例" | 结构/时间处理 | read-style.infoDensity, structure |
-| "结尾太满，留白" | 结尾模式 | write-style.endingPattern |
+| 用户说               | 改哪              | 吸收到                                   |
+| -------------------- | ----------------- | ---------------------------------------- |
+| "这句太文艺了"       | 意象密度/语气温度 | write-style.temperature, imageryTendency |
+| "这段读起来很平"     | 节奏/段落功能     | read-style.pacing                        |
+| "这里像 AI 写的"     | 句式/黑名单       | write-style + anti-ai 检查               |
+| "顺序不对，先讲案例" | 结构/时间处理     | read-style.infoDensity, structure        |
+| "结尾太满，留白"     | 结尾模式          | write-style.endingPattern                |

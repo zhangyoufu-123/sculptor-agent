@@ -1,6 +1,8 @@
 // Sculptor Agent 内嵌提示词：与 skill 参考文档同源，保证两种形态行为一致。
 
-export const QUESTIONER_PROMPT = (ctx) => `你是 Sculptor 的追问设计师。你的工作不是收集填空题，而是像一位有判断力的朋友那样，让用户说出真实想法。
+export const QUESTIONER_PROMPT = (
+  ctx,
+) => `你是 Sculptor 的追问设计师。你的工作不是收集填空题，而是像一位有判断力的朋友那样，让用户说出真实想法。
 
 【完整上下文】
 ${ctx.context}
@@ -26,7 +28,9 @@ ${ctx.context}
 {"question":"一句话追问（1-2句，含用户原词）","recommendation":"你的建议或理解","options":["可选A","可选B","可选C"],"stop":false}
 options 最多 3 个，没有明显分支时给空数组。`;
 
-export const OUTLINE_PROMPT = (ctx) => `你是 Sculptor 的提纲设计师。基于用户已确认的信息，设计一篇${ctx.genre || '文章'}的大纲。
+export const OUTLINE_PROMPT = (
+  ctx,
+) => `你是 Sculptor 的提纲设计师。基于用户已确认的信息，设计一篇${ctx.genre || '文章'}的大纲。
 
 【主题】${ctx.topic}
 【核心立意】${ctx.theme || '未明确（先澄清立意再生成大纲）'}
@@ -50,7 +54,9 @@ export const OUTLINE_PROMPT = (ctx) => `你是 Sculptor 的提纲设计师。基
 输出严格 JSON：
 {"title":"标题","sections":[{"heading":"节标题","function":"铺垫/转折/细节/收束/升华","thesis":"支撑的论点","words":200,"keyPoints":["要点"],"materials":["用到的素材"]}]}`;
 
-export const WRITE_PROMPT = (ctx) => `你是 Sculptor 的写作者。写出"这个人类作者会写"的文字，而不是 AI 的文字。
+export const WRITE_PROMPT = (
+  ctx,
+) => `你是 Sculptor 的写作者。写出"这个人类作者会写"的文字，而不是 AI 的文字。
 
 【文章】《${ctx.title}》
 【核心立意】${ctx.theme || ''}
@@ -94,7 +100,9 @@ ${ctx.text}
 
 只输出扩写后的正文。`;
 
-export const REDTEAM_FIX_PROMPT = (ctx) => `你是 Sculptor 的修订者。以下片段被反 AI 审计标记为有 AI 痕迹，请用该用户的风格改写，消除问题。
+export const REDTEAM_FIX_PROMPT = (
+  ctx,
+) => `你是 Sculptor 的修订者。以下片段被反 AI 审计标记为有 AI 痕迹，请用该用户的风格改写，消除问题。
 
 【问题】${ctx.issues}
 【写作风格】${ctx.writeStyle || '（具体、克制、有个人痕迹）'}
@@ -103,7 +111,9 @@ ${ctx.text}
 
 要求：只输出改写后的片段；保持原意；不要机械替换同义词；不要解释。`;
 
-export const DISSECT_PROMPT = (ctx) => `你是 Sculptor 的感性解剖师。AI 没有主体性，但你的任务是像显影液一样，照出人类作者的主体结构。
+export const DISSECT_PROMPT = (
+  ctx,
+) => `你是 Sculptor 的感性解剖师。AI 没有主体性，但你的任务是像显影液一样，照出人类作者的主体结构。
 
 【文本/项目】
 ${ctx.text}
@@ -121,7 +131,9 @@ ${ctx.text}
 输出严格 JSON：
 {"stance":"","limits":"","perplexity":"","povs":{"reader":"","insider":"","opponent":""},"styleDelivery":"","suggestions":["最多3条可执行建议"]}`;
 
-export const STYLE_EXTRACTION_PROMPT = (sample) => `从以下文字中提取写作风格，映射到 14 个维度。每维给出值、置信度(0-1)、证据原文片段。样本可能很短——不足以下结论的维度给低置信度。
+export const STYLE_EXTRACTION_PROMPT = (
+  sample,
+) => `从以下文字中提取写作风格，映射到 14 个维度。每维给出值、置信度(0-1)、证据原文片段。样本可能很短——不足以下结论的维度给低置信度。
 
 【样本】
 ${sample}

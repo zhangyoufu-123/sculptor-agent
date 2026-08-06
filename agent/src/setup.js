@@ -10,7 +10,14 @@ import { fileURLToPath } from 'node:url';
 
 const AGENT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BUNDLED_SKILL = path.resolve(AGENT_ROOT, '..', 'skills', 'sculptor');
-const BUNDLED_ENGINE_MCP = path.resolve(AGENT_ROOT, '..', 'integration', 'engine-mcp', 'src', 'mcp');
+const BUNDLED_ENGINE_MCP = path.resolve(
+  AGENT_ROOT,
+  '..',
+  'integration',
+  'engine-mcp',
+  'src',
+  'mcp',
+);
 const CLI_BIN = path.join(AGENT_ROOT, 'bin', 'sculptor.js');
 
 function log(msg) {
@@ -74,8 +81,14 @@ function ensureEngineMCP(engineDir, report) {
     return null;
   }
   fs.mkdirSync(path.join(engineDir, 'src', 'mcp'), { recursive: true });
-  fs.copyFileSync(path.join(BUNDLED_ENGINE_MCP, 'server.ts'), path.join(engineDir, 'src', 'mcp', 'server.ts'));
-  fs.copyFileSync(path.join(BUNDLED_ENGINE_MCP, 'workspace.ts'), path.join(engineDir, 'src', 'mcp', 'workspace.ts'));
+  fs.copyFileSync(
+    path.join(BUNDLED_ENGINE_MCP, 'server.ts'),
+    path.join(engineDir, 'src', 'mcp', 'server.ts'),
+  );
+  fs.copyFileSync(
+    path.join(BUNDLED_ENGINE_MCP, 'workspace.ts'),
+    path.join(engineDir, 'src', 'mcp', 'workspace.ts'),
+  );
   // 注册 npm script（幂等）
   const pkgFile = path.join(engineDir, 'package.json');
   if (fs.existsSync(pkgFile)) {
@@ -97,7 +110,17 @@ function ensureEngineMCP(engineDir, report) {
 }
 
 function mcpEntry(engineServerFile) {
-  if (engineServerFile && fs.existsSync(path.join(path.dirname(path.dirname(path.dirname(engineServerFile))), 'node_modules', '.bin', 'tsx'))) {
+  if (
+    engineServerFile &&
+    fs.existsSync(
+      path.join(
+        path.dirname(path.dirname(path.dirname(engineServerFile))),
+        'node_modules',
+        '.bin',
+        'tsx',
+      ),
+    )
+  ) {
     const engineDir = path.dirname(path.dirname(path.dirname(engineServerFile)));
     return {
       command: path.join(engineDir, 'node_modules', '.bin', 'tsx'),
@@ -116,7 +139,10 @@ function ensureCodexProjectConfig(projectDir, entry, dry, report) {
     return;
   }
   fs.mkdirSync(cfgDir, { recursive: true });
-  if (fs.existsSync(cfg) && fs.readFileSync(cfg, 'utf8').includes('[mcp_servers.sculptor-engine]')) {
+  if (
+    fs.existsSync(cfg) &&
+    fs.readFileSync(cfg, 'utf8').includes('[mcp_servers.sculptor-engine]')
+  ) {
     report.push('Codex: 项目配置已存在，跳过');
     return;
   }
@@ -134,11 +160,32 @@ function registerClaude(entry, dry, report) {
     return;
   }
   if (dry) {
-    report.push(`[dry-run] claude mcp add sculptor-engine --transport stdio -- ${entry.command} ${entry.args.join(' ')}`);
+    report.push(
+      `[dry-run] claude mcp add sculptor-engine --transport stdio -- ${entry.command} ${entry.args.join(' ')}`,
+    );
     return;
   }
-  const r = spawnSync(claude, ['mcp', 'add', 'sculptor-engine', '--transport', 'stdio', '--scope', 'local', '--', entry.command, ...entry.args], { encoding: 'utf8' });
-  report.push(r.status === 0 ? `Claude Code: 已注册（${r.stdout.trim().slice(0, 80) || 'ok'}）` : `Claude Code: 注册失败（${r.stderr.trim().slice(0, 120)}）`);
+  const r = spawnSync(
+    claude,
+    [
+      'mcp',
+      'add',
+      'sculptor-engine',
+      '--transport',
+      'stdio',
+      '--scope',
+      'local',
+      '--',
+      entry.command,
+      ...entry.args,
+    ],
+    { encoding: 'utf8' },
+  );
+  report.push(
+    r.status === 0
+      ? `Claude Code: 已注册（${r.stdout.trim().slice(0, 80) || 'ok'}）`
+      : `Claude Code: 注册失败（${r.stderr.trim().slice(0, 120)}）`,
+  );
 }
 
 function registerOpencode(entry, dry, report) {
@@ -148,11 +195,19 @@ function registerOpencode(entry, dry, report) {
     return;
   }
   if (dry) {
-    report.push(`[dry-run] opencode mcp add sculptor-engine -- ${entry.command} ${entry.args.join(' ')}`);
+    report.push(
+      `[dry-run] opencode mcp add sculptor-engine -- ${entry.command} ${entry.args.join(' ')}`,
+    );
     return;
   }
-  const r = spawnSync(opencode, ['mcp', 'add', 'sculptor-engine', '--', entry.command, ...entry.args], { encoding: 'utf8' });
-  report.push(r.status === 0 ? 'OpenCode: 已注册' : `OpenCode: 注册失败（${r.stderr.trim().slice(0, 120)}）`);
+  const r = spawnSync(
+    opencode,
+    ['mcp', 'add', 'sculptor-engine', '--', entry.command, ...entry.args],
+    { encoding: 'utf8' },
+  );
+  report.push(
+    r.status === 0 ? 'OpenCode: 已注册' : `OpenCode: 注册失败（${r.stderr.trim().slice(0, 120)}）`,
+  );
 }
 
 function ensureSkill(projectDir, dry, report) {
@@ -179,7 +234,10 @@ function writeCredentials(engineDir, projectDir, creds, dry, report) {
     report.push('凭据: 未发现 DEEPSEEK_API_KEY（可在 .env.local 或环境变量里配置）');
     return;
   }
-  const target = engineDir && fs.existsSync(engineDir) ? path.join(engineDir, '.env.local') : path.join(projectDir, '.env.local');
+  const target =
+    engineDir && fs.existsSync(engineDir)
+      ? path.join(engineDir, '.env.local')
+      : path.join(projectDir, '.env.local');
   if (dry) {
     report.push(`[dry-run] 凭据 → ${target}（来自本机已有配置，权限 0600）`);
     return;
@@ -196,7 +254,12 @@ export async function runSetup(flags = {}) {
   const projectDir = path.resolve(flags.dir || process.cwd());
   // 引擎仓库路径可配置：--engine 或环境变量 SCULPTOR_ENGINE_DIR；未配置时使用轻量引擎。
   const engineDir = flags.engine || process.env.SCULPTOR_ENGINE_DIR || '';
-  const hosts = flags.hosts ? flags.hosts.split(',').map((s) => s.trim()).filter(Boolean) : ['codex', 'claude', 'opencode'];
+  const hosts = flags.hosts
+    ? flags.hosts
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : ['codex', 'claude', 'opencode'];
   const report = [];
 
   log(`Sculptor 自动接入（${dry ? 'dry-run' : '执行'}）`);

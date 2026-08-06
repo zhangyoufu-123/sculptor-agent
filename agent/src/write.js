@@ -25,7 +25,9 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
   const existing = fs.existsSync(draftFile) ? fs.readFileSync(draftFile, 'utf8') : '';
   // 退让协议：draft.md 若被用户/其他 agent 外部修改过，不静默覆盖；除非显式 --force。
   if (existing && state.lastDraftHash && fileHash(existing) !== state.lastDraftHash && !force) {
-    throw new Error('draft.md 在最后一次写作后被外部修改过，Sculptor 已退让、不覆盖。确认要重写请运行: sculptor write --force');
+    throw new Error(
+      'draft.md 在最后一次写作后被外部修改过，Sculptor 已退让、不覆盖。确认要重写请运行: sculptor write --force',
+    );
   }
   const parts = existing ? existing.split(/\n(?=## )/) : [];
   const report = [];
@@ -44,18 +46,35 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       writeStyle: styleSummary(path.join(workspace, 'vault', 'write-style.json')),
       readStyle: styleSummary(path.join(workspace, 'vault', 'read-style.json')),
     };
-    const body = await chatWithRetry(cfg, [
-      { role: 'system', content: '你是人类风格的写作者，输出正文。' },
-      { role: 'user', content: WRITE_PROMPT(ctx) },
-    ], { temperature: 0.85, maxTokens: 3000 });
+    const body = await chatWithRetry(
+      cfg,
+      [
+        { role: 'system', content: '你是人类风格的写作者，输出正文。' },
+        { role: 'user', content: WRITE_PROMPT(ctx) },
+      ],
+      { temperature: 0.85, maxTokens: 3000 },
+    );
     let text = body.trim();
     let actual = (text.match(/[\u4e00-\u9fff]/g) || []).length;
     let expanded = false;
     if (actual < words * 0.6) {
-      const fixed = await chatWithRetry(cfg, [
-        { role: 'system', content: '你是写作者，扩写本节。' },
-        { role: 'user', content: EXPAND_PROMPT({ heading: section.heading, function: section.function, target: words, actual, text }) },
-      ], { temperature: 0.85, maxTokens: 4000 });
+      const fixed = await chatWithRetry(
+        cfg,
+        [
+          { role: 'system', content: '你是写作者，扩写本节。' },
+          {
+            role: 'user',
+            content: EXPAND_PROMPT({
+              heading: section.heading,
+              function: section.function,
+              target: words,
+              actual,
+              text,
+            }),
+          },
+        ],
+        { temperature: 0.85, maxTokens: 4000 },
+      );
       text = fixed.trim();
       actual = (text.match(/[\u4e00-\u9fff]/g) || []).length;
       expanded = true;

@@ -12,19 +12,107 @@ import { pointEdit } from './point-edit.js';
 import { probeTask } from './observer.js';
 
 const TOOLS = [
-  { name: 'init', description: '初始化 Sculptor 工作区（.sculptor/）', inputSchema: { type: 'object', properties: { dir: { type: 'string' } } } },
-  { name: 'panel', description: '渲染玻璃面板（当前写作进度白话视图）', inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } } },
-  { name: 'status', description: '显示工作区摘要', inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } } },
-  { name: 'clarify_step', description: '澄清单步：传入用户最新消息，返回下一个问题（含建议与选项）', inputSchema: { type: 'object', properties: { workspace: { type: 'string' }, lastInput: { type: 'string' } }, required: ['lastInput'] } },
-  { name: 'outline', description: '生成结构化大纲（素材门槛未过会报错）', inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } } },
-  { name: 'write_section', description: '按大纲写一节（双风格注入 + 反 AI 硬规则）', inputSchema: { type: 'object', properties: { workspace: { type: 'string' }, index: { type: 'integer' } } } },
-  { name: 'write_all', description: '按大纲写完所有节到 draft.md', inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } } },
-  { name: 'redteam', description: '反 AI 审计（黑名单/重复比喻/重复句式/统计指标），可选 LLM 修订', inputSchema: { type: 'object', properties: { workspace: { type: 'string' }, fix: { type: 'boolean' } } } },
-  { name: 'dissect', description: '感性解剖：5 维度报告（立场/局限/困惑/多视角/风格兑现度）', inputSchema: { type: 'object', properties: { workspace: { type: 'string' }, file: { type: 'string' } } } },
-  { name: 'absorb', description: '把一次定点修改吸收进风格档案', inputSchema: { type: 'object', properties: { workspace: { type: 'string' }, target: { type: 'string' }, original: { type: 'string' }, changed: { type: 'string' }, intent: { type: 'string' }, evidence: { type: 'string' }, writeDims: { type: 'object' }, readDims: { type: 'object' } }, required: ['target'] } },
-  { name: 'fingerprint', description: '刷新压缩守卫风格指纹', inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } } },
-  { name: 'point_edit', description: '深度定点修改：给出选中原句与修改指令，只改那一处并吸收进风格档案', inputSchema: { type: 'object', properties: { workspace: { type: 'string' }, quote: { type: 'string' }, instruction: { type: 'string' }, dir: { type: 'string' }, file: { type: 'string' } }, required: ['quote', 'instruction'] } },
-  { name: 'probe', description: '生态位探测：判断任务是否值得 Sculptor 主动介入（长文写作/风格/结构/定点修改）', inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] } },
+  {
+    name: 'init',
+    description: '初始化 Sculptor 工作区（.sculptor/）',
+    inputSchema: { type: 'object', properties: { dir: { type: 'string' } } },
+  },
+  {
+    name: 'panel',
+    description: '渲染玻璃面板（当前写作进度白话视图）',
+    inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } },
+  },
+  {
+    name: 'status',
+    description: '显示工作区摘要',
+    inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } },
+  },
+  {
+    name: 'clarify_step',
+    description: '澄清单步：传入用户最新消息，返回下一个问题（含建议与选项）',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' }, lastInput: { type: 'string' } },
+      required: ['lastInput'],
+    },
+  },
+  {
+    name: 'outline',
+    description: '生成结构化大纲（素材门槛未过会报错）',
+    inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } },
+  },
+  {
+    name: 'write_section',
+    description: '按大纲写一节（双风格注入 + 反 AI 硬规则）',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' }, index: { type: 'integer' } },
+    },
+  },
+  {
+    name: 'write_all',
+    description: '按大纲写完所有节到 draft.md',
+    inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } },
+  },
+  {
+    name: 'redteam',
+    description: '反 AI 审计（黑名单/重复比喻/重复句式/统计指标），可选 LLM 修订',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' }, fix: { type: 'boolean' } },
+    },
+  },
+  {
+    name: 'dissect',
+    description: '感性解剖：5 维度报告（立场/局限/困惑/多视角/风格兑现度）',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' }, file: { type: 'string' } },
+    },
+  },
+  {
+    name: 'absorb',
+    description: '把一次定点修改吸收进风格档案',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        target: { type: 'string' },
+        original: { type: 'string' },
+        changed: { type: 'string' },
+        intent: { type: 'string' },
+        evidence: { type: 'string' },
+        writeDims: { type: 'object' },
+        readDims: { type: 'object' },
+      },
+      required: ['target'],
+    },
+  },
+  {
+    name: 'fingerprint',
+    description: '刷新压缩守卫风格指纹',
+    inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } },
+  },
+  {
+    name: 'point_edit',
+    description: '深度定点修改：给出选中原句与修改指令，只改那一处并吸收进风格档案',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        quote: { type: 'string' },
+        instruction: { type: 'string' },
+        dir: { type: 'string' },
+        file: { type: 'string' },
+      },
+      required: ['quote', 'instruction'],
+    },
+  },
+  {
+    name: 'probe',
+    description: '生态位探测：判断任务是否值得 Sculptor 主动介入（长文写作/风格/结构/定点修改）',
+    inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+  },
 ];
 
 function wsDir(args, cfg) {
@@ -53,19 +141,29 @@ async function callTool(name, args, cfg) {
     case 'outline': {
       const w = wsDir(args, cfg);
       const r = await generateOutline(cfg, w);
-      return { text: `《${r.outline.title}》${r.outline.sections.length} 节\n` + r.outline.sections.map((s, i) => `${i + 1}. ${s.heading}（${s.function}）`).join('\n') };
+      return {
+        text:
+          `《${r.outline.title}》${r.outline.sections.length} 节\n` +
+          r.outline.sections.map((s, i) => `${i + 1}. ${s.heading}（${s.function}）`).join('\n'),
+      };
     }
     case 'write_section':
     case 'write_all': {
       const w = wsDir(args, cfg);
-      const r = await writeSection(cfg, w, { index: name === 'write_section' ? args.index ?? null : null });
+      const r = await writeSection(cfg, w, {
+        index: name === 'write_section' ? (args.index ?? null) : null,
+      });
       return { text: `已写入 ${r.sections} 节 → ${r.draftFile}` };
     }
     case 'redteam': {
       const w = wsDir(args, cfg);
       const r = await redteam(cfg, w, { fix: Boolean(args.fix) });
       const rep = r.report;
-      return { text: `通过=${rep.passed} 黑名单=${rep.blacklistHits.length} 重复比喻=${rep.repeatedMetaphors.length} 重复句式=${rep.repeatedPatterns.length} 建议=${rep.suggestions.length}\n` + JSON.stringify(rep, null, 2) };
+      return {
+        text:
+          `通过=${rep.passed} 黑名单=${rep.blacklistHits.length} 重复比喻=${rep.repeatedMetaphors.length} 重复句式=${rep.repeatedPatterns.length} 建议=${rep.suggestions.length}\n` +
+          JSON.stringify(rep, null, 2),
+      };
     }
     case 'dissect': {
       const w = wsDir(args, cfg);
@@ -90,7 +188,9 @@ async function callTool(name, args, cfg) {
         dir: args.dir,
         file: args.file,
       });
-      return { text: `已定点修改: ${r.file}\n- ${r.quote}\n+ ${r.replacement}\n风格吸收: write ${r.writeUpdated} + read ${r.readUpdated}` };
+      return {
+        text: `已定点修改: ${r.file}\n- ${r.quote}\n+ ${r.replacement}\n风格吸收: write ${r.writeUpdated} + read ${r.readUpdated}`,
+      };
     }
     case 'probe': {
       return { text: JSON.stringify(probeTask(args.text || ''), null, 2) };
@@ -107,20 +207,43 @@ export async function runMcpServer({ input = process.stdin, output = process.std
   for await (const line of rl) {
     const msg = JSON.parse(line);
     if (msg.method === 'initialize') {
-      send({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: '2025-03-26', capabilities: { tools: {} }, serverInfo: { name: 'sculptor', version: '0.3.0' } } });
-    } else if (msg.method === 'notifications/initialized' || msg.method === 'notifications/cancelled') {
+      send({
+        jsonrpc: '2.0',
+        id: msg.id,
+        result: {
+          protocolVersion: '2025-03-26',
+          capabilities: { tools: {} },
+          serverInfo: { name: 'sculptor', version: '0.3.0' },
+        },
+      });
+    } else if (
+      msg.method === 'notifications/initialized' ||
+      msg.method === 'notifications/cancelled'
+    ) {
       // 通知无响应
     } else if (msg.method === 'tools/list') {
       send({ jsonrpc: '2.0', id: msg.id, result: { tools: TOOLS } });
     } else if (msg.method === 'tools/call') {
       try {
         const result = await callTool(msg.params.name, msg.params.arguments || {}, cfg);
-        send({ jsonrpc: '2.0', id: msg.id, result: { content: [{ type: 'text', text: result.text }], isError: false } });
+        send({
+          jsonrpc: '2.0',
+          id: msg.id,
+          result: { content: [{ type: 'text', text: result.text }], isError: false },
+        });
       } catch (err) {
-        send({ jsonrpc: '2.0', id: msg.id, result: { content: [{ type: 'text', text: `[sculptor] ${err.message}` }], isError: true } });
+        send({
+          jsonrpc: '2.0',
+          id: msg.id,
+          result: { content: [{ type: 'text', text: `[sculptor] ${err.message}` }], isError: true },
+        });
       }
     } else if (msg.id !== undefined) {
-      send({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: `未知方法: ${msg.method}` } });
+      send({
+        jsonrpc: '2.0',
+        id: msg.id,
+        error: { code: -32601, message: `未知方法: ${msg.method}` },
+      });
     }
   }
 }

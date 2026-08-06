@@ -47,7 +47,7 @@ Sculptor 在 Phase 0 和压缩恢复时优先读这份日志 + state.json，而�
 宿主没接 hooks 时，Phase 0 就把已有对话摘要手动追加一条：
 
 ```json
-{"ts":"2026-08-06T10:00:00.000Z","event":"manual-observe","summary":"用户想写……"}
+{ "ts": "2026-08-06T10:00:00.000Z", "event": "manual-observe", "summary": "用户想写……" }
 ```
 
 ## 素材门槛（硬约束）

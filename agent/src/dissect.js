@@ -12,15 +12,30 @@ export async function dissect(cfg, wsDir, { file = null } = {}) {
   const text = fs.readFileSync(target, 'utf8').slice(0, 20000);
   const ctx = {
     text,
-    writeStyle: JSON.stringify(ws.readJson(path.join(workspace, 'vault', 'write-style.json')).dimensions || {}, null, 0).slice(0, 600),
-    readStyle: JSON.stringify(ws.readJson(path.join(workspace, 'vault', 'read-style.json')).structure || {}, null, 0).slice(0, 600),
+    writeStyle: JSON.stringify(
+      ws.readJson(path.join(workspace, 'vault', 'write-style.json')).dimensions || {},
+      null,
+      0,
+    ).slice(0, 600),
+    readStyle: JSON.stringify(
+      ws.readJson(path.join(workspace, 'vault', 'read-style.json')).structure || {},
+      null,
+      0,
+    ).slice(0, 600),
   };
-  const content = await chatWithRetry(cfg, [
-    { role: 'system', content: '你是感性解剖师，用感性语言输出严格 JSON。' },
-    { role: 'user', content: DISSECT_PROMPT(ctx) },
-  ], { json: true, temperature: 0.7, maxTokens: 3000 });
+  const content = await chatWithRetry(
+    cfg,
+    [
+      { role: 'system', content: '你是感性解剖师，用感性语言输出严格 JSON。' },
+      { role: 'user', content: DISSECT_PROMPT(ctx) },
+    ],
+    { json: true, temperature: 0.7, maxTokens: 3000 },
+  );
   const report = parseJsonContent(content, '解剖报告');
   const outFile = path.join(workspace, 'vault', 'project-memory', `dissect-${Date.now()}.json`);
-  fs.writeFileSync(outFile, JSON.stringify({ ...report, target, generatedAt: ws.nowIso() }, null, 2) + '\n');
+  fs.writeFileSync(
+    outFile,
+    JSON.stringify({ ...report, target, generatedAt: ws.nowIso() }, null, 2) + '\n',
+  );
   return { report, outFile };
 }

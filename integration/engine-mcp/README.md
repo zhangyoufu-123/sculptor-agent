@@ -19,18 +19,18 @@ Codex / Claude Code / OpenCode。
 
 ## 工具（10 个）
 
-| 工具 | 复用原引擎 |
-| --- | --- |
-| `init` | `SculptorOrchestrator` + PCS 快照恢复 |
-| `input` | `processInput`（澄清/大纲/写作全由引擎驱动，宿主只传话） |
-| `state` | `getState` → 玻璃面板 |
-| `draft` | `state.outline` → 正文导出 |
-| `projects` | 工作区快照列表 |
-| `style_extract` | `extractStyle`（4 遍管线）→ vault 14 维 |
-| `redteam` | `findBlacklistedPhrases` + `detectRepeatedFrames` + `checkFormatDiversity` + `detectAverageness` |
-| `absorb_edit` | `captureEdit`（风格信号提取） |
-| `fingerprint` | 风格指纹刷新（压缩守卫） |
-| `dissect` | `generateReaderProfiles` + `simulateReading` + `critiqueStyle` |
+| 工具            | 复用原引擎                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| `init`          | `SculptorOrchestrator` + PCS 快照恢复                                                            |
+| `input`         | `processInput`（澄清/大纲/写作全由引擎驱动，宿主只传话）                                         |
+| `state`         | `getState` → 玻璃面板                                                                            |
+| `draft`         | `state.outline` → 正文导出                                                                       |
+| `projects`      | 工作区快照列表                                                                                   |
+| `style_extract` | `extractStyle`（4 遍管线）→ vault 14 维                                                          |
+| `redteam`       | `findBlacklistedPhrases` + `detectRepeatedFrames` + `checkFormatDiversity` + `detectAverageness` |
+| `absorb_edit`   | `captureEdit`（风格信号提取）                                                                    |
+| `fingerprint`   | 风格指纹刷新（压缩守卫）                                                                         |
+| `dissect`       | `generateReaderProfiles` + `simulateReading` + `critiqueStyle`                                   |
 
 ## 触发纪律（必须遵守）
 

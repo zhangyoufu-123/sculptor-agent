@@ -9,10 +9,12 @@ export function styleSummary(file) {
   try {
     const obj = ws.readJson(file);
     const dims = obj.dimensions || obj.structure || {};
-    return Object.entries(dims)
-      .filter(([, d]) => d && (d.confidence || 0) >= 0.3)
-      .map(([k, d]) => `${k}: ${d.value}（${(d.confidence * 100).toFixed(0)}%）`)
-      .join('\n') || '（未采集）';
+    return (
+      Object.entries(dims)
+        .filter(([, d]) => d && (d.confidence || 0) >= 0.3)
+        .map(([k, d]) => `${k}: ${d.value}（${(d.confidence * 100).toFixed(0)}%）`)
+        .join('\n') || '（未采集）'
+    );
   } catch {
     return '（未采集）';
   }
@@ -47,10 +49,14 @@ export async function generateOutline(cfg, wsDir) {
     writeStyle: styleSummary(path.join(workspace, 'vault', 'write-style.json')),
     readStyle: styleSummary(path.join(workspace, 'vault', 'read-style.json')),
   };
-  const content = await chatWithRetry(cfg, [
-    { role: 'system', content: '你是提纲设计师。输出严格 JSON。' },
-    { role: 'user', content: OUTLINE_PROMPT(ctx) },
-  ], { json: true, temperature: 0.7, maxTokens: 3000 });
+  const content = await chatWithRetry(
+    cfg,
+    [
+      { role: 'system', content: '你是提纲设计师。输出严格 JSON。' },
+      { role: 'user', content: OUTLINE_PROMPT(ctx) },
+    ],
+    { json: true, temperature: 0.7, maxTokens: 3000 },
+  );
   const outline = parseJsonContent(content, '大纲');
   if (!outline.sections?.length) throw new Error('大纲缺少 sections');
   const total = outline.sections.reduce((s, x) => s + Number(x.words || 0), 0);
@@ -71,6 +77,9 @@ export async function generateOutline(cfg, wsDir) {
   state.outline = outline;
   ws.writeState(workspace, state);
   const memoryFile = path.join(workspace, 'vault', 'project-memory', `outline-${Date.now()}.json`);
-  fs.writeFileSync(memoryFile, JSON.stringify({ ...outline, generatedAt: ws.nowIso() }, null, 2) + '\n');
+  fs.writeFileSync(
+    memoryFile,
+    JSON.stringify({ ...outline, generatedAt: ws.nowIso() }, null, 2) + '\n',
+  );
   return { outline, state, memoryFile };
 }

@@ -1,7 +1,8 @@
 // Phase 1 澄清：一次一问、带建议、从用户原话生长；连续两次低意愿即终止。
 import readline from 'node:readline';
 import fs from 'node:fs';
-import { chatWithRetry, parseJsonContent, LlmError } from './llm.js';
+import path from 'node:path';
+import { chatWithRetry, parseJsonContent } from './llm.js';
 import { QUESTIONER_PROMPT } from './prompts.js';
 import * as ws from './workspace.js';
 
@@ -18,14 +19,46 @@ const NEED_LABELS = {
 };
 
 const FALLBACK_QUESTIONS = [
-  { need: 'topic', ask: '用一句话说说，这篇文章你想写什么？', recommendation: '先给个最接近你心里的说法，哪怕是口语' },
-  { need: 'stance', ask: '写完这篇文章，你希望读者心里留下什么？', recommendation: '比如"相信教育要转向能力培养"，或"感到历史的现场感"' },
-  { need: 'audience', ask: '这篇文章主要给谁看？', recommendation: '老师、同学、家长、还是陌生读者？这决定信息密度' },
-  { need: 'materials', ask: '有没有具体的事、画面、数据或引文可以用进去？', recommendation: '哪怕一个小场景也行，细节比观点更难得' },
-  { need: 'theme', ask: '这篇文章的"立意"是什么？用一句话说清你最想表达的那个核心意思。', recommendation: '立意是全文的心脏，比如"历史不是展品，而是可以站进去的现场"' },
-  { need: 'argument', ask: '围绕这个立意，你有哪些支撑论点？（先列一个）', recommendation: '论点要能展开成一段，比如"现场感来自具体的人，而非抽象的时间"' },
-  { need: 'emotion', ask: '读者读完，情绪上应该经历怎样的曲线？', recommendation: '比如"先好奇，再触动，最后安宁"——这决定节奏与收束' },
-  { need: 'ending', ask: '结尾你想停在什么姿态上？', recommendation: '比如"必胜的决心/赴死的意志/心安则上/留白"——按你的价值取向定调' },
+  {
+    need: 'topic',
+    ask: '用一句话说说，这篇文章你想写什么？',
+    recommendation: '先给个最接近你心里的说法，哪怕是口语',
+  },
+  {
+    need: 'stance',
+    ask: '写完这篇文章，你希望读者心里留下什么？',
+    recommendation: '比如"相信教育要转向能力培养"，或"感到历史的现场感"',
+  },
+  {
+    need: 'audience',
+    ask: '这篇文章主要给谁看？',
+    recommendation: '老师、同学、家长、还是陌生读者？这决定信息密度',
+  },
+  {
+    need: 'materials',
+    ask: '有没有具体的事、画面、数据或引文可以用进去？',
+    recommendation: '哪怕一个小场景也行，细节比观点更难得',
+  },
+  {
+    need: 'theme',
+    ask: '这篇文章的"立意"是什么？用一句话说清你最想表达的那个核心意思。',
+    recommendation: '立意是全文的心脏，比如"历史不是展品，而是可以站进去的现场"',
+  },
+  {
+    need: 'argument',
+    ask: '围绕这个立意，你有哪些支撑论点？（先列一个）',
+    recommendation: '论点要能展开成一段，比如"现场感来自具体的人，而非抽象的时间"',
+  },
+  {
+    need: 'emotion',
+    ask: '读者读完，情绪上应该经历怎样的曲线？',
+    recommendation: '比如"先好奇，再触动，最后安宁"——这决定节奏与收束',
+  },
+  {
+    need: 'ending',
+    ask: '结尾你想停在什么姿态上？',
+    recommendation: '比如"必胜的决心/赴死的意志/心安则上/留白"——按你的价值取向定调',
+  },
 ];
 
 export function contextOf(state) {
@@ -40,7 +73,7 @@ export function contextOf(state) {
   return lines.join('\n');
 }
 
-function classifyAnswer(question, answer) {
+function classifyAnswer(question, _answer) {
   const q = question || '';
   if (/论点|支撑|理由|论证|观点/.test(q)) return { field: 'argument' };
   if (/立意|中心意思|核心意思|想表达的最核心/.test(q)) return { field: 'theme' };
@@ -108,19 +141,31 @@ async function askOnce(state, cfg) {
     stageNeed: NEED_LABELS[need] || '素材细节',
   };
   try {
-    const content = await chatWithRetry(cfg, [
-      { role: 'system', content: '你是追问设计师。从用户话语中自然生长问题，每个问题都给出建议答案。' },
-      { role: 'user', content: QUESTIONER_PROMPT(ctx) },
-    ], { json: true, temperature: 0.7, maxTokens: 1000 });
+    const content = await chatWithRetry(
+      cfg,
+      [
+        {
+          role: 'system',
+          content: '你是追问设计师。从用户话语中自然生长问题，每个问题都给出建议答案。',
+        },
+        { role: 'user', content: QUESTIONER_PROMPT(ctx) },
+      ],
+      { json: true, temperature: 0.7, maxTokens: 1000 },
+    );
     const q = parseJsonContent(content, '追问');
     if (q.stop) return { stop: true, ready: materialGate(state), question: null };
     const question = String(q.question || '').trim();
     // 硬校验：一次只允许一个问题。LLM 一旦输出"一次多问"（≥3 个问号，或带编号/其次/另外的列举），
     // 退回确定性单问题，绝不让用户面对多问、也绝不自答默认。
     const qMarks = (question.match(/[？?]/g) || []).length;
-    const multi = qMarks >= 3 || /(^|\n)\s*([1-9一二三四五六]、?\.?)\s*/.test(question) || /另外|还有|其次|最后，/.test(question);
+    const multi =
+      qMarks >= 3 ||
+      /(^|\n)\s*([1-9一二三四五六]、?\.?)\s*/.test(question) ||
+      /另外|还有|其次|最后，/.test(question);
     if (!question || multi) {
-      const f = FALLBACK_QUESTIONS.find((x) => x.need === need) || FALLBACK_QUESTIONS[FALLBACK_QUESTIONS.length - 1];
+      const f =
+        FALLBACK_QUESTIONS.find((x) => x.need === need) ||
+        FALLBACK_QUESTIONS[FALLBACK_QUESTIONS.length - 1];
       return {
         stop: false,
         ready: materialGate(state),
@@ -131,11 +176,27 @@ async function askOnce(state, cfg) {
         warn: 'LLM 一次输出多个问题，已强制退回单问题',
       };
     }
-    return { stop: false, ready: materialGate(state), question, recommendation: q.recommendation, options: q.options || [] };
+    return {
+      stop: false,
+      ready: materialGate(state),
+      question,
+      recommendation: q.recommendation,
+      options: q.options || [],
+    };
   } catch (err) {
     // LLM 不可用时的确定性兜底：按缺口依次问，绝不死循环。
-    const f = FALLBACK_QUESTIONS.find((x) => x.need === need) || FALLBACK_QUESTIONS[FALLBACK_QUESTIONS.length - 1];
-    return { stop: false, ready: materialGate(state), question: f.ask, recommendation: f.recommendation, options: [], fallback: true, warn: String(err.message).slice(0, 120) };
+    const f =
+      FALLBACK_QUESTIONS.find((x) => x.need === need) ||
+      FALLBACK_QUESTIONS[FALLBACK_QUESTIONS.length - 1];
+    return {
+      stop: false,
+      ready: materialGate(state),
+      question: f.ask,
+      recommendation: f.recommendation,
+      options: [],
+      fallback: true,
+      warn: String(err.message).slice(0, 120),
+    };
   }
 }
 
@@ -184,7 +245,9 @@ export async function clarifyInteractive(cfg, wsDir) {
       if (next.stop || (lowWill >= 2 && next.ready)) {
         state = ws.readState(workspace);
         state.summary = next.ready ? '澄清完成，可生成大纲' : '澄清暂停（素材未齐）';
-        state.nextStep = next.ready ? '运行 sculptor outline' : '还需补充：' + (missingNeed(state) || '细节');
+        state.nextStep = next.ready
+          ? '运行 sculptor outline'
+          : '还需补充：' + (missingNeed(state) || '细节');
         ws.writeState(workspace, state);
         break;
       }
@@ -194,7 +257,8 @@ export async function clarifyInteractive(cfg, wsDir) {
       }
       let prompt = `\n${next.question}`;
       if (next.recommendation) prompt += `\n我的建议: ${next.recommendation}`;
-      if (next.options?.length) prompt += `\n选项: ${next.options.map((o, i) => `${'ABC'[i]}. ${o}`).join('  ')}`;
+      if (next.options?.length)
+        prompt += `\n选项: ${next.options.map((o, i) => `${'ABC'[i]}. ${o}`).join('  ')}`;
       const answer = await ask(prompt + '\n> ');
       if (LOW_WILL.test(answer)) lowWill += 1;
       else lowWill = 0;

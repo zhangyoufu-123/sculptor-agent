@@ -4,7 +4,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const TEMPLATE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'templates');
+export const TEMPLATE_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'templates',
+);
 
 export const PHASE_LABELS = {
   observe: '观察中',
@@ -65,7 +69,10 @@ export function truncate(s, n = 1000) {
 
 export function countLines(file) {
   try {
-    return fs.readFileSync(file, 'utf8').split('\n').filter((l) => l.trim()).length;
+    return fs
+      .readFileSync(file, 'utf8')
+      .split('\n')
+      .filter((l) => l.trim()).length;
   } catch {
     return 0;
   }
@@ -83,7 +90,10 @@ export function writeState(ws, state) {
 }
 
 export function logContext(ws, event, summary) {
-  appendLine(path.join(ws, 'protocol', 'context.jsonl'), JSON.stringify({ ts: nowIso(), event, summary: truncate(summary, 1200) }));
+  appendLine(
+    path.join(ws, 'protocol', 'context.jsonl'),
+    JSON.stringify({ ts: nowIso(), event, summary: truncate(summary, 1200) }),
+  );
 }
 
 export function queueRequest(ws, req) {
@@ -159,10 +169,19 @@ export function refreshFingerprint(ws) {
   const write = readJson(path.join(vaultDir, 'write-style.json'));
   const read = readJson(path.join(vaultDir, 'read-style.json'));
   const high = [];
-  for (const [obj, style, key] of [[write, 'write', 'dimensions'], [read, 'read', 'structure']]) {
+  for (const [obj, style, key] of [
+    [write, 'write', 'dimensions'],
+    [read, 'read', 'structure'],
+  ]) {
     for (const [name, d] of Object.entries(obj[key] || {})) {
       if (d && (d.confidence || 0) >= 0.6) {
-        high.push({ style, dim: name, value: d.value, confidence: d.confidence, evidence: (d.evidence || []).slice(0, 3) });
+        high.push({
+          style,
+          dim: name,
+          value: d.value,
+          confidence: d.confidence,
+          evidence: (d.evidence || []).slice(0, 3),
+        });
       }
     }
   }
@@ -179,7 +198,10 @@ export function refreshFingerprint(ws) {
         .slice(0, 5)
         .map(([k]) => k),
     },
-    learnedFrom: { writeEdits: write.learnedFrom?.edits || 0, readEdits: read.learnedFrom?.edits || 0 },
+    learnedFrom: {
+      writeEdits: write.learnedFrom?.edits || 0,
+      readEdits: read.learnedFrom?.edits || 0,
+    },
   };
   writeJson(path.join(vaultDir, 'style-fingerprint.json'), fingerprint);
   return fingerprint;
@@ -188,7 +210,9 @@ export function refreshFingerprint(ws) {
 // ── panel / status ─────────────────────────────────────
 
 export function renderPanel(stateFile) {
-  const statePath = path.resolve(stateFile || path.join(process.cwd(), '.sculptor', 'protocol', 'state.json'));
+  const statePath = path.resolve(
+    stateFile || path.join(process.cwd(), '.sculptor', 'protocol', 'state.json'),
+  );
   const s = readJson(statePath);
   const line = '─'.repeat(46);
   const phase = PHASE_LABELS[s.phase] || s.phase || '未知';

@@ -55,11 +55,13 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 ## 工作流
 
 ### Phase 0 观察（Observe）
+
 只整理**对话上下文**和**用户本次明确指定的素材**（用户给的文件路径或粘贴的内容）。
 历史草稿、旧文章一律不是本次素材：不得自动读取、不得当作素材引用；最多作为风格参考，且必须先用一句话征求用户同意。
 把整理结果写入 `protocol/state.json`，然后立即进入 Phase 1 提问。**不得**因为找到旧稿就跳过提问直接写作。
 
 ### Phase 1 澄清（Clarify）
+
 按 [references/questioning.md](references/questioning.md) 动态追问：一次一问、带建议、从用户原词生长、不重复、共情先行。素材与意图足够（主题 + 立场/目的 + 至少 2 条具体素材）即通过门槛进入大纲。
 
 **单问句硬规则**：每条回复**只允许一个问题**。发送前自检：回复里问号（？/?）≥3 个，或出现"1. 2. 3."、另外、还有、其次 等列举 → 立即重写，只留最关键的一个问题。
@@ -71,20 +73,25 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 **硬门槛（未满足=禁止进入大纲，必须继续提问）**：主题 ✓ + 立场/目的 ✓ + 素材 ≥2 条 ✓ + **核心立意 ✓ + 支撑论点 ≥2 个 ✓**。同时确认目标字数或文体。
 
 ### Phase 2 大纲（Plan）
+
 产出结构化大纲：每节一句话功能（铺垫/转折/细节/收束/升华）+ **每节挂一个支撑论点（thesis）** + 每节目标字数，并给出白话进度图（玻璃面板）供用户确认。**大纲未经用户确认（"可以/开始写"或明确授权）不得进入写作。** 用户说"可以/继续"是推进信号，不是低意愿。
 
 ### Phase 3 双风格写作（Write）
+
 先读 [references/style-vectors.md](references/style-vectors.md) 确认 write-style 与 read-style，再读 [references/anti-ai.md](references/anti-ai.md) 的全部硬规则。逐节写作，遵守格式多样性。
 **每节必须展开它挂载的论点：论点 → 论据（素材/细节/引文）→ 论证推进，禁止只有结论没有论证。** 全篇围绕核心立意展开，不跑题。同时写具体的人、事、画面、细节、引文——禁止"假大空"。每节写完后按目标字数核对，不足就扩写后再继续。
 写作中按需用 Requester 协议让用户补充图片/录音素材。
 
 ### Phase 4 红队审计（Red-team）
+
 用 [references/anti-ai.md](references/anti-ai.md) 的清单扫自己的稿子：黑名单、重复比喻、重复句式、统计指标。发现问题先自己修，再交付。
 
 ### Phase 5 交付与学习（Deliver & Learn）
+
 交付时：① **终核字数**（总字数达到目标 ±20%，逐节不缩水）与素材兑现（每个大纲素材都出现在正文）；② 更新 `protocol/state.json` 与 vault 双风格档案（本轮增量）；③ 告知用户可定点修改（[references/point-edit.md](references/point-edit.md)）；④ 用户要求深度审视时输出感性解剖报告（[references/sensibility.md](references/sensibility.md)）。
 
 ### 新任务隔离
+
 每次新任务使用新的工作区目录（如 `.sculptor-<任务名>`），**不要复用上次任务的 `.sculptor/`**——旧状态、旧草稿会污染澄清与写作。
 
 ## 协议文件（工作区 `.sculptor/`）

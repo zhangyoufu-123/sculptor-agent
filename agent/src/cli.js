@@ -67,16 +67,25 @@ function printError(err) {
 
 async function doctor(cfg, { ping = false } = {}) {
   const report = [];
-  report.push(`Node: ${process.version} ${Number(process.versions.node.split('.')[0]) >= 18 ? '✓' : '✗（需要 ≥18）'}`);
-  report.push(`LLM 端点: ${cfg.baseUrl}（模型 ${cfg.model}）${cfg.apiKey ? '✓ 已配置密钥' : '⚠ 未配置密钥（可用 mock 或本地服务）'}`);
+  report.push(
+    `Node: ${process.version} ${Number(process.versions.node.split('.')[0]) >= 18 ? '✓' : '✗（需要 ≥18）'}`,
+  );
+  report.push(
+    `LLM 端点: ${cfg.baseUrl}（模型 ${cfg.model}）${cfg.apiKey ? '✓ 已配置密钥' : '⚠ 未配置密钥（可用 mock 或本地服务）'}`,
+  );
   const w = ws.resolveWorkspace(cfg, '');
   report.push(`工作区: ${w} ${fs.existsSync(w) ? '✓' : '（未初始化）'}`);
   if (fs.existsSync(`${w}/vault/write-style.json`)) {
-    report.push(`风格档案: write ${ws.styleDimSummary(`${w}/vault/write-style.json`)} · read ${ws.styleDimSummary(`${w}/vault/read-style.json`)}`);
+    report.push(
+      `风格档案: write ${ws.styleDimSummary(`${w}/vault/write-style.json`)} · read ${ws.styleDimSummary(`${w}/vault/read-style.json`)}`,
+    );
   }
   if (ping) {
     try {
-      const r = await chat(cfg, [{ role: 'user', content: 'ping' }], { maxTokens: 16, temperature: 0 });
+      const r = await chat(cfg, [{ role: 'user', content: 'ping' }], {
+        maxTokens: 16,
+        temperature: 0,
+      });
       report.push(`LLM 连通: ✓（${r.trim().slice(0, 40)}）`);
     } catch (err) {
       report.push(`LLM 连通: ✗ ${err.message.slice(0, 120)}`);
@@ -105,7 +114,9 @@ export async function runCli(argv, io = {}) {
         break;
       }
       case 'panel': {
-        const f = positional[0] || `${workspace || path.join(process.cwd(), '.sculptor')}/protocol/state.json`;
+        const f =
+          positional[0] ||
+          `${workspace || path.join(process.cwd(), '.sculptor')}/protocol/state.json`;
         console.log(ws.renderPanel(f));
         break;
       }
@@ -128,7 +139,11 @@ export async function runCli(argv, io = {}) {
         const w = ws.resolveWorkspace(cfg, workspace);
         const r = await generateOutline(cfg, w);
         console.log(`《${r.outline.title}》 ${r.outline.sections.length} 节\n`);
-        r.outline.sections.forEach((s, i) => console.log(`${i + 1}. ${s.heading}（${s.function}）\n   ${(s.keyPoints || []).join(' / ')}`));
+        r.outline.sections.forEach((s, i) =>
+          console.log(
+            `${i + 1}. ${s.heading}（${s.function}）\n   ${(s.keyPoints || []).join(' / ')}`,
+          ),
+        );
         break;
       }
       case 'write': {
@@ -137,7 +152,9 @@ export async function runCli(argv, io = {}) {
         const r = await writeSection(cfg, w, { index, force: Boolean(flags.force) });
         console.log(`已写入 ${r.sections} 节 → ${r.draftFile}`);
         for (const s of r.report) {
-          console.log(`  ${s.index}. ${s.heading}：目标 ${s.target} 字 / 实际 ${s.actual} 字${s.expanded ? '（已扩写）' : ''}`);
+          console.log(
+            `  ${s.index}. ${s.heading}：目标 ${s.target} 字 / 实际 ${s.actual} 字${s.expanded ? '（已扩写）' : ''}`,
+          );
         }
         console.log(`合计 ${r.total} 字（目标 ${cfg.targetWords} 字）`);
         break;
@@ -186,7 +203,10 @@ export async function runCli(argv, io = {}) {
         await runSetup(flags);
         break;
       case 'point-edit': {
-        if (positional.length < 2) throw new Error('用法: sculptor point-edit "<引用/原文>" "<修改指令>" [--dir 项目] [--file 文件]');
+        if (positional.length < 2)
+          throw new Error(
+            '用法: sculptor point-edit "<引用/原文>" "<修改指令>" [--dir 项目] [--file 文件]',
+          );
         const r = await pointEdit(cfg, ws.resolveWorkspace(cfg, flags.workspace || ''), {
           quote: positional[0],
           instruction: positional[1],

@@ -27,22 +27,22 @@
 
 ## 14 个规范维度
 
-| 维度 | 问的是 | 示例信号 |
-| --- | --- | --- |
-| temperature 语气温度 | 冷还是暖，主观还是克制 | 常用"我总觉得" vs 不用第一人称 |
-| sentencePreference 句式偏好 | 短句、长句还是混合 | 平均句长、最常用句式 |
-| modifierDensity 修饰密度 | 细节与修饰的浓淡 | 形容词/副词频率 |
-| languageRegister 语域 | 口语化还是书面化 | 会不会用方言、网络词 |
-| emotionalSpectrum 情感频谱 | 主要情绪域 | 怀旧、愤怒、平静、昂扬 |
-| narrativePerspective 叙述视角 | 第一人称/旁观/全知 | 视角是否稳定 |
-| imageryTendency 意象倾向 | 画面感与意象密度 | 比喻来源（自然/器物/历史） |
-| rhythm 节奏 | 快慢与呼吸感 | 逗号密度、段落长度 |
-| rhetoricalDevices 修辞手法 | 惯用修辞 | 白描 vs 排比 vs 通感 |
-| dialogueRatio 对话比例 | 引语与对话多少 | 直接引语频率 |
-| timeHandling 时间处理 | 顺叙/倒叙/闪回 | 时间词分布 |
-| endingPattern 结尾模式 | 收束方式 | 留白 vs 点题 vs 升华 |
-| criticalStance 批判姿态 | 是否带立场与批判 | 反问句、价值判断密度 |
-| vocabularyCharacter 词汇特色 | 词汇指纹 | 高频专属词、生僻词 |
+| 维度                          | 问的是                 | 示例信号                       |
+| ----------------------------- | ---------------------- | ------------------------------ |
+| temperature 语气温度          | 冷还是暖，主观还是克制 | 常用"我总觉得" vs 不用第一人称 |
+| sentencePreference 句式偏好   | 短句、长句还是混合     | 平均句长、最常用句式           |
+| modifierDensity 修饰密度      | 细节与修饰的浓淡       | 形容词/副词频率                |
+| languageRegister 语域         | 口语化还是书面化       | 会不会用方言、网络词           |
+| emotionalSpectrum 情感频谱    | 主要情绪域             | 怀旧、愤怒、平静、昂扬         |
+| narrativePerspective 叙述视角 | 第一人称/旁观/全知     | 视角是否稳定                   |
+| imageryTendency 意象倾向      | 画面感与意象密度       | 比喻来源（自然/器物/历史）     |
+| rhythm 节奏                   | 快慢与呼吸感           | 逗号密度、段落长度             |
+| rhetoricalDevices 修辞手法    | 惯用修辞               | 白描 vs 排比 vs 通感           |
+| dialogueRatio 对话比例        | 引语与对话多少         | 直接引语频率                   |
+| timeHandling 时间处理         | 顺叙/倒叙/闪回         | 时间词分布                     |
+| endingPattern 结尾模式        | 收束方式               | 留白 vs 点题 vs 升华           |
+| criticalStance 批判姿态       | 是否带立场与批判       | 反问句、价值判断密度           |
+| vocabularyCharacter 词汇特色  | 词汇指纹               | 高频专属词、生僻词             |
 
 每个维度记录：值 + 置信度（0-1）+ 证据片段（来自哪句话/哪次修改）。
 

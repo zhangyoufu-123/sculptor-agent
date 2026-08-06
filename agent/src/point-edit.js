@@ -92,12 +92,17 @@ export function locateQuote(dir, quote, fileHint) {
 export function applyChangeIfUnchanged(file, hit, replacement) {
   const current = fs.readFileSync(file, 'utf8');
   if (current.slice(hit.start, hit.end) !== hit.matched) {
-    throw new Error('该文件在修改期间被外部改动（目标原文已变化），Sculptor 已退让中止、未写盘。请重新选择引用后再改。');
+    throw new Error(
+      '该文件在修改期间被外部改动（目标原文已变化），Sculptor 已退让中止、未写盘。请重新选择引用后再改。',
+    );
   }
   const before = current.slice(0, hit.start);
   const after = current.slice(hit.end);
   const newText = before + replacement + after;
-  if (newText.slice(0, hit.start) !== before || newText.slice(hit.start + replacement.length) !== after) {
+  if (
+    newText.slice(0, hit.start) !== before ||
+    newText.slice(hit.start + replacement.length) !== after
+  ) {
     throw new Error('修订结果越界（改到了区间之外），已中止且未写盘。');
   }
   fs.writeFileSync(file, newText);
@@ -149,10 +154,14 @@ export async function pointEdit(cfg, wsDir, { quote, instruction, dir, file }) {
   if (!q) throw new Error('引用为空：请提供选中的原文');
   const found = locateQuote(project, q, file);
   if (found.length === 0) {
-    throw new Error(`在工作区找不到引用的原文:\n「${q}」\n请确认选中的是文档里的原句（带上标点更稳）。`);
+    throw new Error(
+      `在工作区找不到引用的原文:\n「${q}」\n请确认选中的是文档里的原句（带上标点更稳）。`,
+    );
   }
   if (found.length > 1) {
-    throw new Error(`「${q}」在 ${found.length} 个位置出现，请用 --file 指定文件:\n${found.map((f) => `  ${f.file}`).join('\n')}`);
+    throw new Error(
+      `「${q}」在 ${found.length} 个位置出现，请用 --file 指定文件:\n${found.map((f) => `  ${f.file}`).join('\n')}`,
+    );
   }
   const { file: targetFile, text, hit } = found[0];
   const before = text.slice(0, hit.start);
@@ -160,10 +169,21 @@ export async function pointEdit(cfg, wsDir, { quote, instruction, dir, file }) {
   const context = `${before.slice(-200)}\n⟦待修改⟧${hit.matched}⟦⟧\n${after.slice(0, 200)}`;
   const writeStyle = styleSummary(path.join(workspace, 'vault', 'write-style.json'));
 
-  const content = await chatWithRetry(cfg, [
-    { role: 'system', content: '你是修订者。只改写 ⟦待修改⟧ 标记的片段本身，保持上下文其余文字完全不变；只输出改写后的片段。' },
-    { role: 'user', content: `修改指令: ${instruction}\n\n【写作风格】${writeStyle}\n\n【上下文】\n${context}` },
-  ], { temperature: 0.7, maxTokens: 1500 });
+  const content = await chatWithRetry(
+    cfg,
+    [
+      {
+        role: 'system',
+        content:
+          '你是修订者。只改写 ⟦待修改⟧ 标记的片段本身，保持上下文其余文字完全不变；只输出改写后的片段。',
+      },
+      {
+        role: 'user',
+        content: `修改指令: ${instruction}\n\n【写作风格】${writeStyle}\n\n【上下文】\n${context}`,
+      },
+    ],
+    { temperature: 0.7, maxTokens: 1500 },
+  );
   const replacement = content.trim();
 
   applyChangeIfUnchanged(targetFile, hit, replacement);
@@ -178,7 +198,11 @@ export async function pointEdit(cfg, wsDir, { quote, instruction, dir, file }) {
     writeDims: dims.write,
     readDims: dims.read,
   });
-  ws.logContext(workspace, 'point-edit', `${targetFile}: 「${q.slice(0, 30)}」→ ${String(instruction).slice(0, 30)}`);
+  ws.logContext(
+    workspace,
+    'point-edit',
+    `${targetFile}: 「${q.slice(0, 30)}」→ ${String(instruction).slice(0, 30)}`,
+  );
 
   return {
     file: targetFile,
