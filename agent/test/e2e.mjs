@@ -77,6 +77,7 @@ try {
     '每一个细节都是过去的证词',
     '先好奇，再触动，最后安宁',
     '停在"心安则上"',
+    '史铁生在文中将地坛视为宿命的等待，于荒芜与辉煌的落日中体悟个体生命的流逝 [1.1]。他在生死边缘选择平静审视，将死亡视为必然降临的节日，以通透的智慧将苦难化为对美的沉思',
   ];
   let last;
   r = await run(['clarify', '--once'], { input: '\n' });
@@ -90,6 +91,72 @@ try {
     '澄清挖透立意与论点',
     Boolean(last.confirmed?.theme && last.confirmed?.arguments?.length >= 2),
     JSON.stringify({ c: last.confirmed, m: last.materials }),
+  );
+  check('风格底稿问题已问并收尾', last.confirmed?.styleSample === true);
+  const writeStyle = JSON.parse(
+    fs.readFileSync(path.join(workspace, 'vault', 'write-style.json'), 'utf8'),
+  );
+  const learnedDims = Object.values(writeStyle.dimensions || {}).filter(
+    (d) => (d.confidence || 0) > 0,
+  ).length;
+  check(
+    '对话语气已被动采集进风格档案',
+    learnedDims >= 3 && writeStyle.learnedFrom?.samples > 0,
+    `已学 ${learnedDims} 维，样本 ${writeStyle.learnedFrom?.samples}`,
+  );
+  check(
+    '风格底稿 14 维提取已落地',
+    writeStyle.dimensions?.temperature?.value === '克制内敛' &&
+      writeStyle.vector?.personalDataset?.topAssociations?.includes('地坛'),
+    JSON.stringify({
+      temperature: writeStyle.dimensions?.temperature?.value,
+      associations: writeStyle.vector?.personalDataset?.topAssociations,
+    }),
+  );
+
+  // 2.5 需求访谈：独立工作区跑多轮，返回确认清单与进度
+  const ws2 = path.join(root, 'ws2');
+  process.env.SCULPTOR_WORKSPACE = ws2;
+  r = await run(['init'], {});
+  check('interview 前 init', r.code === 0);
+  r = await run(['interview', '--once'], { input: '\n' });
+  const i0 = JSON.parse(r.out);
+  check(
+    'interview 首轮返回问题+清单',
+    Boolean(i0.question) && Array.isArray(i0.checklist) && i0.checklist.length === 9,
+    JSON.stringify({ q: i0.question?.slice(0, 20), n: i0.checklist?.length }),
+  );
+  for (const a of answers) {
+    r = await run(['interview', '--once'], { input: a + '\n' });
+    check('interview --once 正常', r.code === 0, r.out.slice(0, 100));
+  }
+  const iLast = JSON.parse(r.out);
+  check(
+    '访谈完成：核心需求齐 + 风格底稿收尾',
+    iLast.done === true && iLast.remaining.coreCount === 0,
+    JSON.stringify({ done: iLast.done, remain: iLast.remaining }),
+  );
+  r = await run(['interview', '--summary', ws2], {});
+  check(
+    '访谈摘要打包清单与剩余步骤',
+    r.out.includes('确认清单') && r.out.includes('下一步'),
+    r.out.slice(0, 120),
+  );
+  process.env.SCULPTOR_WORKSPACE = workspace;
+
+  // 2.6 quote 引用块
+  r = await run(['quote', '那扇窗沉默地注视着一切。']);
+  check(
+    'quote 生成可粘贴引用块',
+    r.out.includes('〔Sculptor 引用〕《那扇窗沉默地注视着一切。》') && r.out.includes('修改指令'),
+  );
+
+  // 2.7 style 档案进度可见
+  r = await run(['style']);
+  check(
+    'style 命令显示档案进度',
+    r.out.includes('风格档案进度') && r.out.includes('已学'),
+    r.out.slice(0, 100),
   );
 
   // 3. outline
@@ -147,6 +214,19 @@ try {
     after.passed === true,
     JSON.stringify({ blacklist: after.blacklistHits, metaphors: after.repeatedMetaphors }),
   );
+
+  // 6.5 读者群像（交付前强制环节）
+  r = await run(['audience']);
+  check(
+    '读者群像 8 人反馈',
+    r.code === 0 &&
+      r.out.includes('读者群像') &&
+      r.out.includes('老教师') &&
+      r.out.includes('最想对作者说'),
+    r.out.slice(0, 160),
+  );
+  r = await run(['audience', '--quick']);
+  check('--quick 快速模式', r.code === 0 && r.out.includes('读者群像'));
 
   // 7. dissect
   r = await run(['dissect']);
@@ -214,6 +294,13 @@ try {
     work,
   ]);
   check('引用格式可解析', r.code === 0, r.out.slice(0, 120));
+  r = await run([
+    'point-edit',
+    '〔Sculptor 引用〕《历史从不缺席。》\n修改指令：更口语一点',
+    '--dir',
+    work,
+  ]);
+  check('两行引用块单参数可解析', r.code === 0, r.out.slice(0, 120));
 
   const md2 = path.join(work, 'sample2.md');
   fs.writeFileSync(md2, '重复出现的句子就是它。这里再来一次：重复出现的句子就是它。\n');
@@ -270,9 +357,33 @@ try {
       .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
   );
   check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'sculptor');
-  check('MCP tools/list 13 个工具', byId[2]?.result?.tools?.length === 13);
+  check('MCP tools/list 17 个工具', byId[2]?.result?.tools?.length === 17);
   check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Sculptor 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
+  const mcpInput2 = Readable.from([
+    `${JSON.stringify({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'interview_step', arguments: { workspace, lastInput: '我在想结尾要不要留白' } } })}\n`,
+    `${JSON.stringify({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'quote', arguments: { text: '一扇窗' } } })}\n`,
+  ]);
+  const mcpOut2 = [];
+  const output2 = new Writable({
+    write(c, _e, cb) {
+      mcpOut2.push(c.toString());
+      cb();
+    },
+  });
+  await runMcpServer({ input: mcpInput2, output: output2 });
+  const byId2 = Object.fromEntries(
+    mcpOut2
+      .join('')
+      .trim()
+      .split('\n')
+      .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
+  );
+  check('MCP interview_step 返回清单', byId2[5]?.result?.content?.[0]?.text?.includes('checklist'));
+  check(
+    'MCP quote 生成引用块',
+    byId2[6]?.result?.content?.[0]?.text?.includes('〔Sculptor 引用〕'),
+  );
 
   // 12. 生态位探测：主动触发判断
   r = await run(['probe', '帮我写一篇关于北大红楼的演讲稿，要有我的风格']);

@@ -10,6 +10,9 @@ import { redteam } from './redteam.js';
 import { dissect } from './dissect.js';
 import { pointEdit } from './point-edit.js';
 import { probeTask } from './observer.js';
+import { interviewStep } from './interview.js';
+import { runAudience, renderAudience } from './reader-gallery.js';
+import { styleProgress } from './style.js';
 
 const TOOLS = [
   {
@@ -35,6 +38,41 @@ const TOOLS = [
       properties: { workspace: { type: 'string' }, lastInput: { type: 'string' } },
       required: ['lastInput'],
     },
+  },
+  {
+    name: 'interview_step',
+    description: '需求访谈单步：传入用户最新消息，返回下一个问题 + 确认清单 + 进度 + 风格档案进度',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' }, lastInput: { type: 'string' } },
+      required: ['lastInput'],
+    },
+  },
+  {
+    name: 'audience',
+    description: '读者群像：8 个"第一读者"对草稿的感性反馈（交付前强制环节）',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        file: { type: 'string' },
+        quick: { type: 'boolean' },
+      },
+    },
+  },
+  {
+    name: 'quote',
+    description: '生成可粘贴的〔Sculptor 引用〕块（选中原句 → 右键/粘贴 → 定点修改）',
+    inputSchema: {
+      type: 'object',
+      properties: { text: { type: 'string' } },
+      required: ['text'],
+    },
+  },
+  {
+    name: 'style_status',
+    description: '查看风格档案进度（已学维度 + 最近证据），确认风格被读到了',
+    inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } },
   },
   {
     name: 'outline',
@@ -137,6 +175,36 @@ async function callTool(name, args, cfg) {
       const w = wsDir(args, cfg);
       const r = await clarifyStep(cfg, w, { lastInput: args.lastInput || '' });
       return { text: JSON.stringify(r, null, 2) };
+    }
+    case 'interview_step': {
+      const w = wsDir(args, cfg);
+      const r = await interviewStep(cfg, w, { lastInput: args.lastInput || '' });
+      return { text: JSON.stringify(r, null, 2) };
+    }
+    case 'audience': {
+      const w = wsDir(args, cfg);
+      const r = await runAudience(cfg, w, {
+        file: args.file || null,
+        quick: Boolean(args.quick),
+      });
+      return { text: renderAudience(r) };
+    }
+    case 'quote': {
+      return {
+        text: `〔Sculptor 引用〕《${String(args.text || '').trim()}》\n修改指令：<在这里写你要怎么改>`,
+      };
+    }
+    case 'style_status': {
+      const w = wsDir(args, cfg);
+      ws.ensureWorkspace(w);
+      const p = styleProgress(w);
+      return {
+        text:
+          `风格档案: write 已学 ${p.write.learned}/${p.write.total} 维 · read ${p.read.learned}/${p.read.total} 维\n` +
+          (p.write.top[0]
+            ? `最近: ${p.write.top.map((t) => `${t.dim}→${t.value}`).join('、')}`
+            : '（暂无信号，继续对话/修改会自动采集）'),
+      };
     }
     case 'outline': {
       const w = wsDir(args, cfg);

@@ -14,7 +14,12 @@ import { dissect } from './dissect.js';
 import { runMcpServer } from './mcp.js';
 import { runSetup } from './setup.js';
 import { pointEdit } from './point-edit.js';
+import { extractInstruction } from './point-edit.js';
+import { parseQuoteArg } from './point-edit.js';
 import { probeTask } from './observer.js';
+import { interviewStep, interviewInteractive, interviewSummary } from './interview.js';
+import { runAudience, renderAudience } from './reader-gallery.js';
+import { styleProgress, backfillFromContext, extractStyleFromSamples } from './style.js';
 
 const HELP = `Sculptor Agent v0.3 — 完整写作 Agent（独立运行 + MCP 协作）
 
@@ -22,12 +27,18 @@ const HELP = `Sculptor Agent v0.3 — 完整写作 Agent（独立运行 + MCP �
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
   sculptor clarify [工作区]           交互澄清（一次一问）
   sculptor clarify --once [工作区]    单步澄清：应用 stdin 的回答，输出下一个问题
+  sculptor interview [工作区]         需求访谈：多轮一问 + 实时确认清单 + 进度
+  sculptor interview --once [工作区]  单步访谈：应用 stdin 回答，输出问题+清单+进度
+  sculptor interview --summary [工作区]  打包需求确认清单与剩余步骤（不消耗 LLM）
   sculptor outline [工作区]           生成大纲（素材门槛未过会报错）
   sculptor write [--from N] [工作区]  按大纲逐节写作到 draft.md
   sculptor write --section N [工作区] 只写第 N 节
   sculptor redteam [--fix] [工作区]   反 AI 审计（可选 LLM 修订）
   sculptor redteam --file x.md        直接审计任意文件
+  sculptor audience [--file x.md] [--quick] [工作区]  读者群像：8 个"第一读者"的感性反馈
   sculptor dissect [--file x.md] [工作区]  感性解剖 5 维度
+  sculptor quote "<原句>"             生成可粘贴的「Sculptor 引用」块
+  sculptor style [--backfill] [--extract] [工作区]  查看风格档案进度（--backfill 回填对话日志；--extract 提取风格底稿）
   sculptor absorb <工作区> <edit.json>   吸收定点修改进风格档案
   sculptor fingerprint <工作区>       刷新压缩守卫风格指纹
   sculptor panel [state.json]         渲染玻璃面板
@@ -135,6 +146,64 @@ export async function runCli(argv, io = {}) {
         }
         break;
       }
+      case 'interview': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        if (flags.once) {
+          const r = await interviewStep(cfg, w, { lastInput: io.input || '' });
+          console.log(JSON.stringify(r, null, 2));
+        } else if (flags.summary) {
+          console.log(await interviewSummary(cfg, w));
+        } else {
+          await interviewInteractive(cfg, w);
+        }
+        break;
+      }
+      case 'audience': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        const r = await runAudience(cfg, w, {
+          file: flags.file || null,
+          quick: Boolean(flags.quick),
+        });
+        console.log(renderAudience(r));
+        break;
+      }
+      case 'quote': {
+        const raw = positional.join(' ');
+        if (!raw) throw new Error('用法: sculptor quote "<选中的原句>"');
+        const q = parseQuoteArg(raw);
+        if (!q) throw new Error('引用为空');
+        console.log(
+          `〔Sculptor 引用〕《${q}》\n修改指令：<在这里写你要怎么改，例如：这句太文艺，收一点>`,
+        );
+        break;
+      }
+      case 'style': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, workspace));
+        if (flags.extract) {
+          const ex = await extractStyleFromSamples(w, cfg);
+          console.log(`风格底稿提取：${ex.extracted} 份已提取，${ex.skipped} 份跳过/失败`);
+        }
+        if (flags.backfill) {
+          const r = backfillFromContext(w);
+          console.log(`已从对话日志回填 ${r.applied} 条风格信号（跳过 ${r.skipped} 条）`);
+        }
+        const p = styleProgress(w);
+        console.log(
+          `风格档案进度:\n` +
+            `  write（语言层）: 已学 ${p.write.learned}/${p.write.total} 维\n` +
+            `  read（结构层）: 已学 ${p.read.learned}/${p.read.total} 维`,
+        );
+        for (const [style, s] of Object.entries(p)) {
+          if (!s.top.length) continue;
+          console.log(`\n${style === 'write' ? '语言层' : '结构层'}最近信号:`);
+          for (const t of s.top) {
+            console.log(
+              `  · ${t.dim} → ${t.value}（置信 ${(t.confidence * 100).toFixed(0)}%${t.evidence?.length ? '，依据: ' + t.evidence.slice(-1)[0] : ''}）`,
+            );
+          }
+        }
+        break;
+      }
       case 'outline': {
         const w = ws.resolveWorkspace(cfg, workspace);
         const r = await generateOutline(cfg, w);
@@ -203,13 +272,14 @@ export async function runCli(argv, io = {}) {
         await runSetup(flags);
         break;
       case 'point-edit': {
-        if (positional.length < 2)
+        const instruction = positional[1] || extractInstruction(positional[0] || '');
+        if (!positional[0] || !instruction)
           throw new Error(
-            '用法: sculptor point-edit "<引用/原文>" "<修改指令>" [--dir 项目] [--file 文件]',
+            '用法: sculptor point-edit "<引用/原文>" "<修改指令>" [--dir 项目] [--file 文件]\n或: sculptor point-edit "〔Sculptor 引用〕《原句》\\n修改指令：…"',
           );
         const r = await pointEdit(cfg, ws.resolveWorkspace(cfg, flags.workspace || ''), {
           quote: positional[0],
-          instruction: positional[1],
+          instruction,
           dir: flags.dir,
           file: flags.file,
         });

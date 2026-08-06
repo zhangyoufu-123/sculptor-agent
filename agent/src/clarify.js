@@ -5,6 +5,7 @@ import path from 'node:path';
 import { chatWithRetry, parseJsonContent } from './llm.js';
 import { QUESTIONER_PROMPT } from './prompts.js';
 import * as ws from './workspace.js';
+import { applyStyleSignals, styleProgress, extractStyleFromSamples } from './style.js';
 
 const LOW_WILL = /没(有|什么)?更多|你决定|你自己决定|就这样|先这样|可以了|够了|你看着办/;
 const NEED_LABELS = {
@@ -16,6 +17,7 @@ const NEED_LABELS = {
   argument: '支撑论点',
   emotion: '情感曲线',
   ending: '结尾姿态',
+  styleSample: '风格底稿',
 };
 
 const FALLBACK_QUESTIONS = [
@@ -59,6 +61,12 @@ const FALLBACK_QUESTIONS = [
     ask: '结尾你想停在什么姿态上？',
     recommendation: '比如"必胜的决心/赴死的意志/心安则上/留白"——按你的价值取向定调',
   },
+  {
+    need: 'styleSample',
+    ask: '你以前写过类似这样的文章吗？有同文体的旧稿或片段的话，发我一段，我把它记成你的风格底稿。',
+    recommendation: '300 字以上的旧稿最理想；实在没有，说一句"没有"也行，我边写边从你的修改里学',
+    options: ['没有，先写吧'],
+  },
 ];
 
 export function contextOf(state) {
@@ -82,7 +90,7 @@ function classifyAnswer(question, _answer) {
   if (/立场|目的|想让人|希望读者|相信什么/.test(q)) return { field: 'stance' };
   if (/读者|给谁|听众/.test(q)) return { field: 'audience' };
   if (/主题|写什么|什么事|想写/.test(q)) return { field: 'topic' };
-  if (/风格|写过|类似|文体|文风/.test(q)) return { field: 'style' };
+  if (/风格|写过|类似|文体|文风|旧稿|底稿/.test(q)) return { field: 'style' };
   if (/素材|经历|案例|数据|画面|照片|手稿|细节/.test(q)) return { field: 'material' };
   return { field: 'material' };
 }
@@ -105,6 +113,7 @@ function applyAnswer(state, field, answer) {
     state.materials = state.materials || [];
     if (!state.materials.includes(a)) state.materials.push(a);
   }
+  if (field === 'style') state.confirmed.styleSample = true;
   return state;
 }
 
@@ -129,16 +138,24 @@ function missingNeed(state) {
   if ((c.arguments || []).length < 2) return 'argument';
   if (!c.emotionalCurve) return 'emotion';
   if (!c.endingTaste) return 'ending';
+  if (!c.styleSample) return 'styleSample';
   return '';
 }
 
-async function askOnce(state, cfg) {
+async function askOnce(state, cfg, workspace) {
   const need = missingNeed(state);
+  const coreReady = materialGate(state);
+  const style = workspace ? styleProgress(workspace) : null;
   const ctx = {
     context: contextOf(state),
     lastInput: state.lastInput || '（刚开始）',
     stage: '澄清',
     stageNeed: NEED_LABELS[need] || '素材细节',
+    coreReady,
+    styleNote: state.confirmed.styleNote || '',
+    styleProgress: style
+      ? `write ${style.write.learned}/${style.write.total} 维 · read ${style.read.learned}/${style.read.total} 维`
+      : '',
   };
   try {
     const content = await chatWithRetry(
@@ -153,7 +170,9 @@ async function askOnce(state, cfg) {
       { json: true, temperature: 0.7, maxTokens: 1000 },
     );
     const q = parseJsonContent(content, '追问');
-    if (q.stop) return { stop: true, ready: materialGate(state), question: null };
+    if (q.stop && missingNeed(state) === '') {
+      return { stop: true, ready: materialGate(state), question: null };
+    }
     const question = String(q.question || '').trim();
     // 硬校验：一次只允许一个问题。LLM 一旦输出"一次多问"（≥3 个问号，或带编号/其次/另外的列举），
     // 退回确定性单问题，绝不让用户面对多问、也绝不自答默认。
@@ -210,9 +229,31 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     // 答案归类到"上一个问题"的意图；提问时就推断并保存该意图。
     const field = state.lastField || 'material';
     applyAnswer(state, field, lastInput);
+    // 风格全程采集：用户每一句话（含修改理由、素材、语气）都是风格信号。
+    const style = applyStyleSignals(workspace, lastInput);
+    if (style.writeUpdated + style.readUpdated > 0) {
+      ws.logContext(
+        workspace,
+        'style',
+        `被动采集到风格信号 ${style.writeUpdated} 维（write）+ ${style.readUpdated} 维（read）`,
+      );
+    }
+    // 风格底稿落盘：用户贴的长样本存进 vault，供后续 STYLE_EXTRACTION 使用。
+    if (state.lastField === 'style' && lastInput.length >= 80) {
+      const sampleDir = path.join(workspace, 'vault', 'style-samples');
+      fs.mkdirSync(sampleDir, { recursive: true });
+      const sampleFile = path.join(sampleDir, `sample-${Date.now()}.md`);
+      fs.writeFileSync(sampleFile, lastInput + '\n');
+      state.confirmed.styleSampleFile = sampleFile;
+      // 贴了风格底稿 → 立即做 14 维风格提取（LLM），写进 write-style.json。
+      const ex = await extractStyleFromSamples(workspace, cfg);
+      if (ex.extracted > 0) {
+        ws.logContext(workspace, 'style', `风格底稿提取完成：${ex.extracted} 份样本 → 14 维档案`);
+      }
+    }
     ws.logContext(workspace, 'clarify', `${state.lastQuestion || '（首轮）'} → ${lastInput}`);
   }
-  const next = await askOnce(state, cfg);
+  const next = await askOnce(state, cfg, workspace);
   if (next.question) {
     state.lastQuestion = next.question;
     state.lastField = classifyAnswer(next.question, '').field;
@@ -220,7 +261,13 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
   state.summary = next.ready ? '立意、论点与素材已确认，可生成大纲' : '澄清中';
   state.nextStep = next.ready ? '运行 sculptor outline' : '继续回答澄清问题';
   ws.writeState(workspace, state);
-  return { ...next, phase: state.phase, confirmed: state.confirmed, materials: state.materials };
+  return {
+    ...next,
+    phase: state.phase,
+    confirmed: state.confirmed,
+    materials: state.materials,
+    style: styleProgress(workspace),
+  };
 }
 
 export async function clarifyOnce(cfg, wsDir, { input } = {}) {
@@ -230,6 +277,8 @@ export async function clarifyOnce(cfg, wsDir, { input } = {}) {
   }
   return clarifyStep(cfg, wsDir, { lastInput: answer });
 }
+
+export { missingNeed };
 
 export async function clarifyInteractive(cfg, wsDir) {
   const workspace = ws.ensureWorkspace(wsDir);

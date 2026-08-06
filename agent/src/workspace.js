@@ -238,8 +238,23 @@ export function renderPanel(stateFile) {
   const ws = path.resolve(path.dirname(statePath), '..');
   out.push(
     `风格金库: write ${styleDimSummary(path.join(ws, 'vault', 'write-style.json'))} · read ${styleDimSummary(path.join(ws, 'vault', 'read-style.json'))}`,
-    line,
   );
+  for (const [label, file] of [
+    ['语言层', 'write-style.json'],
+    ['结构层', 'read-style.json'],
+  ]) {
+    try {
+      const obj = readJson(path.join(ws, 'vault', file));
+      const dims = obj.dimensions || obj.structure || {};
+      const top = Object.entries(dims)
+        .filter(([, d]) => d && (d.confidence || 0) >= 0.4)
+        .sort((a, b) => (b[1].confidence || 0) - (a[1].confidence || 0))
+        .slice(0, 3)
+        .map(([k, d]) => `${k}→${d.value}（${(d.confidence * 100).toFixed(0)}%）`);
+      if (top.length) out.push(`  ${label}: ${top.join('、')}`);
+    } catch {}
+  }
+  out.push(line);
   return out.join('\n');
 }
 

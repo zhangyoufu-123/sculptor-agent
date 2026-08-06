@@ -25,15 +25,58 @@ export SCULPTOR_TARGET_WORDS=1000                           # 可选：目标字
 
 ```bash
 sculptor init                 # 初始化 .sculptor/ 工作区
-sculptor clarify              # 交互澄清（一次一问、带建议、可随时"你决定"结束）
+sculptor interview            # 需求访谈：多轮一问 + 实时确认清单 + 进度（推荐入口）
+sculptor clarify              # 轻量交互澄清（一次一问、带建议、可随时"你决定"结束）
 sculptor outline              # 生成大纲（素材门槛未过会拒绝）
 sculptor write                # 逐节写作 → draft.md（双风格注入 + 反 AI 硬规则）
 sculptor redteam --fix        # 反 AI 审计 + LLM 修订
+sculptor audience             # 读者群像：8 个"第一读者"的感性反馈（交付前强制）
 sculptor dissect              # 感性解剖 5 维度
+sculptor quote "选中的原句"    # 生成可粘贴的「Sculptor 引用」块
+sculptor style                # 查看风格档案进度（证明风格被读到了）
 sculptor panel / status       # 玻璃面板 / 工作区摘要
 sculptor doctor --ping        # 自检 + LLM 连通
 sculptor point-edit "原句" "修改指令" --dir 项目   # 深度定点修改：只改选中的那一句
 ```
+
+### 需求访谈（Interview）——与普通 AI 对话的本质区别
+
+`sculptor interview` 把澄清阶段变成**用户看得见的结构化多轮对话**：
+每轮只问一个问题（带建议与选项），回答后立刻更新一张确认清单：
+
+```text
+Sculptor 需求访谈 · 确认清单
+✓ 主题（已确认）
+✓ 立场/目的（已确认）
+… 读者与场合 — 待确认
+… 具体素材（≥2 条）（1/2）— 待确认
+…
+进度: 4/9（* 可选维度，用户连续两次说"你决定"可跳过）
+```
+
+进度和剩余项实时可见，最后一轮还会补问风格底稿（"你以前写过类似这样的文章吗？
+发我一段同文体旧稿"），并在收尾时打包输出确认清单 + 风格档案进度 + 剩余步骤。
+宿主（MCP）可调用 `interview_step` 拿到同样的结构化结果。
+
+### 定点引用（Quote）——选中即改
+
+在 md 文档里选中一句话 → 右键 → 复制 → 粘贴到 Sculptor 对话：
+
+```text
+〔Sculptor 引用〕《选中的原句》
+修改指令：这句太文艺，收一点
+```
+
+`sculptor quote "原句"` 可一键生成这个块；macOS 用户可装
+`extras/Sculptor 引用服务.workflow`（右键菜单服务），选中文字 → 右键 → 在 Sculptor 中修改。
+point-edit 会精确定位原文、只改那一处、并把修改吸收进风格档案。
+
+### 读者群像（Audience）——交付前的感性把关
+
+`sculptor audience` 屏蔽作者视角，模拟 8 个"第一读者"（老教师/挑剔编辑/中学生/
+挑剔评论家/焦虑家长/历史爱好者/随性读者/年轻作家）第一次读草稿的心理活动：
+在哪里停下来、哪里走神、哪句记住了、最想对作者说什么。LLM 不可用时退化为
+确定性反馈，保证这个环节永不缺席。
 
 ## 自动接入（零手动配置）
 
@@ -72,9 +115,25 @@ Claude Code 项目 `.mcp.json`：
 { "mcpServers": { "sculptor": { "command": "/path/to/sculptor", "args": ["mcp"] } } }
 ```
 
-宿主 agent 通过 11 个 MCP 工具调用 Sculptor：`init / panel / status / clarify_step / outline /
-write_section / write_all / redteam / dissect / absorb / fingerprint`。对话仍由宿主主导，
+宿主 agent 通过 17 个 MCP 工具调用 Sculptor：`init / panel / status / clarify_step /
+interview_step / outline / write_section / write_all / redteam / audience / dissect /
+absorb / fingerprint / point_edit / quote / style_status / probe`。对话仍由宿主主导，
 Sculptor 只负责写作工作流与风格——这就是"承上启下"的协作模型。
+
+### 风格可见性（Style）
+
+用户的每一句话、每一条素材、每一次手动修改都会被动采集进
+`vault/write-style.json`（语言层）与 `vault/read-style.json`（结构层），
+每条信号都带证据。`sculptor style` 随时可以查看"风格被读到了什么"：
+
+```text
+风格档案进度:
+  write（语言层）: 已学 5/14 维
+  read（结构层）: 已学 2/7 维
+语言层最近信号:
+  · imageryTendency → 善用比喻意象（置信 40%，依据: 比喻词）
+  · sentencePreference → 短句为主（置信 40%，依据: 对话/素材句长偏短）
+```
 
 ## 可靠性设计
 

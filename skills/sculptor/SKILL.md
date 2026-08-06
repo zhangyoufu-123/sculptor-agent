@@ -64,11 +64,15 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 
 按 [references/questioning.md](references/questioning.md) 动态追问：一次一问、带建议、从用户原词生长、不重复、共情先行。素材与意图足够（主题 + 立场/目的 + 至少 2 条具体素材）即通过门槛进入大纲。
 
+**访谈要可见（Interview）**：澄清不是隐藏的流程，而是用户看得见的多轮对话。优先用 `sculptor interview`（或 MCP `interview_step`）：每轮回答后向用户展示**确认清单**（✓/…、进度 x/9、剩余项），让用户感到"AI 在认真记录我的需求"，而不是泛泛地闲聊。
+
 **单问句硬规则**：每条回复**只允许一个问题**。发送前自检：回复里问号（？/?）≥3 个，或出现"1. 2. 3."、另外、还有、其次 等列举 → 立即重写，只留最关键的一个问题。
 
 **未回答问题 = 待办，禁止默认**：用户没回答的维度一律视为"未确认"。即使上一轮不小心问了多个，未答的必须下轮重问，**绝不把推荐答案当默认采纳跳过**。用户明确说"你决定"才算放弃该维度。
 
-**澄清深度阶梯（按序挖透，不许跳）**：主题 → 立场/目的 → 读者 → 素材（≥2 条）→ **核心立意（一句话）** → **支撑论点（≥2 个，每个能展开成一段）** → 情感曲线 → 结尾姿态。立意和论点不挖透，等于没澄清。
+**澄清深度阶梯（按序挖透，不许跳）**：主题 → 立场/目的 → 读者 → 素材（≥2 条）→ **核心立意（一句话）** → **支撑论点（≥2 个，每个能展开成一段）** → 情感曲线 → 结尾姿态 → **风格底稿（同文体旧稿，问一次即可，没有就放过）**。立意和论点不挖透，等于没澄清。
+
+**全程被动采集风格**：用户的每一句话、每一条素材、每一次手动修改都是风格信号，即时写入 vault（write/read 双档案）并带证据。澄清时每轮都让用户看到风格档案在长（`sculptor style` / 玻璃面板），不要等到写作才想起风格。
 
 **硬门槛（未满足=禁止进入大纲，必须继续提问）**：主题 ✓ + 立场/目的 ✓ + 素材 ≥2 条 ✓ + **核心立意 ✓ + 支撑论点 ≥2 个 ✓**。同时确认目标字数或文体。
 
@@ -86,9 +90,13 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 
 用 [references/anti-ai.md](references/anti-ai.md) 的清单扫自己的稿子：黑名单、重复比喻、重复句式、统计指标。发现问题先自己修，再交付。
 
+### Phase 4.5 读者群像（Audience，交付前强制）
+
+用 `sculptor audience`（或 MCP `audience`）模拟 8 个"第一读者"第一次读草稿的心理活动：老教师、挑剔编辑、中学生、挑剔评论家、焦虑家长、历史爱好者、随性读者、年轻作家。完全屏蔽作者视角，记录他们"在哪里停下来、哪里走神、哪句记住了、最想对作者说什么"，把群像化的感性反馈返回给用户。LLM 不可用时也要给出确定性兜底反馈，这个环节**永不缺席**——它是"人想听的"那一面的最后一道闸门。
+
 ### Phase 5 交付与学习（Deliver & Learn）
 
-交付时：① **终核字数**（总字数达到目标 ±20%，逐节不缩水）与素材兑现（每个大纲素材都出现在正文）；② 更新 `protocol/state.json` 与 vault 双风格档案（本轮增量）；③ 告知用户可定点修改（[references/point-edit.md](references/point-edit.md)）；④ 用户要求深度审视时输出感性解剖报告（[references/sensibility.md](references/sensibility.md)）。
+交付时：① **终核字数**（总字数达到目标 ±20%，逐节不缩水）与素材兑现（每个大纲素材都出现在正文）；② 更新 `protocol/state.json` 与 vault 双风格档案（本轮增量）；③ 交付前已跑读者群像（Phase 4.5）并把关键反馈转达用户；④ 告知用户可定点修改（[references/point-edit.md](references/point-edit.md)）；⑤ 用户要求深度审视时输出感性解剖报告（[references/sensibility.md](references/sensibility.md)）。
 
 ### 新任务隔离
 
@@ -111,12 +119,14 @@ node scripts/sculptor.mjs panel .sculptor/protocol/state.json  # 渲染玻璃面
 node scripts/sculptor.mjs absorb .sculptor/vault edit.json     # 吸收定点修改进风格档案
 node scripts/sculptor.mjs fingerprint .sculptor/vault          # 刷新压缩守卫指纹
 node scripts/sculptor.mjs status .sculptor                     # 工作区摘要
+node scripts/sculptor.mjs checklist .sculptor                  # 渲染需求访谈确认清单（Q2 可见化）
+node scripts/sculptor.mjs quote "选中的原句"                    # 生成〔Sculptor 引用〕块（Q1）
 ```
 
 详情见 references/workflow.md、references/point-edit.md、hooks/compact-guard.md。
 
 > 如果宿主环境存在独立 `sculptor` CLI（agent 形态，见包内 agent/README.md），
-> 优先让它执行工作流步骤（`sculptor outline / write / redteam / dissect`），
+> 优先让它执行工作流步骤（`sculptor interview / outline / write / redteam / audience / dissect`），
 > 宿主负责对话与工具，Sculptor 负责写作与风格——这就是承上启下的协作模型。
 
 ## 参考资料路由

@@ -9,6 +9,8 @@
  *   fingerprint <vault目录>   刷新风格指纹（压缩守卫用）
  *   hook <工作区> [payload]   观察者日志入口（宿主 hook 调用，可从 stdin 读 JSON）
  *   status <工作区>           显示工作区摘要
+ *   checklist <工作区>        渲染需求访谈确认清单（主题→…→风格底稿）
+ *   quote <原句>              生成可粘贴的〔Sculptor 引用〕块
  *
  * 纯 Node 标准库，零依赖，跨平台（Codex / Claude Code / OpenCode 环境均有 Node）。
  */
@@ -36,6 +38,8 @@ const USAGE = `Sculptor CLI — 玻璃面板 / 定点修改吸收 / 压缩指纹
   sculptor.mjs fingerprint <vault目录>        刷新风格指纹（压缩守卫用）
   sculptor.mjs hook <工作区> [payload]        观察者日志入口（宿主 hook 调用，可从 stdin 读 JSON）
   sculptor.mjs status <工作区>                显示工作区摘要
+  sculptor.mjs checklist <工作区>             渲染需求访谈确认清单
+  sculptor.mjs quote <原句>                   生成〔Sculptor 引用〕块
 `;
 
 function die(msg, code = 1) {
@@ -319,6 +323,68 @@ function cmdStatus(ws) {
   console.log(`  风格指纹: ${fs.existsSync(path.join(vault, 'style-fingerprint.json')) ? '已生成' : '未生成'}`);
 }
 
+// ── checklist ────────────────────────────────────────
+
+const CHECKLIST_ROWS = [
+  { key: 'topic', label: '主题', required: true },
+  { key: 'stance', label: '立场/目的', required: true },
+  { key: 'audience', label: '读者与场合', required: true },
+  { key: 'materials', label: '具体素材（≥2 条）', required: true, count: 2 },
+  { key: 'theme', label: '核心立意', required: true },
+  { key: 'arguments', label: '支撑论点（≥2 个）', required: true, count: 2 },
+  { key: 'emotion', label: '情感曲线', required: false },
+  { key: 'ending', label: '结尾姿态', required: false },
+  { key: 'styleSample', label: '风格底稿（同文体旧稿）', required: false },
+];
+
+function cmdChecklist(ws) {
+  if (!fs.existsSync(ws)) die(`工作区不存在: ${ws}`);
+  const s = readJson(path.join(ws, 'protocol/state.json'));
+  const c = s.confirmed || {};
+  const mats = s.materials || [];
+  const args = c.arguments || [];
+  const line = '─'.repeat(46);
+  const out = [line, 'Sculptor 需求访谈 · 确认清单', line];
+  for (const row of CHECKLIST_ROWS) {
+    let done = false;
+    let note = '';
+    if (row.key === 'materials') {
+      done = mats.length >= (row.count || 1);
+      note = `${mats.length}/${row.count}`;
+    } else if (row.key === 'arguments') {
+      done = args.length >= (row.count || 1);
+      note = `${args.length}/${row.count}`;
+    } else if (row.key === 'styleSample') {
+      done = Boolean(c.styleSample);
+      note = c.styleNote ? '已记录' : '';
+    } else if (row.key === 'emotion') {
+      done = Boolean(c.emotionalCurve);
+      note = c.emotionalCurve ? '已确认' : '';
+    } else if (row.key === 'ending') {
+      done = Boolean(c.endingTaste);
+      note = c.endingTaste ? '已确认' : '';
+    } else {
+      done = Boolean(c[row.key]);
+      note = c[row.key] ? '已确认' : '';
+    }
+    const mark = done ? '✓' : '…';
+    out.push(`${mark} ${row.label}${note ? `（${note}）` : ''}${done ? '' : ' — 待确认'}`);
+  }
+  out.push(line);
+  out.push(`进度: ${out.filter((x) => x.startsWith('✓')).length}/${CHECKLIST_ROWS.length}（* 可选维度，用户连续两次说"你决定"可跳过）`);
+  out.push(line);
+  console.log(out.join('\n'));
+}
+
+// ── quote ────────────────────────────────────────────
+
+function cmdQuote(raw) {
+  const q = String(raw || '').trim().replace(/^〔[^〕]*引用[^〕]*〕\s*/, '');
+  if (!q) die('用法: sculptor.mjs quote <原句>');
+  console.log(`〔Sculptor 引用〕《${q}》`);
+  console.log('修改指令：<在这里写你要怎么改，例如：这句太文艺，收一点>');
+}
+
 // ── main ──────────────────────────────────────────────
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -344,6 +410,14 @@ switch (cmd) {
   case 'status':
     if (args.length < 1) die('用法: sculptor.mjs status <工作区>');
     cmdStatus(args[0]);
+    break;
+  case 'checklist':
+    if (args.length < 1) die('用法: sculptor.mjs checklist <工作区>');
+    cmdChecklist(args[0]);
+    break;
+  case 'quote':
+    if (args.length < 1) die('用法: sculptor.mjs quote <原句>');
+    cmdQuote(args.join(' '));
     break;
   case '-h':
   case '--help':

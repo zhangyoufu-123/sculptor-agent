@@ -9,11 +9,20 @@ import { styleSummary } from './outline.js';
 /** 解析"引用"粘贴格式：〔Sculptor 引用〕《原文》 或 直接原文 */
 export function parseQuoteArg(raw) {
   let s = String(raw || '').trim();
+  // 两行引用块：〔Sculptor 引用〕《原文》\n修改指令：…
+  const block = s.match(/〔[^〕]*引用[^〕]*〕\s*[《<«「](.+?)[》>»」]/s);
+  if (block) return block[1].trim();
   const m = s.match(/〔[^〕]*引用[^〕]*〕\s*[《<«「]?(.+?)[》>»」]?$/s);
   if (m) return m[1].trim();
   s = s.replace(/^〔[^〕]*引用[^〕]*〕\s*/, '');
   s = s.replace(/^[《<«「]/, '').replace(/[》>»」]$/, '');
   return s.trim();
+}
+
+/** 从两行引用块里提取"修改指令：…" */
+export function extractInstruction(raw) {
+  const m = String(raw || '').match(/修改指令[：:]\s*(.+)/s);
+  return m ? m[1].trim() : '';
 }
 
 function normalizeText(t) {

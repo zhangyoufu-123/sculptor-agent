@@ -43,6 +43,12 @@ const CLARIFY_QUESTIONS = [
     recommendation: '比如"必胜的决心/赴死的意志/心安则上/留白"',
     options: [],
   },
+  {
+    question:
+      '你以前写过类似这样的文章吗？有同文体的旧稿或片段的话，发我一段，我把它记成你的风格底稿。',
+    recommendation: '300 字以上的旧稿最理想；没有的话说"没有"即可，我边写边学',
+    options: ['没有，先写吧'],
+  },
 ];
 
 const OUTLINE = {
@@ -127,8 +133,43 @@ export function respond(messages) {
     else if (argCount < 2) q = CLARIFY_QUESTIONS[argCount === 0 ? 6 : 7];
     else if (!has(/^emotionalCurve:/m)) q = CLARIFY_QUESTIONS[8];
     else if (!has(/^endingTaste:/m)) q = CLARIFY_QUESTIONS[9];
+    else if (!has(/^styleSample:/m)) q = CLARIFY_QUESTIONS[10];
     else q = { question: null, recommendation: null, options: [], stop: true };
     return JSON.stringify({ ...q, stop: Boolean(q.stop) });
+  }
+  if (userMsg.includes('第一读者') && userMsg.includes('【文章】')) {
+    const name = userMsg.match(/你是「(.+?)」/)?.[1] || '读者';
+    const firstLine = (userMsg.match(/【文章】\n([\s\S]*?)\n\n输出严格 JSON/) || [])[1] || '';
+    const at = firstLine.slice(0, 20) || '开头';
+    return JSON.stringify({
+      impression: `我是${name}，第一次读这篇：开头有现场感，中段我停了一下来确认那个细节，结尾留下的余味比较清楚。`,
+      moments: [
+        { at, thought: '这里让我停下来想了想。' },
+        { at: firstLine.slice(-20) || '结尾', thought: '结尾这里我记住了。' },
+      ],
+      advice: '最打动我的是具体场景；抽象的道理再少一点我会更信。',
+    });
+  }
+  if (userMsg.includes('提取写作风格') && userMsg.includes('14 维')) {
+    return JSON.stringify({
+      dimensions: {
+        temperature: { value: '克制内敛', confidence: 0.7, evidence: ['样本情绪克制，少直白宣泄'] },
+        sentencePreference: { value: '长短交错', confidence: 0.65, evidence: ['样本句长有起伏'] },
+        imageryTendency: {
+          value: '善用意象承载情感',
+          confidence: 0.8,
+          evidence: ['地坛/落日/节日等意象'],
+        },
+        endingPattern: {
+          value: '以通透平静收束',
+          confidence: 0.75,
+          evidence: ['样本结尾平静超脱'],
+        },
+      },
+      associations: ['地坛', '落日', '节日'],
+      techniques: ['以景写情', '平静审视'],
+      attentionFocus: { 生命: 0.8, 死亡: 0.7, 苦难: 0.6 },
+    });
   }
   if (userMsg.includes('提纲设计师')) return JSON.stringify(OUTLINE);
   if (userMsg.includes('⟦待修改⟧') && userMsg.includes('修改指令')) {

@@ -49,13 +49,23 @@ node scripts/sculptor.mjs absorb .sculptor/vault edit.json
 
 ```bash
 sculptor point-edit "选中的原句" "修改指令" --dir 项目目录
-# 支持"引用"粘贴格式：
-#   sculptor point-edit "〔Sculptor 引用〕《选中的原句》" "修改指令" --dir 项目目录
 ```
 
 point-edit 会在项目 .md 文件里精确定位原文（同句多处出现时报错要求指定文件），
 只改写目标区间（越界即中止不写盘），并把修改吸收进 write/read 风格档案。
 macOS 用户可安装 `extras/Sculptor 引用服务.workflow`，右键菜单一键触发。
+
+### 引用块（给对话里用）
+
+在文档里选中一句 → `sculptor quote "选中的原句"` 生成可粘贴块，或直接手写：
+
+```text
+〔Sculptor 引用〕《选中的原句》
+修改指令：这句太文艺，收一点
+```
+
+把整个块粘进 Sculptor 对话，宿主即可调用 `sculptor point-edit` 或 MCP `point_edit`
+（两行格式会自动拆出原句与修改指令），只改那一处并吸收进风格档案。
 
 edit.json 格式：
 
