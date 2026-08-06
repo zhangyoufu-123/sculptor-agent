@@ -14,6 +14,11 @@
 - **风格全程被动采集**：每句话/素材/修改理由即时写入 write/read 档案（带证据）；
   同文体旧稿（≥80 字）自动落盘并做 14 维风格提取（联想/技巧/注意力焦点）；
   `sculptor style [--backfill|--extract]` 让"风格被读到了"全程可见。
+- **风格记忆检索（RAG 增强注入）**：写作/大纲/扩写/红队修订前按
+  "论题 + 文体 + 本节论点 + 高置信风格维度"检索作者旧稿片段与亲手修改对
+  （原文→修改→意图），BM25 中文二元组打分，相关度/时间衰减/重要性加权排序，
+  以少样本 + 联想库 + 反例块注入提示词；CLI 新增 `sculptor style --memory <查询>` 预览，
+  MCP 新增 `style_memory` 工具（17 → 18 个）。
 - MCP 新增 `interview_step / audience / quote / style_status`（13 → 17 个工具）。
 - skill 独立形态新增 `checklist / quote` 子命令（零依赖）。
 
