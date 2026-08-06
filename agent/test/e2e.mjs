@@ -282,8 +282,7 @@ try {
     '风格记忆按相关度排序（同题旧稿压过更新的无关样本 + 修改对入列）',
     shot?.samples?.[0]?.source === 'old-draft.md' &&
       shot.samples.some((s) => s.source === 'unrelated-new.md') &&
-      shot.samples[0].score >
-        shot.samples.find((s) => s.source === 'unrelated-new.md').score &&
+      shot.samples[0].score > shot.samples.find((s) => s.source === 'unrelated-new.md').score &&
       (shot?.edits?.length || 0) >= 1,
     JSON.stringify(
       shot?.samples?.map((s) => `${s.source}:${s.score}`).join(', ') +
@@ -303,7 +302,7 @@ try {
   );
 
   // 9. panel / status / doctor
-  r = await run(['panel']);
+  r = await run(['panel', path.join(workspace, 'protocol', 'state.json')]);
   check('玻璃面板渲染', r.out.includes('玻璃面板'));
   r = await run(['status']);
   check('状态摘要', r.out.includes('Sculptor 工作区'));
