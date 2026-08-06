@@ -74,6 +74,8 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 
 **全程被动采集风格**：用户的每一句话、每一条素材、每一次手动修改都是风格信号，即时写入 vault（write/read 双档案）并带证据。澄清时每轮都让用户看到风格档案在长（`sculptor style` / 玻璃面板），不要等到写作才想起风格。
 
+**风格记忆检索（RAG）**：写作前用 `sculptor style --memory "<论题/文体>"`（或 MCP `style_memory`）把作者旧稿片段与亲手修改对（原文→修改→意图）检索出来——**作者亲手改过的句子是最强风格信号，优先模仿**。写作/大纲/红队修订提示词已自动注入这些少样本 + 联想库 + 反例块；无检索结果时正常写作，不要因此卡住。
+
 **硬门槛（未满足=禁止进入大纲，必须继续提问）**：主题 ✓ + 立场/目的 ✓ + 素材 ≥2 条 ✓ + **核心立意 ✓ + 支撑论点 ≥2 个 ✓**。同时确认目标字数或文体。
 
 ### Phase 2 大纲（Plan）
@@ -85,6 +87,7 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 先读 [references/style-vectors.md](references/style-vectors.md) 确认 write-style 与 read-style，再读 [references/anti-ai.md](references/anti-ai.md) 的全部硬规则。逐节写作，遵守格式多样性。
 **每节必须展开它挂载的论点：论点 → 论据（素材/细节/引文）→ 论证推进，禁止只有结论没有论证。** 全篇围绕核心立意展开，不跑题。同时写具体的人、事、画面、细节、引文——禁止"假大空"。每节写完后按目标字数核对，不足就扩写后再继续。
 写作中按需用 Requester 协议让用户补充图片/录音素材。
+**少样本跟随**：写作与扩写时严格跟随检索到的作者旧稿笔法（节奏、用词、联想），修改时先对照"原文→修改→意图"再动手，不让风格漂回 AI 腔。
 
 ### Phase 4 红队审计（Red-team）
 
