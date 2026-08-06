@@ -1,41 +1,52 @@
 #!/usr/bin/env bash
-# Sculptor Agent 一键安装（开源分发入口）
+# Sculptor one-click installer (open-source distribution entry).
+# The skill ships the complete agent engine inside it - no separate CLI needed.
 #
-# 用法（任一）:
+# Usage (either):
 #   curl -fsSL https://raw.githubusercontent.com/sculptor-agent/sculptor-agent/main/install.sh | bash
 #   git clone https://github.com/sculptor-agent/sculptor-agent && cd sculptor-agent && ./install.sh
 #
-# 可选参数:
-#   --prefix <目录>     CLI 安装目录（默认 ~/.local/bin）
-#   --setup-dir <目录>  安装后自动 setup 到指定项目（目录级接入）
-#   --repo <URL>        curl 安装时使用的仓库地址（默认 github.com/sculptor-agent/sculptor-agent）
-#   --dry-run           只显示将做什么
+# Options:
+#   --project <dir>   project-scoped install into <dir>/.codex/skills/sculptor (default: current dir)
+#   --global          install into ~/.codex/skills/sculptor (affects all Codex sessions)
+#   --cli             also symlink the standalone CLI to ~/.local/bin/sculptor (optional)
+#   --mcp-codex       print Codex MCP config snippet (never modifies host config on its own)
+#   --dry-run         only show what would be done
 set -euo pipefail
 
 DRY_RUN=0
-PREFIX="${HOME}/.local/bin"
-SETUP_DIR=""
+PROJECT_DIR=""
+GLOBAL=0
+WITH_CLI=0
+MCP_CODEX=0
 REPO_URL="${SCULPTOR_REPO_URL:-https://github.com/sculptor-agent/sculptor-agent}"
+
+usage() {
+  sed -n '1,18p' "$0"
+  exit 0
+}
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --prefix) PREFIX="$2"; shift 2 ;;
-    --setup-dir) SETUP_DIR="$2"; shift 2 ;;
-    --repo) REPO_URL="$2"; shift 2 ;;
+    --project) PROJECT_DIR="$2"; shift 2 ;;
+    --global) GLOBAL=1; shift ;;
+    --cli) WITH_CLI=1; shift ;;
+    --mcp-codex) MCP_CODEX=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
-    -h|--help) sed -n '1,12p' "$0"; exit 0 ;;
-    *) echo "未知参数: $1" >&2; exit 1 ;;
+    -h|--help) usage ;;
+    *) echo "Unknown option: $1" >&2; usage ;;
   esac
 done
 
 step() { printf '\n=== %s ===\n' "$1"; }
 
-if [ -f "$PWD/agent/package.json" ]; then
+# 1/5 locate the repository (local checkout or clone)
+if [ -f "$PWD/agent/package.json" ] && [ -d "$PWD/skills/sculptor" ]; then
   REPO_DIR="$PWD"
-  step "1/3 使用本地仓库"
+  step "1/5 use local repo: $REPO_DIR"
 else
   REPO_DIR="${SCULPTOR_INSTALL_DIR:-${HOME}/.local/share/sculptor-agent}"
-  step "1/3 克隆仓库到 $REPO_DIR"
+  step "1/5 clone repo to $REPO_DIR"
   if [ "$DRY_RUN" -eq 1 ]; then
     echo "[dry-run] git clone --depth 1 $REPO_URL $REPO_DIR"
   else
@@ -44,34 +55,79 @@ else
   fi
 fi
 
-step "2/3 安装 CLI 到 $PREFIX/sculptor"
-if [ "$DRY_RUN" -eq 1 ]; then
-  bash "$REPO_DIR/scripts/install-agent.sh" --prefix "$PREFIX" --dry-run
+# 2/5 decide the install target (project-scoped by default)
+if [ "$GLOBAL" -eq 1 ]; then
+  DEST="${HOME}/.codex/skills/sculptor"
+  step "2/5 global install -> $DEST (affects all Codex sessions)"
 else
-  bash "$REPO_DIR/scripts/install-agent.sh" --prefix "$PREFIX"
+  PROJECT_DIR="${PROJECT_DIR:-$PWD}"
+  DEST="$PROJECT_DIR/.codex/skills/sculptor"
+  step "2/5 project-scoped install -> $DEST (this project only)"
 fi
 
-step "3/3 验证"
-if [ "$DRY_RUN" -eq 1 ]; then
-  echo "[dry-run] 跳过验证"
-else
-  "$PREFIX/sculptor" doctor || true
+if [ -d "$DEST" ]; then
+  BK="$DEST.bak.$(date +%s)"
+  step "existing install found; backing up to $BK (recoverable)"
+  if [ "$DRY_RUN" -eq 1 ]; then echo "[dry-run] cp -R $DEST $BK"; else cp -R "$DEST" "$BK"; fi
 fi
 
-if [ -n "$SETUP_DIR" ]; then
-  step "安装后自动接入到项目: $SETUP_DIR"
-  if [ "$DRY_RUN" -eq 1 ]; then
-    "$PREFIX/sculptor" setup --dir "$SETUP_DIR" --dry-run
+# 3/5 copy the skill (embedded engine included)
+step "3/5 copy skill -> $DEST"
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo "[dry-run] cp -R $REPO_DIR/skills/sculptor $DEST"
+else
+  mkdir -p "$(dirname "$DEST")"
+  cp -R "$REPO_DIR/skills/sculptor" "$DEST"
+fi
+
+# 4/5 verify the embedded engine can run standalone
+step "4/5 verify embedded engine"
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo "[dry-run] node $DEST/scripts/sculptor.mjs --help | grep -q interview"
+else
+  if node "$DEST/scripts/sculptor.mjs" --help | grep -q 'interview' &&
+     node "$DEST/scripts/sculptor.mjs" --help | grep -q 'redteam'; then
+    echo "OK: engine works - clarify/interview/outline/write/redteam/audience/dissect/restyle all available"
   else
-    "$PREFIX/sculptor" setup --dir "$SETUP_DIR"
+    echo "ERROR: engine verification failed. Node >= 18 required: node --version" >&2
+    exit 1
+  fi
+fi
+
+# 5/5 LLM config and next steps
+step "5/5 LLM config & next steps"
+if [ -n "${SCULPTOR_LLM_API_KEY:-}" ] || [ -n "${DEEPSEEK_API_KEY:-}" ]; then
+  echo "OK: LLM key detected (SCULPTOR_LLM_API_KEY / DEEPSEEK_API_KEY)"
+else
+  echo "NOTE: no LLM key detected. Before writing, configure:"
+  echo "  export SCULPTOR_LLM_API_KEY=sk-xxx"
+  echo "  # optional: export SCULPTOR_LLM_BASE_URL=...  export SCULPTOR_LLM_MODEL=..."
+fi
+if [ "$MCP_CODEX" -eq 1 ]; then
+  echo
+  echo "Codex MCP config snippet (append to project .codex/config.toml or ~/.codex/config.toml):"
+  cat <<EOF
+[mcp_servers.sculptor]
+command = "node"
+args = ["$DEST/scripts/sculptor.mjs", "mcp"]
+EOF
+fi
+if [ "$WITH_CLI" -eq 1 ]; then
+  step "optional: symlink standalone CLI to ${HOME}/.local/bin/sculptor"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    echo "[dry-run] ln -sf $DEST/scripts/sculptor.mjs ${HOME}/.local/bin/sculptor"
+  else
+    mkdir -p "${HOME}/.local/bin"
+    ln -sf "$DEST/scripts/sculptor.mjs" "${HOME}/.local/bin/sculptor"
   fi
 fi
 
 cat <<EOF
 
-✅ 完成。
-- CLI: ${PREFIX}/sculptor（如 PATH 不含 ${PREFIX}，请加入）
-- 下一步: 在你的写作项目里运行: sculptor setup
-- 配置 LLM: export SCULPTOR_LLM_API_KEY=sk-xxx  （或 setup 自动复用本机已有凭据）
-- 文档: https://github.com/sculptor-agent/sculptor-agent
+DONE.
+- Skill (with full engine): $DEST
+- Run in your writing project: node $DEST/scripts/sculptor.mjs interview
+- Or let the host agent call it per $DEST/SKILL.md
+- Rollback: move $DEST.bak.* back to $DEST if needed
+- Docs: https://github.com/sculptor-agent/sculptor-agent
 EOF

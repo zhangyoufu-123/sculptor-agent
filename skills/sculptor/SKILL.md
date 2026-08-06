@@ -115,29 +115,33 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 - `protocol/context.jsonl` — 观察者日志（宿主 hook 自动写入）。
 - `vault/` — 双风格档案、风格指纹、修改记录（`edits.jsonl`）。
 
-## 工具（零依赖 Node CLI）
+## 工具（skill 自带完整引擎，零依赖 Node CLI）
 
-维护协议用工具，不手写 JSON：
+本 skill **内嵌完整 agent 引擎**（`scripts/engine/`，由 `scripts/sync-skill-engine.sh` 从 agent/ 同步，CI 校验防漂移）。所有工作流步骤都能直接运行，**不需要单独安装 `sculptor` CLI**：
 
 ```bash
 # 下面的 scripts/ 指本 skill 目录下的 scripts/（如 ~/.codex/skills/sculptor/scripts/）
-node scripts/sculptor.mjs panel .sculptor/protocol/state.json  # 渲染玻璃面板
-node scripts/sculptor.mjs absorb .sculptor/vault edit.json     # 吸收定点修改进风格档案
-node scripts/sculptor.mjs fingerprint .sculptor/vault          # 刷新压缩守卫指纹
-node scripts/sculptor.mjs status .sculptor                     # 工作区摘要
-node scripts/sculptor.mjs checklist .sculptor                  # 渲染需求访谈确认清单（Q2 可见化）
-node scripts/sculptor.mjs quote "选中的原句"                    # 生成〔Sculptor 引用〕块（Q1）
+node scripts/sculptor.mjs interview .sculptor                  # 需求访谈：一次一问 + 确认清单 + 蓝图回显（首选入口）
+node scripts/sculptor.mjs outline .sculptor                    # 生成大纲（素材门槛未过会报错）
+node scripts/sculptor.mjs write .sculptor                      # 逐节写作（RAG 风格少样本注入 + 最新风格方向）
+node scripts/sculptor.mjs redteam --fix .sculptor              # 反 AI 审计 + 按用户风格修订
 node scripts/sculptor.mjs audience .sculptor                   # 读者群像：8 个"第一读者"反馈（交付前强制，Phase 4.5）
-node scripts/sculptor.mjs restyle .sculptor --direction "更克制一点"  # 按新风格方向重写整篇（缺省用档案最近方向）
+node scripts/sculptor.mjs restyle .sculptor --direction "更克制一点"  # 风格方向变化 → 整篇按新方向重写
+node scripts/sculptor.mjs dissect .sculptor                    # 感性解剖 5 维度（立场/局限/困惑/多视角/风格兑现度）
+node scripts/sculptor.mjs style --memory "论题" .sculptor      # 预览按论题检索到的旧稿与修改对
+node scripts/sculptor.mjs style --export .sculptor             # 导出人类可读风格档案（vault/style-profile.md）
+node scripts/sculptor.mjs point-edit "原句" "指令" --dir 项目   # 深度定点修改并吸收进风格档案
+node scripts/sculptor.mjs hook .sculptor                       # 宿主生命周期钩子 → 观察日志 + 压缩守卫
+node scripts/sculptor.mjs panel / status / checklist / absorb / fingerprint / quote
 ```
 
 详情见 references/workflow.md、references/point-edit.md、hooks/compact-guard.md。
 
-> 读者群像与重写需要 LLM（配置 `SCULPTOR_LLM_API_KEY`，默认 DeepSeek 端点）；
-> 未配置或调用失败时，读者群像自动退化为确定性兜底反馈（永不缺席），重写会给出明确提示。
-> 如果宿主环境存在独立 `sculptor` CLI（agent 形态，见包内 agent/README.md），
-> 优先让它执行工作流步骤（`sculptor interview / outline / write / redteam / audience / dissect`），
-> 宿主负责对话与工具，Sculptor 负责写作与风格——这就是承上启下的协作模型。
+> **LLM 配置**：澄清/大纲/写作/红队/读者群像/重写需要 LLM——配置
+> `SCULPTOR_LLM_API_KEY`（默认 DeepSeek 端点，可用 `SCULPTOR_LLM_BASE_URL/MODEL` 覆盖），
+> 或由宿主直接执行 LLM 步骤。未配置或调用失败时：读者群像退化为确定性兜底（永不缺席）、
+> 澄清退回确定性单问题阶梯、重写会给出明确提示——核心流程不崩，只是降级。
+> **分工**：宿主负责对话与工具，Sculptor 引擎负责写作、风格与结构——承上启下的协作模型。
 
 ## 参考资料路由
 

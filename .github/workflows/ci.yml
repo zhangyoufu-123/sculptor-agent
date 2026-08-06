@@ -13,11 +13,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Agent e2e（离线 mock，74 项断言）
+      - name: Agent e2e（离线 mock）
         run: cd agent && npm test
+      - name: Skill engine 与 agent 一致（防漂移）
+        run: bash scripts/sync-skill-engine.sh --check
+      - name: Skill 启动器可独立运行（内嵌引擎冒烟）
+        run: |
+          node skills/sculptor/scripts/sculptor.mjs --help | grep -q interview
+          node skills/sculptor/scripts/sculptor.mjs --help | grep -q redteam
+          node skills/sculptor/scripts/sculptor.mjs --help | grep -q 'mcp'
       - name: Shell 语法
         run: |
-          bash -n install.sh scripts/install.sh scripts/install-agent.sh \
+          bash -n install.sh scripts/install.sh scripts/install-agent.sh scripts/sync-skill-engine.sh \
             skills/sculptor/scripts/install.sh skills/sculptor/hooks/sculptor-hook.sh \
             integration/engine-mcp/apply.sh
       - name: SKILL frontmatter

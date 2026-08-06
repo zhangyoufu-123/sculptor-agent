@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.5.0 (2026-08-06)
+
+### Added
+
+- **skill 内嵌完整引擎**：`skills/sculptor/scripts/engine/` 是 agent 的完整快照
+  （bin + src + templates + package.json），`scripts/sculptor.mjs` 为启动器——
+  装完 skill 即拥有全部工作流（interview/outline/write/redteam/audience/dissect/
+  restyle/style/point-edit/mcp），**不再依赖外部安装的 sculptor CLI**。
+- **引擎同步脚本** `scripts/sync-skill-engine.sh`：agent/ 为单一事实源，
+  `--check` 模式供 CI 校验漂移。
+- **一键安装** `install.sh`：curl | bash 或 git clone；默认目录级安装
+  （`<项目>/.codex/skills/sculptor`），可 `--global` / `--cli` / `--mcp-codex`；
+  已有安装自动备份（`.bak.<时间戳>`）可回滚；装完自动验证引擎可独立运行。
+- **hook 命令**：宿主生命周期事件（session/user/assistant/compact/stop）→
+  观察日志 + 压缩守卫（压缩前刷新风格指纹）。
+- **checklist 命令**：渲染需求访谈确认清单（不消耗 LLM）。
+
+### Changed
+
+- 版本 0.4.0 → 0.5.0（MCP serverInfo、CLI HELP 同步）。
+- `setup` 支持双布局（独立包 / skill 内嵌引擎），自动定位 skill 目录。
+
 ## 0.4.0 (2026-08-06)
 
 ### Added

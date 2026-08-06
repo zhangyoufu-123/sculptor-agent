@@ -338,6 +338,30 @@ try {
       skillHelp.stdout.includes('audience') &&
       skillHelp.stdout.includes('restyle'),
   );
+  check(
+    'skill 启动器 = 完整引擎（interview/outline/write/redteam/dissect/mcp 全注册）',
+    skillHelp.status === 0 &&
+      skillHelp.stdout.includes('interview') &&
+      skillHelp.stdout.includes('outline') &&
+      skillHelp.stdout.includes('write') &&
+      skillHelp.stdout.includes('redteam') &&
+      skillHelp.stdout.includes('dissect') &&
+      skillHelp.stdout.includes('mcp'),
+  );
+  r = await run([
+    'hook',
+    workspace,
+    JSON.stringify({ event: 'session/start', summary: 'e2e 会话' }),
+  ]);
+  check('hook 记录会话事件', r.code === 0 && r.out.includes('session-start'), r.out.slice(0, 80));
+  r = await run([
+    'hook',
+    workspace,
+    JSON.stringify({ event: 'user/message', message: 'e2e 用户消息' }),
+  ]);
+  check('hook 记录用户消息', r.code === 0 && r.out.includes('用户消息'), r.out.slice(0, 80));
+  r = await run(['checklist', workspace]);
+  check('checklist 渲染确认清单', r.code === 0 && r.out.includes('确认清单'), r.out.slice(0, 80));
 
   // 7. dissect
   r = await run(['dissect']);

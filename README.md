@@ -7,29 +7,39 @@
 ## 快速开始（一键安装）
 
 ```bash
-# 方式一：一行命令（curl | bash）
+# 方式一：一行命令（curl | bash，目录级安装到当前项目）
 curl -fsSL https://raw.githubusercontent.com/sculptor-agent/sculptor-agent/main/install.sh | bash
 
 # 方式二：git clone
 git clone https://github.com/sculptor-agent/sculptor-agent
-cd sculptor-agent && ./install.sh --setup-dir ~/我的写作项目
+cd sculptor-agent && ./install.sh --project ~/我的写作项目
 ```
 
-装好后在你的写作项目里：
+skill 内嵌**完整 agent 引擎**，装完即用，无需单独安装 CLI。在你的写作项目里：
 
 ```bash
-sculptor setup          # 自动接入：检测宿主→原生注册→装 skill→复用本机凭据（目录级）
-export SCULPTOR_LLM_API_KEY=sk-xxx   # 或让 setup 自动发现
-sculptor init && sculptor interview   # 可见的需求访谈：一次一问 + 实时确认清单
+export SCULPTOR_LLM_API_KEY=sk-xxx    # 必配：默认 DeepSeek 端点
+SCULPTOR=.codex/skills/sculptor/scripts/sculptor.mjs
+node $SCULPTOR init && node $SCULPTOR interview   # 可见的需求访谈：一次一问 + 确认清单 + 蓝图回显
+node $SCULPTOR outline && node $SCULPTOR write     # 大纲（素材门槛）→ 逐节写作（风格少样本注入）
+node $SCULPTOR redteam --fix                        # 反 AI 审计 + 按你的风格修订
+node $SCULPTOR audience                             # 交付前强制：8 个"第一读者"的群像反馈
 ```
 
-深度定点修改：在 md 文档里选中一句话 → `sculptor point-edit "原句" "指令" --dir 项目`（macOS 可装右键服务，见 extras/）。
-写完后交付前跑 `sculptor audience`——8 个"第一读者"的群像化感性反馈。
+深度定点修改：在 md 文档里选中一句话 → `node $SCULPTOR point-edit "原句" "指令" --dir 项目`（macOS 可装右键服务，见 extras/）。
+风格方向变化（"整篇更克制一点"）→ `node $SCULPTOR restyle` 让整篇按新方向重写。
+宿主 agent（Codex / Claude Code / OpenCode）安装后可直接按 `SKILL.md` 自动调用全部流程。
 
 ## 双形态
 
-- **Skill 形态**（本包 `skills/sculptor/`）：宿主 agent 按 SKILL.md 指导完成写作工作流，零安装、零依赖。
-- **完整 Agent 形态**（[agent/](agent/README.md)）：独立 Node CLI `sculptor`，自带澄清/大纲/写作/红队/解剖全工作流 + LLM 连接，并提供 **MCP stdio 服务器**——Codex、Claude Code、OpenCode 通过标准 MCP 调用它，对话仍由宿主主导，Sculptor 只负责写作与风格。**只写自己的工作区，绝不碰宿主配置。**
+- **Skill 形态（默认，完整引擎内嵌）**（本包 `skills/sculptor/`）：`scripts/engine/` 是
+  agent 的完整快照（由 `scripts/sync-skill-engine.sh` 同步、CI 校验防漂移），
+  `node scripts/sculptor.mjs <cmd>` 直接运行全部工作流——**装 skill 即装完整 agent，
+  不依赖外部 CLI**。宿主 agent 按 SKILL.md 自动调用，或手动跑命令。
+- **独立 CLI 形态（可选）**（[agent/](agent/README.md)）：`./install.sh --cli` 软链
+  `sculptor` 到 `~/.local/bin`，方便命令行直用；同一引擎，另提供 **MCP stdio 服务器**
+  （`node scripts/sculptor.mjs mcp`）——Codex、Claude Code、OpenCode 通过标准 MCP 调用，
+  对话由宿主主导，Sculptor 只负责写作与风格。**只写自己的工作区，绝不碰宿主配置。**
 
 ## 共存与退让（不与其他 agent 打架）
 
@@ -44,11 +54,13 @@ sculptor init && sculptor interview   # 可见的需求访谈：一次一问 + �
 - **提议一次、可拒绝**：一句话说清能做什么，被拒即完全退让，不纠缠。
 - **合作不接管**：Sculptor 只负责写作工作流与风格，对话仍由宿主主导；缺信息时反向请宿主代问。
 
-安装完整 Agent：
+安装完整 Agent（可选 CLI / MCP）：
 
 ```bash
-./scripts/install-agent.sh                  # CLI → ~/.local/bin/sculptor
-./scripts/install-agent.sh --mcp-codex      # 打印 Codex 的 MCP 注册片段（不写文件）
+./install.sh --project ~/项目                # skill（含引擎）→ 项目 .codex/skills/sculptor
+./install.sh --global                        # 或全局 → ~/.codex/skills/sculptor
+./install.sh --cli                           # 额外软链独立 CLI
+./install.sh --mcp-codex                     # 打印 Codex 的 MCP 注册片段（不写文件）
 ```
 
 ## 独特资产
@@ -64,19 +76,14 @@ sculptor init && sculptor interview   # 可见的需求访谈：一次一问 + �
 - **反 AI 痕迹硬规则**：零容忍黑名单、重复比喻/句式禁令、人类化统计指标。详见 [skills/sculptor/references/anti-ai.md](skills/sculptor/references/anti-ai.md)。
 - **压缩守卫**：上下文压缩前把风格指纹写回 vault，记忆会丢、风格不丢。
 
-## 安装
+## 引擎同步与维护（给开发者）
+
+`agent/` 是唯一事实源；skill 内嵌引擎由同步脚本生成：
 
 ```bash
-git clone <repo-url> sculptor-agent
-cd sculptor-agent
-./scripts/install.sh --all
-```
-
-在项目里初始化工作区：
-
-```bash
-./scripts/install.sh init .        # 生成 .sculptor/ 工作区
-./scripts/install.sh hooks         # 可选：把观察者 hooks 接入 Codex config.toml
+scripts/sync-skill-engine.sh           # agent → skills/sculptor/scripts/engine
+scripts/sync-skill-engine.sh --check   # 校验是否漂移（CI 在跑）
+node agent/test/e2e.mjs                # 全链路离线测试（mock LLM，88 项断言）
 ```
 
 skill 是自包含的（SKILL.md + references + scripts + hooks + 模板都在一个目录里），

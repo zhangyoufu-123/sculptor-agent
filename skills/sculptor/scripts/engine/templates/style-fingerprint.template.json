@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "0.1",
+  "generatedAt": null,
+  "highConfidenceDimensions": [],
+  "vectorTop": {
+    "associations": [],
+    "techniques": [],
+    "attentionTargets": []
+  },
+  "sessionDelta": {
+    "newSamples": [],
+    "editAbsorptions": []
+  }
+}
