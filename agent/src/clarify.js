@@ -313,7 +313,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     }
     // 多模态输入：用户给出文件路径（docx/xlsx/图片/md）→ 提取成文本素材。
     if (fs.existsSync(String(lastInput).trim())) {
-      const ing = extractInput(String(lastInput).trim(), cfg);
+      const ing = await extractInput(String(lastInput).trim(), cfg);
       if (ing.kind === 'text') {
         state.materials = state.materials || [];
         state.materials.push(

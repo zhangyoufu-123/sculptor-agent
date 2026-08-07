@@ -193,6 +193,19 @@ ${sample}
 输出严格 JSON：
 {"dimensions":{"temperature":{"value":"","confidence":0,"evidence":[""]},"sentencePreference":{...},...},"associations":["联想/意象"],"techniques":["惯用技巧"],"attentionFocus":{"对象":0.8}}`;
 
+export const DICTATE_DRAFT_PROMPT = (
+  text,
+) => `把下面的口述内容整理成一篇可直接继续写作的结构化草稿：
+- 保持原意与细节，不添加编造的事实；
+- 用 markdown：标题 + 小节，长段落拆成若干自然段；
+- 保留说话人的具体事例、数字、引文；
+- 语言贴近口述者，不改成书面腔。
+
+【口述内容】
+${text}
+
+只输出整理后的草稿。`;
+
 /** 风格少样本块：作者本人的旧稿 + 亲手修改对 + 联想库 + 反例（StyleMC 对比式注入）。 */
 export const STYLE_SHOT = (shot) => `【风格少样本 · 全部来自作者本人】
 以下内容全部来自这位作者自己的文字或亲手修改——写的时候模仿这些，而不是模仿范文或通用模板：

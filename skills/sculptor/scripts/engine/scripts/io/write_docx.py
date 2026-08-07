@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """markdown → docx。用法:
-  write_docx.py <in.md> <out.docx> [--official] [--redhead]
+  write_docx.py <in.md> <out.docx> [--official] [--redhead] [--academic]
 --official: GB/T 9704-2012 公文排版（A4，3号仿宋正文，黑体/楷体层级标题，页码）
 --redhead:  红头文件（红色发文机关标志 + 红色分隔线 + 发文字号；需 --official）
+--academic: 学术论文排版（宋体小四正文 1.5 倍行距、黑体标题、楷体二级标题）
 markdown 首部支持 front-matter 提供发文字号：
   ---
   文号: 国办发〔2026〕12号
@@ -169,14 +170,52 @@ def plain_doc(md, out):
     print(out)
 
 
+def academic_doc(md, out):
+    doc = Document()
+    sec = doc.sections[0]
+    sec.top_margin = sec.bottom_margin = Mm(25)
+    sec.left_margin = sec.right_margin = Mm(25)
+    for raw in open(md, encoding="utf-8"):
+        line = raw.rstrip("\n")
+        if not line.strip():
+            continue
+        p = doc.add_paragraph()
+        pf = p.paragraph_format
+        pf.line_spacing = 1.5
+        pf.space_after = Pt(0)
+        h = re.match(r"^#\s+(.+)$", line)
+        if h:
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            set_font(p.add_run(h.group(1)), "黑体", 16)
+            continue
+        h2 = re.match(r"^##\s+(.+)$", line)
+        if h2:
+            set_font(p.add_run(h2.group(1)), "黑体", 12)
+            continue
+        if re.match(r"^[一二三四五六七八九十]+、", line):
+            set_font(p.add_run(line), "黑体", 12)
+            continue
+        if re.match(r"^（[一二三四五六七八九十]+）", line):
+            pf.first_line_indent = Pt(24)
+            set_font(p.add_run(line), "楷体_GB2312", 12)
+            continue
+        pf.first_line_indent = Pt(24)
+        set_font(p.add_run(line), "宋体", 12)
+    doc.save(out)
+    print(out)
+
+
 def main():
     args = sys.argv[1:]
     official = "--official" in args
+    academic = "--academic" in args
     redhead = "--redhead" in args
-    args = [a for a in args if a not in ("--official", "--redhead")]
+    args = [a for a in args if a not in ("--official", "--redhead", "--academic")]
     md, out = args[0], args[1]
     if official:
         official_doc(md, out, redhead)
+    elif academic:
+        academic_doc(md, out)
     else:
         plain_doc(md, out)
 

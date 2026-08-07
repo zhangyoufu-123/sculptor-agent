@@ -26,6 +26,7 @@ import {
   submitFineTune,
 } from './style-adapter.js';
 import { factCheck, renderFactCheck } from './fact-check.js';
+import { proofread, renderProofread } from './proofread.js';
 
 const TOOLS = [
   {
@@ -111,6 +112,15 @@ const TOOLS = [
     name: 'fact_check',
     description:
       '事实核查：把成稿里的数字/年代/引文/人名/机构分级为 material（来自素材）/common（低风险）/verify（交付前必须核对）。',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' }, file: { type: 'string' } },
+    },
+  },
+  {
+    name: 'proofread',
+    description:
+      '校对纠错：错别字/叠字/标点（确定性，毫秒级）+ 语病/搭配（LLM，配置密钥时启用），按 type/severity 分级。',
     inputSchema: {
       type: 'object',
       properties: { workspace: { type: 'string' }, file: { type: 'string' } },
@@ -343,6 +353,11 @@ async function callTool(name, args, cfg) {
       const r = await factCheck(cfg, w, { file: args.file || null });
       return { text: renderFactCheck(r) };
     }
+    case 'proofread': {
+      const w = wsDir(args, cfg);
+      const r = await proofread(cfg, w, { file: args.file || null });
+      return { text: renderProofread(r) };
+    }
     case 'style_adapter': {
       const w = wsDir(args, cfg);
       ws.ensureWorkspace(w);
@@ -520,7 +535,7 @@ export async function runMcpServer({ input = process.stdin, output = process.std
         result: {
           protocolVersion: '2025-03-26',
           capabilities: { tools: {} },
-          serverInfo: { name: 'sculptor', version: '0.10.0' },
+          serverInfo: { name: 'sculptor', version: '0.11.0' },
         },
       });
     } else if (

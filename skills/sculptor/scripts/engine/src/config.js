@@ -7,6 +7,8 @@ export function loadConfig(env = process.env) {
     visionModel: env.SCULPTOR_VISION_MODEL || '',
     fineTuneEndpoint: env.SCULPTOR_FT_ENDPOINT || '',
     fineTuneApiKey: env.SCULPTOR_FT_API_KEY || '',
+    whisperCmd: env.SCULPTOR_WHISPER_CMD || '',
+    whisperTimeoutMs: Number(env.SCULPTOR_WHISPER_TIMEOUT_MS || 300000),
     maxTokens: Number(env.SCULPTOR_LLM_MAX_TOKENS || 8000),
     timeoutMs: Number(env.SCULPTOR_LLM_TIMEOUT_MS || 300000),
     targetWords: Number(env.SCULPTOR_TARGET_WORDS || 1000),

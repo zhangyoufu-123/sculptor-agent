@@ -56,13 +56,34 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 
 ### 文体库（公式化内容：公文 15 文种 + 合同/通知/纪要/报告…）
 
-`node scripts/sculptor.mjs genre <名称>` 查看每种文体的**结构骨架与行文规范**：
+`node scripts/sculptor.mjs genre <名称>` 查看每种文体的**结构骨架与行文规范**（25 种）：
 公文/请示/批复/函/通报/公告/通告/意见/决定/决议/命令/公报/议案/通知/会议纪要/报告/
-议论文/散文/演讲稿/记叙文/合同。用户说"写一份关于××的通知/合同/请示/批复/函"时，
+议论文/散文/演讲稿/记叙文/合同/**学术论文/新闻稿/邮件/视频脚本**。用户说
+"写一份关于××的通知/合同/请示/学术论文/新闻稿/邮件/视频口播稿"时，
 自动识别文体并在大纲与写作阶段按范式产出：结构固定、措辞规范、要素齐全，不靠临场发挥。
 公文类文种按 **GB/T 9704-2012《党政机关公文格式》** 排版导出：
 `sculptor export --official [--redhead]` → A4、3号仿宋正文、2号小标宋标题、
 黑体/楷体层级标题、右空四字落款、一字线页码（红头文件可选）。
+学术论文可 `sculptor export --academic` 导出（宋体小四/黑体标题/1.5 倍行距）；
+参考文献用 `sculptor cite "<条目>" --style gbt7714|apa` 生成（GB/T 7714 / APA 7）。
+
+### 多格式导出
+
+`sculptor export` 支持：`--docx`（普通/`--official` 公文/`--academic` 学术）、
+`--html`（零依赖）、`--pdf`（reportlab 内置中文）、`--srt`（视频脚本台词转字幕，4 字/秒估算）。
+
+### 语音口述（Voice / Dictation）
+
+`sculptor dictate <音频文件...> [--to-draft]`：whisper/whisper.cpp 转录为素材
+（`SCULPTOR_WHISPER_CMD` 可指定命令，命令须把转写文本输出到 stdout；默认自动检测
+`whisper`/`whisper-cli`）；`--to-draft` 再整理成口述草稿。未配置转录器时给出明确降级提示
+（可先用系统听写另存 .md/.txt）。外部进程带超时，绝不阻塞主流程。
+
+### 校对纠错（Proofread）
+
+`sculptor proofread [--file]`：错别字/易混词/叠字/标点/引号配对（确定性、毫秒级）
++ 语病/搭配（LLM，配置密钥时启用）。`sculptor redteam --proofread` 可与反 AI 审计同跑；
+导演交付时确定性校对并提示"N 处需核对"。
 
 ### 大纲评审-修订回路（CogWriter 式）
 

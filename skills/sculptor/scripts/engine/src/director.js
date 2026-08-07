@@ -17,6 +17,7 @@ import { applyStyleDirection } from './style.js';
 import { applyCorrectionFeedback } from './style-pulse.js';
 import { distillStyleAdapter, adapterStale } from './style-adapter.js';
 import { factScan } from './fact-check.js';
+import { proofScan } from './proofread.js';
 import { archiveDraft, distillCategory } from './library.js';
 import { exportDocx } from './io.js';
 
@@ -279,6 +280,9 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     const fc = factScan(fs.readFileSync(ar.file, 'utf8'), state.materials || []);
     const fcVerify = fc.items.filter((i) => i.supported === 'verify').length;
     state.factCheck = { total: fc.items.length, verify: fcVerify, ts: ws.nowIso() };
+    const pr = proofScan(fs.readFileSync(ar.file, 'utf8'));
+    const prCount = pr.items.length;
+    state.proofread = { total: prCount, ts: ws.nowIso() };
     d.stage = 'deliver';
     state.phase = 'deliver';
     ws.writeState(workspace, state);
@@ -290,7 +294,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       distilled: distilled || '',
       audience: rendered,
       debate: debateRendered,
-      message: `整篇文章已完成：逐节写作（每节风格脉搏已即时反馈）→ 反 AI 审计 → 读者群像 → 交锋。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}${adapterNote}。${docx ? `已导出 ${docx}。` : ''}${fcVerify ? `⚠ 事实核查：${fcVerify} 处数字/年代/引文需核对（运行 sculptor fact-check 看明细）。` : ''}要改某一句用 point-edit，要整体换风格或表达直接说（如"更克制一点"），我会吸收进风格档案并重写。`,
+      message: `整篇文章已完成：逐节写作（每节风格脉搏已即时反馈）→ 反 AI 审计 → 读者群像 → 交锋。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}${adapterNote}。${docx ? `已导出 ${docx}。` : ''}${prCount ? `⚠ 校对：${prCount} 处提示（错别字/标点，运行 sculptor proofread 看明细）。` : ''}${fcVerify ? `⚠ 事实核查：${fcVerify} 处数字/年代/引文需核对（运行 sculptor fact-check 看明细）。` : ''}要改某一句用 point-edit，要整体换风格或表达直接说（如"更克制一点"），我会吸收进风格档案并重写。`,
       next: 'sculptor redteam / sculptor audience / sculptor debate / sculptor fact-check / sculptor point-edit',
     };
   }

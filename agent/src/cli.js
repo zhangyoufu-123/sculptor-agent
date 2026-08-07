@@ -27,7 +27,20 @@ import { runHook } from './hook.js';
 import { renderChecklist } from './interview.js';
 import { agentStep, agentInteractive } from './director.js';
 import { listLibrary, viewCategory, addPiece, distillAll } from './library.js';
-import { extractInput, exportDocx, exportOfficialDocx, docxAvailable } from './io.js';
+import {
+  extractInput,
+  exportDocx,
+  exportOfficialDocx,
+  exportAcademicDocx,
+  exportHtml,
+  exportSrt,
+  exportPdf,
+  pdfAvailable,
+  docxAvailable,
+  detectWhisper,
+  transcribeAudio,
+} from './io.js';
+import { formatReferences, parseEntries, readEntriesFile, citationStyles } from './citation.js';
 import { GENRES, genreBrief, genreNames } from './genre.js';
 import { evaluateStyleFidelity, applyEvalFeedback, renderStyleEval } from './style-eval.js';
 import { reviewOutline, renderOutlineReview } from './outline-review.js';
@@ -40,8 +53,9 @@ import {
 } from './style-adapter.js';
 import { factCheck, renderFactCheck } from './fact-check.js';
 import { recentPulses, renderPulse } from './style-pulse.js';
+import { proofread, proofScan, renderProofread } from './proofread.js';
 
-const HELP = `Sculptor Agent v0.10 — 完整写作 Agent（导演模式 · 风格脉搏贯穿每轮 · 读者交锋 · 持续微调 · 事实核查 · 多模态）
+const HELP = `Sculptor Agent v0.11 — 完整写作 Agent（导演模式 · 风格脉搏贯穿每轮 · 语音口述 · 多格式导出 · 校对 · 多模态）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
@@ -59,12 +73,14 @@ const HELP = `Sculptor Agent v0.10 — 完整写作 Agent（导演模式 · 风�
                                      按新风格方向重写整篇（或指定节）；缺省用档案最近一条方向
   sculptor redteam [--fix] [工作区]   反 AI 审计（可选 LLM 修订）
   sculptor redteam --file x.md        直接审计任意文件
+  sculptor redteam --proofread [工作区]  反 AI 审计 + 确定性校对
   sculptor style-eval [--file x.md] [工作区]  深度全稿风格保真评估（对照旧稿/修改记录打分；默认不自动跑，需要时手动）
   sculptor outline-review [工作区]    大纲评审：评审当前大纲（低分时自动给出修订版，仍需你确认）
   sculptor audience [--file x.md] [--quick] [工作区]  读者群像：8 个"第一读者"的感性反馈
   sculptor debate [--file x.md] [--quick] [工作区]    读者交锋：分歧最大的 3 位读者互看意见后收敛出共识/争议/优先级
   sculptor dissect [--file x.md] [工作区]  感性解剖 5 维度
   sculptor fact-check [--file x.md] [工作区]  事实核查：数字/年代/引文/人名/机构 → material/common/verify 分级
+  sculptor proofread [--file x.md] [工作区]   校对纠错：错别字/叠字/标点（确定性）+ 语病（LLM，可选）
   sculptor quote "<原句>"             生成可粘贴的「Sculptor 引用」块
   sculptor hook <工作区> [payload]    宿主生命周期钩子 → 观察日志 + 压缩守卫
   sculptor checklist <工作区>         渲染需求访谈确认清单（不消耗 LLM）
@@ -79,8 +95,12 @@ const HELP = `Sculptor Agent v0.10 — 完整写作 Agent（导演模式 · 风�
   sculptor library view <类别> [工作区]  查看某类的蒸馏 skill 与作品清单
   sculptor library add <file> [--category 类别] [--session 标识] [工作区]  归档一篇作品（自动分类）
   sculptor ingest <file...> [工作区]  多模态输入：docx/xlsx/图片/md → 提取成素材
+  sculptor dictate <音频...> [--to-draft] [工作区]  语音口述：whisper 转录 → 素材；--to-draft 生成口述草稿
   sculptor export [--docx out.docx] [--md out.md] [工作区]  把 draft.md 导出为 docx/md
   sculptor export --official [--redhead] [--docx out.docx] [工作区]  按 GB/T 9704-2012 公文排版导出 docx
+  sculptor export --academic [--docx out.docx] [工作区]  按学术论文排版导出 docx（宋体小四/黑体标题）
+  sculptor export --html out.html / --srt out.srt / --pdf out.pdf [工作区]  导出 HTML / 字幕 SRT / PDF
+  sculptor cite "<json条目或数组>" [--style gbt7714|apa] [--file refs.json]  生成参考文献（期刊/图书/网页/报纸/论文/报告）
   sculptor absorb <工作区> <edit.json>   吸收定点修改进风格档案
   sculptor fingerprint <工作区>       刷新压缩守卫风格指纹
   sculptor panel [state.json]         渲染玻璃面板
@@ -235,6 +255,12 @@ export async function runCli(argv, io = {}) {
         const w = ws.resolveWorkspace(cfg, workspace);
         const r = await factCheck(cfg, w, { file: flags.file || null });
         console.log(renderFactCheck(r));
+        break;
+      }
+      case 'proofread': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        const r = await proofread(cfg, w, { file: flags.file || null });
+        console.log(renderProofread(r));
         break;
       }
       case 'style-adapter': {
@@ -478,12 +504,52 @@ export async function runCli(argv, io = {}) {
         const state = ws.readState(w);
         state.materials = state.materials || [];
         for (const f of positional) {
-          const r = extractInput(f, cfg);
+          const r = await extractInput(f, cfg);
           if (r.kind === 'text') {
             state.materials.push(`[文件 ${path.basename(f)}] ${r.text.slice(0, 2000)}`);
             console.log(`✓ ${f}（${r.source}，${r.text.length} 字）→ 素材`);
           } else {
             console.log(`✗ ${f}: ${r.hint || '无法提取'}`);
+          }
+        }
+        ws.writeState(w, state);
+        break;
+      }
+      case 'dictate': {
+        if (!positional.length) throw new Error('用法: sculptor dictate <音频文件...> [--to-draft]');
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const state = ws.readState(w);
+        state.materials = state.materials || [];
+        const dictDir = path.join(w, 'vault', 'dictations');
+        fs.mkdirSync(dictDir, { recursive: true });
+        for (const f of positional) {
+          const r = await transcribeAudio(path.resolve(f), cfg);
+          if (!r.ok) {
+            console.log(`✗ ${f}: ${r.hint}`);
+            continue;
+          }
+          const ts = Date.now();
+          const base = path.basename(f, path.extname(f)).replace(/[^\w\u4e00-\u9fff-]+/g, '-');
+          const rawFile = path.join(dictDir, `${base}-${ts}.md`);
+          fs.writeFileSync(rawFile, `# 口述素材 ${base}\n\n${r.text}\n`);
+          state.materials.push(`[口述 ${path.basename(f)}] ${r.text.slice(0, 2000)}`);
+          console.log(`✓ ${f}（voice，${r.text.length} 字）→ ${rawFile}，已加入素材`);
+          if (flags['to-draft'] && cfg.apiKey) {
+            const { chatWithRetry } = await import('./llm.js');
+            const { DICTATE_DRAFT_PROMPT } = await import('./prompts.js');
+            const draft = await chatWithRetry(
+              cfg,
+              [
+                { role: 'system', content: '你是口述整理师：把口述内容整理成可直接写作的结构化草稿。' },
+                { role: 'user', content: DICTATE_DRAFT_PROMPT(r.text) },
+              ],
+              { temperature: 0.5, maxTokens: 2500 },
+            );
+            const draftFile = path.join(dictDir, `${base}-${ts}-draft.md`);
+            fs.writeFileSync(draftFile, draft.trim() + '\n');
+            console.log(`口述草稿已生成 → ${draftFile}`);
+          } else if (flags['to-draft'] && !cfg.apiKey) {
+            console.log('（--to-draft 需要配置 SCULPTOR_LLM_API_KEY；已保留口述素材）');
           }
         }
         ws.writeState(w, state);
@@ -508,9 +574,25 @@ export async function runCli(argv, io = {}) {
           console.log(`已按 GB/T 9704-2012 排版导出公文 docx → ${out}${flags.redhead ? '（红头）' : ''}`);
           break;
         }
+        if (flags.academic) {
+          if (!docxAvailable()) throw new Error('本机没有 python-docx，无法导出学术 docx');
+          const dest = flags.docx ? path.resolve(String(flags.docx)) : path.join(w, 'draft-学术.docx');
+          out = exportAcademicDocx(text, dest);
+          console.log(`已按学术论文排版导出 docx → ${out}`);
+          break;
+        }
         if (flags.docx) {
           out = exportDocx(text, path.resolve(String(flags.docx)));
           console.log(`已导出 docx → ${out}`);
+        } else if (flags.html) {
+          out = exportHtml(text, path.resolve(String(flags.html)));
+          console.log(`已导出 HTML → ${out}`);
+        } else if (flags.srt) {
+          out = exportSrt(text, path.resolve(String(flags.srt)));
+          console.log(`已导出字幕 SRT → ${out}`);
+        } else if (flags.pdf) {
+          out = exportPdf(text, path.resolve(String(flags.pdf)));
+          console.log(`已导出 PDF → ${out}`);
         } else if (flags.md) {
           out = path.resolve(String(flags.md));
           fs.writeFileSync(out, text);
@@ -527,15 +609,31 @@ export async function runCli(argv, io = {}) {
         }
         break;
       }
+      case 'cite': {
+        const style = flags.style ? String(flags.style) : 'gbt7714';
+        if (!citationStyles().includes(style)) {
+          throw new Error(`未知引用格式「${style}」。可用: ${citationStyles().join(' / ')}`);
+        }
+        const entries = flags.file
+          ? readEntriesFile(path.resolve(String(flags.file)))
+          : parseEntries(positional[0]);
+        if (!entries.length) throw new Error('没有可格式化的条目');
+        console.log(formatReferences(entries, style).join('\n'));
+        break;
+      }
       case 'redteam': {
         const w = ws.resolveWorkspace(cfg, workspace);
         if (flags.file) {
           const text = fs.readFileSync(flags.file, 'utf8');
           const report = audit(text);
+          if (flags.proofread) report.proofread = proofScan(text);
           console.log(JSON.stringify(report, null, 2));
           process.exitCode = report.passed ? 0 : 1;
         } else {
           const r = await redteam(cfg, w, { fix: Boolean(flags.fix) });
+          if (flags.proofread) {
+            r.report.proofread = proofScan(fs.readFileSync(r.draftFile, 'utf8'));
+          }
           console.log(JSON.stringify(r.report, null, 2));
           process.exitCode = r.report.passed ? 0 : 1;
         }

@@ -16,6 +16,8 @@ import { loadPersonalSkill } from '../src/library.js';
 import { loadStyleAdapter } from '../src/style-adapter.js';
 import { factScan } from '../src/fact-check.js';
 import { applyCorrectionFeedback } from '../src/style-pulse.js';
+import { proofScan } from '../src/proofread.js';
+import { formatReference } from '../src/citation.js';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-e2e-'));
 const work = path.join(root, 'work');
@@ -262,6 +264,34 @@ try {
   } else {
     check('export --official 公文 docx', true, '跳过：本机无 python-docx');
   }
+  r = await run(['export', '--html', path.join(ws3, 'draft.html')]);
+  check(
+    'export --html 生成完整 HTML',
+    r.code === 0 &&
+      fs.existsSync(path.join(ws3, 'draft.html')) &&
+      fs.readFileSync(path.join(ws3, 'draft.html'), 'utf8').includes('<!DOCTYPE html>'),
+    r.out.slice(0, 100),
+  );
+  r = await run(['export', '--srt', path.join(ws3, 'draft.srt')]);
+  check(
+    'export --srt 生成字幕',
+    r.code === 0 && fs.existsSync(path.join(ws3, 'draft.srt')),
+    r.out.slice(0, 100),
+  );
+  r = await run(['export', '--pdf', path.join(ws3, 'draft.pdf')]);
+  check(
+    'export --pdf（reportlab）',
+    r.code === 0 && fs.existsSync(path.join(ws3, 'draft.pdf')),
+    r.out.slice(0, 100),
+  );
+  if (pyDocxCheck.status === 0) {
+    r = await run(['export', '--academic', '--docx', path.join(ws3, 'draft-academic.docx')]);
+    check(
+      'export --academic 学术排版 docx',
+      r.code === 0 && fs.existsSync(path.join(ws3, 'draft-academic.docx')),
+      r.out.slice(0, 100),
+    );
+  }
   process.env.SCULPTOR_WORKSPACE = workspace;
 
   // 2.9 文体库：公式化内容的结构范式
@@ -294,6 +324,40 @@ try {
     detectGenre('关于追加经费的请示') === '请示' &&
       detectGenre('关于同意追加经费的批复') === '批复' &&
       detectGenre('关于商洽合作事项的函') === '函',
+  );
+  r = await run([
+    'cite',
+    JSON.stringify([
+      { type: 'journal', authors: ['史铁生'], year: 1990, title: '我与地坛', journal: '上海文学', issue: 1, pages: '1-20' },
+    ]),
+  ]);
+  check(
+    'cite 生成 GB/T 7714 参考文献',
+    r.code === 0 && r.out.includes('我与地坛[J]') && r.out.includes('上海文学'),
+    r.out.slice(0, 120),
+  );
+  r = await run([
+    'cite',
+    JSON.stringify({ type: 'book', authors: ['钱穆'], year: 1996, title: '国史大纲', city: '北京', publisher: '商务印书馆' }),
+    '--style',
+    'apa',
+  ]);
+  check(
+    'cite --style apa',
+    r.code === 0 && r.out.includes('国史大纲') && r.out.includes('商务印书馆'),
+    r.out.slice(0, 120),
+  );
+  check(
+    'formatReference 确定性（期刊）',
+    formatReference({ type: 'journal', authors: ['史铁生'], year: 1990, title: '我与地坛', journal: '上海文学' }, 'gbt7714').includes('史铁生. 我与地坛[J]'),
+  );
+  check(
+    '文体识别：学术论文/新闻稿/邮件/视频脚本',
+    detectGenre('写一篇关于AI教育的学术论文') === '学术论文' &&
+      detectGenre('写一篇产品发布的新闻稿') === '新闻稿' &&
+      detectGenre('给客户发一封邮件') === '邮件' &&
+      detectGenre('写一段短视频口播稿') === '视频脚本' &&
+      detectGenre('帮我写个脚本') === null,
   );
 
   // 2.10 个人写作库：分类 + 蒸馏 + 查看 + 限量注入
@@ -382,6 +446,28 @@ try {
       `跳过：无法构造测试 xlsx（${xlsxStatus.stderr.slice(0, 60)}）`,
     );
   }
+  const audioFile = path.join(ioDir, 'note.m4a');
+  fs.writeFileSync(audioFile, 'fake audio bytes');
+  r = await run(['ingest', audioFile]);
+  check(
+    'ingest 音频无 whisper 时明确降级提示',
+    r.code === 0 && r.out.includes('whisper'),
+    r.out.slice(0, 140),
+  );
+  const fakeWhisper = path.join(ioDir, 'fake-whisper.sh');
+  fs.writeFileSync(
+    fakeWhisper,
+    '#!/bin/sh\necho "今天参观北大红楼，站在门口很久，想到了百年前的青年们。"\n',
+  );
+  spawnSync('chmod', ['+x', fakeWhisper]);
+  process.env.SCULPTOR_WHISPER_CMD = fakeWhisper;
+  r = await run(['dictate', audioFile]);
+  check(
+    'dictate 语音口述转录为素材（whisper 命令不阻塞、超时可控）',
+    r.code === 0 && r.out.includes('voice') && r.out.includes('已加入素材'),
+    r.out.slice(0, 160),
+  );
+  delete process.env.SCULPTOR_WHISPER_CMD;
 
   // 2.6 quote 引用块
   r = await run(['quote', '那扇窗沉默地注视着一切。']);
@@ -785,6 +871,23 @@ try {
     r.code === 0 && r.out.includes('事实核查') && r.out.includes('verify'),
     r.out.slice(0, 140),
   );
+  const prText = '请登录您的帐号，我们迫不急待要开始。他说：今天很忙“然后继续。';
+  const prScan = proofScan(prText);
+  check(
+    'proofScan 确定性校对（错别字/叠字/引号配对）',
+    prScan.items.some((i) => i.issue.includes('账号')) &&
+      prScan.items.some((i) => i.issue.includes('迫不及待')) &&
+      prScan.items.some((i) => i.issue.includes('不配对')),
+    JSON.stringify(prScan.items.map((i) => i.text)),
+  );
+  const prFile = path.join(root, 'proof.md');
+  fs.writeFileSync(prFile, '请登录您的帐号，迫不急待地开始写作。他说：今天很忙“然后继续。\n');
+  r = await run(['proofread', '--file', prFile]);
+  check(
+    'proofread 校对报告（确定性 + LLM 合并）',
+    r.code === 0 && r.out.includes('校对') && r.out.includes('错别字'),
+    r.out.slice(0, 120),
+  );
 
   // 9. panel / status / doctor
   r = await run(['panel', path.join(workspace, 'protocol', 'state.json')]);
@@ -887,7 +990,7 @@ try {
       .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
   );
   check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'sculptor');
-  check('MCP tools/list 25 个工具', byId[2]?.result?.tools?.length === 25);
+  check('MCP tools/list 26 个工具', byId[2]?.result?.tools?.length === 26);
   check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Sculptor 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
   const mcpInput2 = Readable.from([
@@ -942,6 +1045,7 @@ try {
     `${JSON.stringify({ jsonrpc: '2.0', id: 12, method: 'tools/call', params: { name: 'reader_debate', arguments: { workspace } } })}\n`,
     `${JSON.stringify({ jsonrpc: '2.0', id: 13, method: 'tools/call', params: { name: 'fact_check', arguments: { workspace } } })}\n`,
     `${JSON.stringify({ jsonrpc: '2.0', id: 14, method: 'tools/call', params: { name: 'style_adapter', arguments: { workspace, action: 'status' } } })}\n`,
+    `${JSON.stringify({ jsonrpc: '2.0', id: 15, method: 'tools/call', params: { name: 'proofread', arguments: { workspace } } })}\n`,
   ]);
   const mcpOut6 = [];
   const output6 = new Writable({
@@ -980,6 +1084,10 @@ try {
     'MCP style_adapter 返回素材状态',
     byId6[14]?.result?.content?.[0]?.text?.includes('素材') &&
       byId6[14]?.result?.content?.[0]?.text?.includes('适配卡'),
+  );
+  check(
+    'MCP proofread 返回校对报告',
+    byId6[15]?.result?.content?.[0]?.text?.includes('校对'),
   );
 
   // 12. 生态位探测：主动触发判断

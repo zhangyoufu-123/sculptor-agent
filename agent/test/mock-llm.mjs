@@ -195,6 +195,15 @@ export function respond(messages) {
       summary: '两处数字/年代需核对，一处常识性低风险',
     });
   }
+  if (userMsg.includes('校对员')) {
+    return JSON.stringify({
+      items: [
+        { text: '帐号', issue: '应为「账号」', type: 'typo', suggestion: '账号', severity: 'high' },
+        { text: '迫不急待', issue: '应为「迫不及待」', type: 'typo', suggestion: '迫不及待', severity: 'mid' },
+      ],
+      summary: '发现 2 处错别字',
+    });
+  }
   if (userMsg.includes('第一读者') && userMsg.includes('【文章】')) {
     const name = userMsg.match(/你是「(.+?)」/)?.[1] || '读者';
     const firstLine = (userMsg.match(/【文章】\n([\s\S]*?)\n\n输出严格 JSON/) || [])[1] || '';

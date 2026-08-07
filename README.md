@@ -33,6 +33,11 @@ node $SCULPTOR init && node $SCULPTOR agent         # 导演模式：主导全�
 `node $SCULPTOR genre 合同` 可查看每种文体的结构规范；党政机关公文 15 文种
 （请示/批复/函/通报/公告/通告/意见/决定/决议/命令/公报/议案…）按 GB/T 9704-2012 排版导出：
 `node $SCULPTOR export --official [--redhead]` → A4 公文 docx（红头可选）。
+另有学术论文/新闻稿/邮件/视频脚本 4 种新文体（`--academic` 导出学术 docx），
+参考文献 `node $SCULPTOR cite "<条目>" --style gbt7714|apa`。
+语音口述：`node $SCULPTOR dictate <音频> [--to-draft]`（whisper 转录，`SCULPTOR_WHISPER_CMD`
+可指定命令）。校对：`node $SCULPTOR proofread`（错别字/标点确定性 + LLM 语病）。
+导出多格式：`--html` / `--pdf` / `--srt`（视频脚本转字幕）。
 风格脉搏：不再做交付前的一次性大考——澄清每轮、大纲生成、每节写作后都即时采集/评估风格
 （`node $SCULPTOR style --pulses` 查看），每节脉搏建议自动带入下一节；你说的每句修改
 （"太文艺了/太啰嗦/结尾收一点"）都会被吸收进风格档案并自动重写。深度全稿评估保留为

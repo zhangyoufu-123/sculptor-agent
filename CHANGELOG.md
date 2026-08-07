@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.11.0 (2026-08-07)
+
+### Added（补齐 P0：语音口述 / 格式与导出 / 校对纠错）
+
+- **语音口述**：`sculptor dictate <音频...> [--to-draft]` —— whisper/whisper.cpp 转录为素材
+  （`SCULPTOR_WHISPER_CMD` 可指定命令；默认自动检测；`--to-draft` 整理成口述草稿）；
+  未配置转录器时明确降级提示。外部进程带超时，绝不阻塞主流程。
+- **文体库 +4**：学术论文（摘要/关键词/引言/方法/结果/结论/参考文献）、新闻稿（5W1H 导语、
+  倒金字塔）、邮件（主题/称呼/正文/落款）、视频脚本（【画面】【旁白】【字幕】分列）；
+  个人写作库自动分类同步支持。
+- **参考文献生成**：`sculptor cite "<条目>" --style gbt7714|apa` —— 期刊/图书/网页/
+  报纸/学位论文/报告，GB/T 7714-2015 与 APA 7 确定性格式化。
+- **多格式导出**：`--html`（纯 Node 零依赖）、`--pdf`（reportlab 内置中文 CID 字体）、
+  `--srt`（视频脚本台词转字幕，4 字/秒估算）、`--academic`（学术 docx：宋体小四/黑体标题/
+  1.5 倍行距）。
+- **校对纠错**：`sculptor proofread [--file]` —— 错别字/易混词/叠字/标点/引号配对
+  （确定性、毫秒级）+ 语病/搭配（LLM，apiKey 守卫）；`redteam --proofread` 同跑；
+  导演交付时确定性校对并提示"N 处需核对"。
+- **顺手修复**：`extractInput` 对图片/音频返回 Promise，ingest/clarify 之前未 await
+  会静默失败——已改为异步并 await；`dictate` 不再把音频文件误当工作区。
+
+### Changed
+
+- 版本 0.10.0 → 0.11.0（CLI HELP / MCP serverInfo / package.json 同步）；
+  MCP 工具 25 → 26；e2e 154 项全绿。
+
 ## 0.10.0 (2026-08-07)
 
 ### Changed（去臃肿：评估拆进每一轮，不做交付前大考）
