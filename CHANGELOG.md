@@ -24,6 +24,16 @@
 
 - 版本 0.16.0 → 0.17.0（CLI HELP / package.json / 文档同步）。
 
+### Added（一键安装与三处自更新）
+
+- `install.sh` 升级为**一次命令装/更新三个安装点**：`--all` = 全局 skill
+  （`~/.codex/skills/sculptor`）+ 当前项目 skill + 开发镜像（默认 `~/sculptor`）；
+  `--update` 先 `git pull` 再同步；`--dry-run` 全流程预览。
+- 镜像同步是**选择性同步**（agent/skills/scripts/examples/extras/.github/.claude-plugin/
+  .codex-plugin + 根文档），保留你的 `.git`、`node_modules`、`.env.local`，不整树 --delete。
+- skill 内置自更新器 `skills/sculptor/scripts/update.sh`：安装后任意位置一条命令
+  `bash ~/.codex/skills/sculptor/scripts/update.sh [项目目录]` 即可刷新三处。
+
 ## 0.16.0 (2026-08-07)
 
 ### Added（动态规划：文体驱动的澄清蓝图，不再一套 9 项框死所有写作）

@@ -14,12 +14,25 @@
 ## 快速开始（一键安装）
 
 ```bash
-# 方式一：一行命令（curl | bash，目录级安装到当前项目）
-curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/install.sh | bash
+# 方式一：一行命令，一次装好三个安装点（全局 skill + 当前项目 skill + 开发镜像 ~/sculptor）
+curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/install.sh | bash -s -- --all
 
 # 方式二：git clone
 git clone https://github.com/zhangyoufu-123/sculptor-agent
-cd sculptor-agent && ./install.sh --project ~/我的写作项目
+cd sculptor-agent && ./install.sh --all --project ~/我的写作项目
+```
+
+三个安装点各有用途：`~/.codex/skills/sculptor`（全局：所有 Codex 对话可用）、
+`<项目>/.codex/skills/sculptor`（项目级：只在当前项目生效）、`~/sculptor`（开发镜像：
+选择性同步 agent/skills/scripts 等，保留你自己的 `.git`、`node_modules`、`.env.local`）。
+只要其中一个点（或仓库）更新了，随时一键刷新全部：
+
+```bash
+# 推荐：skill 自带更新器，随处可跑
+bash ~/.codex/skills/sculptor/scripts/update.sh [项目目录]
+
+# 或在仓库目录里
+./install.sh --all --update
 ```
 
 安装完成后**自动注册当前项目**（Codex MCP + skill + 凭据，零手动、零全局副作用）：
@@ -100,6 +113,8 @@ Panza 式 <100 样本 + LoRA）。
 ```bash
 ./install.sh --project ~/项目                # skill（含引擎）→ 项目 .codex/skills/sculptor
 ./install.sh --global                        # 或全局 → ~/.codex/skills/sculptor
+./install.sh --all                           # 三处一次装：全局 + 项目 + 开发镜像 ~/sculptor
+./install.sh --all --update                  # 更新：先 git pull 最新，再刷新三处
 ./install.sh --cli                           # 额外软链独立 CLI
 ./install.sh --mcp-codex                     # 打印 Codex 的 MCP 注册片段（不写文件）
 ```
