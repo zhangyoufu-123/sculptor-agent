@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.13.0 (2026-08-07)
+
+### Added
+
+- **联网 RAG** `rag.js`：事实核查 verify 项自动生成检索查询；配置
+  `SCULPTOR_RAG_ENDPOINT/SCULPTOR_RAG_API_KEY` 时直连 `POST /search {queries}` 并回灌，
+  否则把 web-search 请求写入 `protocol/requests.jsonl`（宿主代检，`sculptor rag ingest`
+  或 MCP `rag_ingest` 回灌缓存与素材）。缓存 `vault/rag-cache.json`；
+  CLI `rag status/search/ingest`，MCP `rag_search/rag_ingest`。
+- **静默内部质量门（真实触发、不刷屏）**：导演交付前自动执行——风格保真评估（低分自动
+  微调最多 2 轮）、原创性检查（文内重复句/与个人库自我复用/模板句）、校对扫描、事实核查 +
+  RAG 检索请求；全部写入 `state.quality` 与 context 日志，交付消息不再罗列评估过程。
+- **内置原创性检查** `originality.js`：`sculptor originality [--file]` 手动查看；
+  交付前静默自动执行，MCP `originality`。
+
+### Changed
+
+- 版本 0.12.0 → 0.13.0（CLI HELP / MCP serverInfo / package.json 同步）；
+  MCP 工具 32 → 35；e2e 180 项全绿。
+
 ## 0.12.0 (2026-08-07)
 
 ### Added（P1 四项：改写矩阵 / 版本快照 / 全局档案 / 引文管理）

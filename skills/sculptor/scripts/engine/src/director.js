@@ -18,6 +18,9 @@ import { applyCorrectionFeedback } from './style-pulse.js';
 import { distillStyleAdapter, adapterStale } from './style-adapter.js';
 import { factScan } from './fact-check.js';
 import { proofScan } from './proofread.js';
+import { originalityScan } from './originality.js';
+import { buildSearchQueries, requestHostSearch } from './rag.js';
+import { evaluateStyleFidelity } from './style-eval.js';
 import { archiveDraft, distillCategory } from './library.js';
 import { exportDocx } from './io.js';
 
@@ -31,6 +34,8 @@ function initDirector(state) {
     writeIndex: 0,
     outlineRegens: 0,
     fixAttempts: 0,
+    qualityFixAttempts: 0,
+    qualityFixDirection: '',
   };
   return state.director;
 }
@@ -228,8 +233,68 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       state.summary = '红队审计仍有残留问题，交付带警告';
       ws.writeState(workspace, state);
     }
+    d.stage = 'quality';
+    d.qualityFixAttempts = 0;
+    d.qualityFixDirection = '';
+    ws.writeState(workspace, state);
+  }
+
+  // ── 静默内部质量门：风格保真/原创性/校对/事实核查真实触发，不向用户刷屏 ──
+  // 低分自动微调（最多 2 轮），其余只记录进 state.quality + 触发 RAG 检索请求。
+  if (d.stage === 'quality') {
+    const draftText = fs.readFileSync(path.join(workspace, 'draft.md'), 'utf8');
+    state.quality = state.quality || {};
+    let needsStyleFix = false;
+    if (d.qualityFixAttempts < 2 && cfg.apiKey) {
+      try {
+        const ev = await evaluateStyleFidelity(cfg, workspace);
+        state.quality.styleScore = ev.score;
+        if (ev.needsFix) {
+          needsStyleFix = true;
+          d.qualityFixAttempts += 1;
+          d.qualityFixDirection = (ev.advice || []).join('；') || '更贴合作者风格';
+        }
+      } catch {}
+    }
+    const ori = originalityScan(draftText, workspace);
+    const pr = proofScan(draftText);
+    const fc = factScan(draftText, state.materials || []);
+    state.quality.originality = ori;
+    state.quality.proofread = pr.items.length;
+    state.quality.factVerify = fc.items.filter((i) => i.supported === 'verify').length;
+    state.quality.ts = ws.nowIso();
+    const queries = buildSearchQueries(draftText, {
+      factReport: fc,
+      topic: state.confirmed?.topic || state.outline?.title || '',
+    });
+    const rag = requestHostSearch(workspace, queries, { purpose: 'fact-check' });
+    state.quality.ragQueries = rag.queued;
+    ws.writeState(workspace, state);
+    if (needsStyleFix) {
+      d.stage = 'style_fix';
+      ws.writeState(workspace, state);
+      return {
+        kind: 'working',
+        message: '正在做交付前的内部质量微调…',
+        phase: 'quality',
+      };
+    }
     d.stage = 'audience';
     ws.writeState(workspace, state);
+  }
+
+  // ── 内部质量微调：按评估建议重写 → 回红队复查（静默，不展示评估面板） ──
+  if (d.stage === 'style_fix') {
+    await restyle(cfg, workspace, { direction: d.qualityFixDirection || '' });
+    ({ state, d } = load());
+    d.stage = 'redteam';
+    d.fixAttempts = 0;
+    ws.writeState(workspace, state);
+    return {
+      kind: 'working',
+      message: '内部质量微调完成，重新反 AI 审计…',
+      phase: 'quality',
+    };
   }
 
   // ── 读者群像：交付前强制 ─────────────────────────────
@@ -277,11 +342,10 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
         }
       }
     } catch {}
-    const fc = factScan(fs.readFileSync(ar.file, 'utf8'), state.materials || []);
-    const fcVerify = fc.items.filter((i) => i.supported === 'verify').length;
-    state.factCheck = { total: fc.items.length, verify: fcVerify, ts: ws.nowIso() };
-    const pr = proofScan(fs.readFileSync(ar.file, 'utf8'));
-    const prCount = pr.items.length;
+    const q = state.quality || {};
+    const fcVerify = typeof q.factVerify === 'number' ? q.factVerify : 0;
+    const prCount = typeof q.proofread === 'number' ? q.proofread : 0;
+    state.factCheck = { total: fcVerify, verify: fcVerify, ts: ws.nowIso() };
     state.proofread = { total: prCount, ts: ws.nowIso() };
     d.stage = 'deliver';
     state.phase = 'deliver';

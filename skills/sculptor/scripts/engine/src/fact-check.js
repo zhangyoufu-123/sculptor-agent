@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chatWithRetry, parseJsonContent } from './llm.js';
 import * as ws from './workspace.js';
+import { buildSearchQueries, searchOnline, ingestSearchResults, requestHostSearch } from './rag.js';
 
 const PATTERNS = [
   { type: 'year', re: /\d{3,4}\s*年(?:\s*\d{1,2}\s*月(?:\s*\d{1,2}\s*日)?)?/g },
@@ -162,6 +163,27 @@ export async function factCheck(cfg, wsDir, { file = null } = {}) {
     'fact-check',
     `事实核查（${report.mode}）：material ${report.byType.material} / common ${report.byType.common} / verify ${report.byType.verify}`,
   );
+  // verify 项 → 联网 RAG：直连端点可用则检索并回灌；否则排队宿主代检（真实触发，静默）。
+  const queries = buildSearchQueries(text, {
+    factReport: report,
+    topic: state.confirmed?.topic || '',
+  });
+  if (queries.length) {
+    if (cfg.ragEndpoint && cfg.ragApiKey) {
+      const sr = await searchOnline(cfg, queries);
+      if (sr.searched) {
+        ingestSearchResults(workspace, sr.results);
+        report.rag = { direct: true, ingested: sr.results.length };
+      } else {
+        report.rag = { direct: false, hint: sr.hint };
+      }
+    } else {
+      const rr = requestHostSearch(workspace, queries, { purpose: 'fact-check' });
+      report.rag = { direct: false, queued: rr.queued };
+    }
+  } else {
+    report.rag = { direct: false, queued: 0 };
+  }
   return report;
 }
 
@@ -187,6 +209,8 @@ export function renderFactCheck(report) {
     for (const c of common.slice(0, 6)) out.push(`  · ${c.text}`);
   }
   if (!report.items.length) out.push('这篇文章没有可核对的硬事实。');
+  if (report.rag?.direct) out.push(`联网检索: 直连命中 ${report.rag.ingested || 0} 组结果已回灌素材`);
+  else if (report.rag?.queued) out.push(`联网检索: ${report.rag.queued} 条请求已排队（宿主代检，回灌见 sculptor rag ingest）`);
   out.push(line);
   return out.join('\n');
 }

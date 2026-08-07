@@ -42,6 +42,9 @@ node $SCULPTOR init && node $SCULPTOR agent         # 导演模式：主导全�
 版本快照 `node $SCULPTOR history` / `rollback [N]`（每次写作前自动存）；
 全局风格档案 `node $SCULPTOR profile export/import`（跨工作区携带你的风格）；
 引文管理 `node $SCULPTOR citations [--append refs.json]`。
+联网 RAG：事实核查自动生成检索查询，配置 `SCULPTOR_RAG_ENDPOINT` 直连，否则写入
+`requests.jsonl` 由宿主代检、`node $SCULPTOR rag ingest <results.json>` 回灌；
+交付前静默质量门（风格保真/原创性/校对/事实核查）真实执行但不刷屏，`node $SCULPTOR originality` 可手动查看。
 风格脉搏：不再做交付前的一次性大考——澄清每轮、大纲生成、每节写作后都即时采集/评估风格
 （`node $SCULPTOR style --pulses` 查看），每节脉搏建议自动带入下一节；你说的每句修改
 （"太文艺了/太啰嗦/结尾收一点"）都会被吸收进风格档案并自动重写。深度全稿评估保留为

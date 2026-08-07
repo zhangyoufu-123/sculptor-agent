@@ -9,6 +9,8 @@ export function loadConfig(env = process.env) {
     fineTuneApiKey: env.SCULPTOR_FT_API_KEY || '',
     whisperCmd: env.SCULPTOR_WHISPER_CMD || '',
     whisperTimeoutMs: Number(env.SCULPTOR_WHISPER_TIMEOUT_MS || 300000),
+    ragEndpoint: env.SCULPTOR_RAG_ENDPOINT || '',
+    ragApiKey: env.SCULPTOR_RAG_API_KEY || '',
     maxTokens: Number(env.SCULPTOR_LLM_MAX_TOKENS || 8000),
     timeoutMs: Number(env.SCULPTOR_LLM_TIMEOUT_MS || 300000),
     targetWords: Number(env.SCULPTOR_TARGET_WORDS || 1000),

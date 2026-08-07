@@ -33,6 +33,14 @@ import { transform, PRESETS } from './transform.js';
 import { listHistory, rollback, snapshot } from './history.js';
 import { exportProfile, importProfile, profileStatus } from './profile.js';
 import { extractCitations, formatReferences, readEntriesFile, citationStyles } from './citation.js';
+import {
+  buildSearchQueries,
+  searchOnline,
+  ingestSearchResults,
+  requestHostSearch,
+  ragStatus,
+} from './rag.js';
+import { originalityScan } from './originality.js';
 
 const TOOLS = [
   {
@@ -195,6 +203,40 @@ const TOOLS = [
         refs: { type: 'string' },
         style: { type: 'string' },
       },
+    },
+  },
+  {
+    name: 'rag_search',
+    description:
+      '联网检索：对文稿/文本生成高价值查询（事实 verify 项、《引文》、年份数字）；配置 SCULPTOR_RAG_ENDPOINT 时直连检索并回灌，否则排队宿主代检（requests.jsonl）。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        text: { type: 'string' },
+        topic: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'rag_ingest',
+    description: '回灌宿主检索结果：[{query, results:[{title,url,snippet,source}]}] → 缓存 vault/rag-cache.json + 素材。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        results: { type: 'array', items: { type: 'object' } },
+        file: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'originality',
+    description:
+      '原创性检查（确定性）：文内重复句、与个人写作库/旧稿的自我复用、模板句；交付前静默自动执行，此处可手动查看。',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' }, file: { type: 'string' } },
     },
   },
   {
@@ -510,6 +552,45 @@ async function callTool(name, args, cfg) {
           : '（文稿中没有《书名号》引文）',
       };
     }
+    case 'rag_search': {
+      const w = wsDir(args, cfg);
+      ws.ensureWorkspace(w);
+      const queries = buildSearchQueries(args.text || '', {
+        topic: args.topic || '',
+      });
+      if (!queries.length) return { text: '（没有可检索的高价值查询）' };
+      if (cfg.ragEndpoint && cfg.ragApiKey) {
+        const r = await searchOnline(cfg, queries);
+        if (!r.searched) return { text: r.hint };
+        const ing = ingestSearchResults(w, r.results);
+        return { text: `直连检索命中并回灌 ${ing.ingested} 组结果（缓存 ${ing.cached} 条）` };
+      }
+      const r = requestHostSearch(w, queries, { purpose: 'mcp' });
+      return {
+        text: `已排队 ${r.queued} 条宿主检索请求（${r.requestId}）→ requests.jsonl；检索后调用 rag_ingest 回灌。`,
+      };
+    }
+    case 'rag_ingest': {
+      const w = wsDir(args, cfg);
+      ws.ensureWorkspace(w);
+      let results = args.results;
+      if (!results && args.file) {
+        results = JSON.parse(fs.readFileSync(path.resolve(args.file), 'utf8'));
+        if (!Array.isArray(results)) results = results.results;
+      }
+      const r = ingestSearchResults(w, results || []);
+      return { text: `已回灌 ${r.ingested} 条检索结果（缓存 ${r.cached} 条）` };
+    }
+    case 'originality': {
+      const w = wsDir(args, cfg);
+      ws.ensureWorkspace(w);
+      const file = args.file ? path.resolve(args.file) : path.join(w, 'draft.md');
+      if (!fs.existsSync(file)) throw new Error(`找不到文稿: ${file}`);
+      const r = originalityScan(fs.readFileSync(file, 'utf8'), w);
+      return {
+        text: `原创性检查：风险 ${r.risk}；文内重复 ${r.selfDuplicates.length}、自我复用 ${r.libraryOverlaps.length}、模板句 ${r.templateHits.length}`,
+      };
+    }
     case 'style_adapter': {
       const w = wsDir(args, cfg);
       ws.ensureWorkspace(w);
@@ -687,7 +768,7 @@ export async function runMcpServer({ input = process.stdin, output = process.std
         result: {
           protocolVersion: '2025-03-26',
           capabilities: { tools: {} },
-          serverInfo: { name: 'sculptor', version: '0.12.0' },
+          serverInfo: { name: 'sculptor', version: '0.13.0' },
         },
       });
     } else if (

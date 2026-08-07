@@ -110,6 +110,21 @@ write / restyle / redteam --fix / transform 前自动把当前 draft.md 存到
 + 语病/搭配（LLM，配置密钥时启用）。`sculptor redteam --proofread` 可与反 AI 审计同跑；
 导演交付时确定性校对并提示"N 处需核对"。
 
+### 联网 RAG（事实核查的"去哪查"）
+
+事实核查的 verify 项自动生成检索查询：配置 `SCULPTOR_RAG_ENDPOINT` +
+`SCULPTOR_RAG_API_KEY` 时直连 `POST /search {queries}` 并回灌；否则把检索请求写入
+`protocol/requests.jsonl`（type: web-search），**宿主用自身联网能力检索后**
+`sculptor rag ingest <results.json>`（或 MCP `rag_ingest`）回灌缓存与素材。
+`sculptor rag status / search / ingest` 手动管理；结果缓存 `vault/rag-cache.json`。
+
+### 静默内部质量门（真实触发，不刷屏）
+
+交付前自动执行、只记录不展示：风格保真评估（低分自动微调，最多 2 轮）、
+原创性检查（文内重复句/与个人库自我复用/模板句）、校对扫描、事实核查 +
+RAG 检索请求——全部写进 `state.quality` 与 context 日志，用户只看交付结果。
+`sculptor originality` 可手动查看原创性明细。
+
 ### 大纲评审-修订回路（CogWriter 式）
 
 大纲生成后自动评审（立意贯穿/论点-功能匹配/逻辑递进/素材利用/篇幅分配/文体规范），

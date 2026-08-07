@@ -18,6 +18,8 @@ import { factScan } from '../src/fact-check.js';
 import { applyCorrectionFeedback } from '../src/style-pulse.js';
 import { proofScan } from '../src/proofread.js';
 import { formatReference } from '../src/citation.js';
+import { originalityScan } from '../src/originality.js';
+import { buildSearchQueries, ingestSearchResults } from '../src/rag.js';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-e2e-'));
 const work = path.join(root, 'work');
@@ -219,6 +221,17 @@ try {
     '导演自动推进到交付（逐节写作→审计→群像→交付，无需用户催）',
     ar.kind === 'deliver' && fs.existsSync(path.join(ws3, 'draft.md')),
     `${ar.kind} ${String(ar.message).slice(0, 80)}`,
+  );
+  const ws3StateAfterDeliver = JSON.parse(
+    fs.readFileSync(path.join(ws3, 'protocol', 'state.json'), 'utf8'),
+  );
+  check(
+    '交付前静默质量门真实触发（风格保真/原创性/校对/事实核查→RAG 排队）',
+    typeof ws3StateAfterDeliver.quality?.styleScore === 'number' &&
+      typeof ws3StateAfterDeliver.quality?.originality === 'object' &&
+      typeof ws3StateAfterDeliver.quality?.proofread === 'number' &&
+      typeof ws3StateAfterDeliver.quality?.factVerify === 'number',
+    JSON.stringify(ws3StateAfterDeliver.quality).slice(0, 160),
   );
   // 交付后：用户给风格方向 → 导演全文重写 → 审计 → 群像 → 再次交付
   r = await run(['agent', '--once'], { input: '整篇更克制一点\n' });
@@ -981,6 +994,75 @@ try {
   );
   process.env.SCULPTOR_WORKSPACE = workspace;
 
+  // 8.9 联网 RAG + 内置原创性检查
+  const ragQueries = buildSearchQueries('1987年《光明日报》刊登报道，三百多座红砖楼', {
+    topic: '北大红楼',
+  });
+  check(
+    'buildSearchQueries 生成高价值检索查询',
+    ragQueries.some((q) => q.includes('1987')) && ragQueries.some((q) => q.includes('光明日报')),
+    JSON.stringify(ragQueries),
+  );
+  const ragResults = [
+    {
+      query: '北大红楼 1987年 光明日报',
+      results: [
+        {
+          title: '红楼往事',
+          url: 'https://example.com/honglou',
+          snippet: '1987年《光明日报》刊文介绍北大红楼的历史。',
+          source: '示例来源',
+        },
+      ],
+    },
+  ];
+  const ing = ingestSearchResults(workspace, ragResults);
+  check(
+    'rag 回灌缓存与素材',
+    ing.ingested === 1 &&
+      fs.existsSync(path.join(workspace, 'vault', 'rag-cache.json')) &&
+      JSON.parse(fs.readFileSync(path.join(workspace, 'protocol', 'state.json'), 'utf8')).materials?.some(
+        (m) => m.includes('红楼往事'),
+      ),
+    JSON.stringify(ing),
+  );
+  const ragCache = JSON.parse(
+    fs.readFileSync(path.join(workspace, 'vault', 'rag-cache.json'), 'utf8'),
+  );
+  check(
+    'rag 缓存含查询与命中',
+    ragCache.entries?.[0]?.query?.includes('1987') &&
+      ragCache.entries[0].results[0].snippet.includes('光明日报'),
+  );
+  r = await run(['rag', 'status']);
+  check(
+    'rag status 显示缓存与通路',
+    r.code === 0 && r.out.includes('RAG 状态') && r.out.includes('缓存'),
+    r.out.slice(0, 100),
+  );
+  const ragIngestFile = path.join(root, 'rag-results.json');
+  fs.writeFileSync(ragIngestFile, JSON.stringify(ragResults));
+  r = await run(['rag', 'ingest', ragIngestFile]);
+  check(
+    'rag ingest CLI 回灌',
+    r.code === 0 && r.out.includes('已回灌'),
+    r.out.slice(0, 100),
+  );
+  const oriText =
+    '历史从不缺席，它只等一个人走进去。历史从不缺席，它只等一个人走进去。综上所述，我们应该共同努力。';
+  const ori = originalityScan(oriText, workspace);
+  check(
+    'originality 内置查重（文内重复+模板句）',
+    ori.selfDuplicates.length >= 1 && ori.templateHits.length >= 1,
+    JSON.stringify({ s: ori.selfDuplicates, t: ori.templateHits }),
+  );
+  r = await run(['originality', '--file', citeTextFile]);
+  check(
+    'originality CLI 可手动查看',
+    r.code === 0 && r.out.includes('risk'),
+    r.out.slice(0, 100),
+  );
+
   // 9. panel / status / doctor
   r = await run(['panel', path.join(workspace, 'protocol', 'state.json')]);
   check('玻璃面板渲染', r.out.includes('玻璃面板'));
@@ -1082,7 +1164,7 @@ try {
       .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
   );
   check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'sculptor');
-  check('MCP tools/list 32 个工具', byId[2]?.result?.tools?.length === 32);
+  check('MCP tools/list 35 个工具', byId[2]?.result?.tools?.length === 35);
   check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Sculptor 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
   const mcpInput2 = Readable.from([
@@ -1142,6 +1224,8 @@ try {
     `${JSON.stringify({ jsonrpc: '2.0', id: 17, method: 'tools/call', params: { name: 'history', arguments: { workspace } } })}\n`,
     `${JSON.stringify({ jsonrpc: '2.0', id: 18, method: 'tools/call', params: { name: 'profile_export', arguments: { workspace } } })}\n`,
     `${JSON.stringify({ jsonrpc: '2.0', id: 19, method: 'tools/call', params: { name: 'citations', arguments: { workspace, action: 'extract' } } })}\n`,
+    `${JSON.stringify({ jsonrpc: '2.0', id: 20, method: 'tools/call', params: { name: 'rag_search', arguments: { workspace, text: '1987年《光明日报》北大红楼' } } })}\n`,
+    `${JSON.stringify({ jsonrpc: '2.0', id: 21, method: 'tools/call', params: { name: 'originality', arguments: { workspace } } })}\n`,
   ]);
   const mcpOut6 = [];
   const output6 = new Writable({
@@ -1202,6 +1286,15 @@ try {
     'MCP citations 返回引文结果',
     byId6[19]?.result?.content?.[0]?.text?.includes('引文') ||
       byId6[19]?.result?.content?.[0]?.text?.includes('《'),
+  );
+  check(
+    'MCP rag_search 排队宿主检索',
+    byId6[20]?.result?.content?.[0]?.text?.includes('已排队') ||
+      byId6[20]?.result?.content?.[0]?.text?.includes('直连检索'),
+  );
+  check(
+    'MCP originality 返回原创性结果',
+    byId6[21]?.result?.content?.[0]?.text?.includes('原创性检查'),
   );
 
   // 12. 生态位探测：主动触发判断

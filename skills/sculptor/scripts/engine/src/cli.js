@@ -63,8 +63,16 @@ import { proofread, proofScan, renderProofread } from './proofread.js';
 import { transform, PRESETS } from './transform.js';
 import { listHistory, rollback } from './history.js';
 import { exportProfile, importProfile, profileStatus } from './profile.js';
+import {
+  buildSearchQueries,
+  searchOnline,
+  ingestSearchResults,
+  requestHostSearch,
+  ragStatus,
+} from './rag.js';
+import { originalityScan } from './originality.js';
 
-const HELP = `Sculptor Agent v0.12 — 完整写作 Agent（导演模式 · 风格脉搏贯穿每轮 · 一键改写矩阵 · 版本快照 · 语音口述 · 多格式导出 · 校对 · 多模态）
+const HELP = `Sculptor Agent v0.13 — 完整写作 Agent（导演模式 · 联网 RAG · 静默质量门 · 风格脉搏 · 改写矩阵 · 多模态）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
@@ -118,6 +126,8 @@ const HELP = `Sculptor Agent v0.12 — 完整写作 Agent（导演模式 · 风�
   sculptor export --html out.html / --srt out.srt / --pdf out.pdf [工作区]  导出 HTML / 字幕 SRT / PDF
   sculptor cite "<json条目或数组>" [--style gbt7714|apa] [--file refs.json]  生成参考文献（期刊/图书/网页/报纸/论文/报告）
   sculptor citations [--file x.md] [--append refs.json] [工作区]  提取文中《引文》清单；--append 把参考文献附录追加到草稿
+  sculptor rag [status|search|ingest] [工作区]  联网检索：search 生成查询并直连/排队宿主代检；ingest <results.json> 回灌缓存与素材
+  sculptor originality [--file x.md] [工作区]   原创性检查：文内重复句/与个人库自我复用/模板句（内置质量门，交付前自动执行）
   sculptor absorb <工作区> <edit.json>   吸收定点修改进风格档案
   sculptor fingerprint <工作区>       刷新压缩守卫风格指纹
   sculptor panel [state.json]         渲染玻璃面板
@@ -134,6 +144,7 @@ const HELP = `Sculptor Agent v0.12 — 完整写作 Agent（导演模式 · 风�
   SCULPTOR_LLM_BASE_URL  SCULPTOR_LLM_API_KEY  SCULPTOR_LLM_MODEL
   SCULPTOR_LLM_MAX_TOKENS  SCULPTOR_LLM_TIMEOUT_MS  SCULPTOR_WORKSPACE
   SCULPTOR_QUICK=1          快速模式：读者 3 人、跳过交锋与适配卡重蒸馏（交付更快）
+  SCULPTOR_RAG_ENDPOINT/SCULPTOR_RAG_API_KEY  直连检索端点（POST /search {queries}）；不配置则走宿主代检（requests.jsonl）
 `;
 
 function parseArgs(argv) {
@@ -278,6 +289,54 @@ export async function runCli(argv, io = {}) {
         const w = ws.resolveWorkspace(cfg, workspace);
         const r = await proofread(cfg, w, { file: flags.file || null });
         console.log(renderProofread(r));
+        break;
+      }
+      case 'originality': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        const file = flags.file ? path.resolve(String(flags.file)) : path.join(w, 'draft.md');
+        if (!fs.existsSync(file)) throw new Error(`找不到文稿: ${file}`);
+        const r = originalityScan(fs.readFileSync(file, 'utf8'), w);
+        console.log(JSON.stringify(r, null, 2));
+        break;
+      }
+      case 'rag': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const sub = positional[0] || 'status';
+        if (sub === 'ingest') {
+          if (positional.length < 2) throw new Error('用法: sculptor rag ingest <results.json>');
+          const raw = JSON.parse(fs.readFileSync(path.resolve(positional[1]), 'utf8'));
+          const results = Array.isArray(raw) ? raw : raw.results;
+          const r = ingestSearchResults(w, results);
+          console.log(`已回灌 ${r.ingested} 条检索结果（缓存 ${r.cached} 条，已加入素材）`);
+        } else if (sub === 'search') {
+          const text = flags.text || positional.slice(1).join(' ');
+          if (!text) throw new Error('用法: sculptor rag search "<要检索的文本>" [--topic 主题]');
+          const queries = buildSearchQueries(text, { topic: flags.topic ? String(flags.topic) : '' });
+          if (!queries.length) {
+            console.log('（没有可检索的高价值查询：需要事实候选或《引文》）');
+            break;
+          }
+          if (cfg.ragEndpoint && cfg.ragApiKey) {
+            const r = await searchOnline(cfg, queries);
+            if (r.searched) {
+              const ing = ingestSearchResults(w, r.results);
+              console.log(`直连检索命中并回灌 ${ing.ingested} 组结果 → 缓存与素材`);
+            } else {
+              console.log(r.hint);
+            }
+          } else {
+            const r = requestHostSearch(w, queries, { purpose: 'manual' });
+            console.log(`已排队 ${r.queued} 条宿主检索请求（${r.requestId}）→ requests.jsonl`);
+            console.log('宿主检索后用: sculptor rag ingest <results.json> 回灌');
+          }
+        } else {
+          const st = ragStatus(w, cfg);
+          console.log(
+            `RAG 状态:\n` +
+              `  缓存 ${st.cached} 条 · 待办请求 ${st.pendingRequests} 条\n` +
+              `  通路: ${st.direct ? `直连 ${st.endpoint}` : '宿主代检（未配置 SCULPTOR_RAG_ENDPOINT）'}`,
+          );
+        }
         break;
       }
       case 'style-adapter': {
