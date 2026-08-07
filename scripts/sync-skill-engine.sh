@@ -12,7 +12,7 @@ ENGINE="$ROOT/skills/sculptor/scripts/engine"
 MODE="${1:-sync}"
 
 if [ "$MODE" = "--check" ]; then
-  for d in bin src templates; do
+  for d in bin src templates scripts/io; do
     if ! diff -rq "$AGENT/$d" "$ENGINE/$d" >/dev/null; then
       echo "DRIFT: agent/$d differs from skills/sculptor/scripts/engine/$d"
       echo "Run: scripts/sync-skill-engine.sh"
@@ -28,7 +28,7 @@ if [ "$MODE" = "--check" ]; then
 fi
 
 mkdir -p "$ENGINE"
-for d in bin src templates; do
+for d in bin src templates scripts/io; do
   rsync -a --delete "$AGENT/$d/" "$ENGINE/$d/"
 done
 cp "$AGENT/package.json" "$ENGINE/package.json"
