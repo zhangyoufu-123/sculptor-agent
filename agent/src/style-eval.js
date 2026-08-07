@@ -215,9 +215,13 @@ export async function evaluateStyleFidelity(cfg, wsDir, { file = null } = {}) {
     throw new Error('文稿太短（<60 个汉字），暂无法做有意义的风格保真评估');
   const corpus = loadCorpus(workspace);
   let body;
-  if (corpus.hasRef) {
+  if (corpus.hasRef && cfg.apiKey) {
     try {
       body = await llmEval(cfg, text, corpus);
+      // 集成评分（arxiv 2508.06374：集成指标优于单一指标）：LLM 判断为主、确定性统计为佐证。
+      const deter = deterministicEval(text, corpus);
+      body.score = Number((0.82 * body.score + 0.18 * deter.score).toFixed(2));
+      body.llmScore = body.score;
     } catch {
       body = deterministicEval(text, corpus);
     }
@@ -235,6 +239,7 @@ export async function evaluateStyleFidelity(cfg, wsDir, { file = null } = {}) {
     hasReference: corpus.hasRef,
     mode: body.noReference ? 'no-reference' : body.mode,
     score: body.score,
+    llmScore: body.llmScore,
     dims: body.dims,
     matched: body.matched,
     drifted: body.drifted,

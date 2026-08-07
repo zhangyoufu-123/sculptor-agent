@@ -8,6 +8,7 @@ import { buildStyleShot } from './style-memory.js';
 import { latestStyleDirection } from './style.js';
 import { genreBrief, genreToCategory } from './genre.js';
 import { loadPersonalSkill } from './library.js';
+import { loadStyleAdapter } from './style-adapter.js';
 import { reviewOutline } from './outline-review.js';
 
 export function styleSummary(file) {
@@ -63,6 +64,7 @@ export async function generateOutline(cfg, wsDir) {
     personalSkill: loadPersonalSkill(workspace, {
       category: state.confirmed?.libraryCategory || genreToCategory(state.confirmed?.genre || ''),
     }),
+    styleAdapter: loadStyleAdapter(workspace, 600),
   };
   const content = await chatWithRetry(
     cfg,

@@ -59,7 +59,7 @@ export const PERSONAS = [
   },
 ];
 
-function splitSections(text) {
+export function splitSections(text) {
   const parts = String(text || '').split(/\n(?=## )/);
   if (parts.length > 1) {
     return parts.map((p) => {
@@ -132,10 +132,11 @@ function fallbackPersona(persona, text, sections) {
       thought: '第一次读，我先看有没有让我停下来的句子。',
     });
   }
-  return {
-    persona: persona.name,
-    role: persona.role,
-    impression: `（离线兜底反馈）我是${persona.name}：${persona.lens}。这篇文章我读完后的第一印象是${
+    return {
+      id: persona.id,
+      persona: persona.name,
+      role: persona.role,
+      impression: `（离线兜底反馈）我是${persona.name}：${persona.lens}。这篇文章我读完后的第一印象是${
       cjk < 300
         ? '篇幅偏短，还没来得及进入'
         : cjk >= 1500
@@ -175,6 +176,7 @@ async function personaReaction(cfg, persona, text, sections) {
     );
     const r = parseJsonContent(content, '读者反馈');
     return {
+      id: persona.id,
       persona: persona.name,
       role: persona.role,
       impression: String(r.impression || ''),
@@ -253,6 +255,216 @@ export function renderAudience(report) {
     out.push(
       `\n风格档案（本次阅读时的写/读档案）: write 已学 ${style.write.learned}/${style.write.total} · read ${style.read.learned}/${style.read.total}`,
     );
+  }
+  out.push(line);
+  return out.join('\n');
+}
+
+// ── 读者交锋辩论（MAJ-EVAL 式多智能体评审）────────────────────────
+// 8 位"第一读者"各自读完只代表 8 个单点；再选分歧最大的 3 位进入交锋，
+// 互相看到对方最尖锐的意见后收敛出"共识 / 争议 / 优先级"——共识直接改，
+// 争议留给作者拍板。LLM 失败时用确定性主题聚类兜底，环节永不缺席。
+
+export const DEBATE_IDS = ['teacher', 'critic', 'youngWriter', 'editor'];
+
+const THEME_WORDS = [
+  ['重复', '注水', '赘余'],
+  ['结尾', '收束'],
+  ['开头', '开场'],
+  ['空洞', '空泛', '口号', '说教'],
+  ['细节', '具体', '画面'],
+  ['事实', '数字', '年代', '查证'],
+  ['节奏', '句式', '句长'],
+  ['比喻', '意象', '文艺'],
+  ['结构', '段落', '层次'],
+  ['立场', '立意', '论点'],
+];
+
+function themeOf(text) {
+  const t = String(text || '');
+  for (const words of THEME_WORDS) {
+    if (words.some((w) => t.includes(w))) return words[0];
+  }
+  return '其他';
+}
+
+function deterministicDebate(debaters) {
+  const themes = new Map(); // theme -> { personas: [], advice: [], quotes: [] }
+  for (const d of debaters) {
+    const theme = themeOf(d.sharpest);
+    if (!themes.has(theme)) themes.set(theme, { personas: [], advice: [], quotes: [] });
+    const t = themes.get(theme);
+    if (!t.personas.includes(d.persona)) t.personas.push(d.persona);
+    t.advice.push(d.sharpest);
+    if (d.quote) t.quotes.push(d.quote);
+  }
+  const sorted = [...themes.entries()].sort((a, b) => b[1].personas.length - a[1].personas.length);
+  const shared = sorted.filter(([, t]) => t.personas.length >= 2);
+  const solo = sorted.filter(([, t]) => t.personas.length === 1);
+  const consensus = shared.slice(0, 3).map(([theme, t]) => ({
+    point: `${theme}：${t.advice[0]}`,
+    quote: t.quotes[0] || '',
+  }));
+  const disputes = solo.slice(0, 3).map(([theme, t]) => ({
+    topic: theme,
+    views: t.advice.slice(0, 2),
+  }));
+  const priority = sorted.slice(0, 3).map(([theme, t], i) => ({
+    action: t.advice[0],
+    quote: t.quotes[0] || '',
+    why: `${t.personas.join('、')}都提到了${theme}`,
+  }));
+  return {
+    exchanges: debaters.map((d) => ({
+      persona: d.persona,
+      reply: `我最想说的是：${d.sharpest}`,
+    })),
+    consensus,
+    disputes,
+    priority,
+    mode: 'fallback',
+  };
+}
+
+const DEBATE_PROMPT = (ctx) => `你是 Sculptor 的读者辩论主持人（MAJ-EVAL 式多智能体交锋）。三位"第一读者"第一次读同一篇文章，各执一词。请组织一轮交锋并收敛，让作者拿到可直接执行的结论。
+
+【文章】（节选）
+${ctx.excerpt}
+
+【三位读者与最尖锐的意见】
+${ctx.debaters
+  .map(
+    (d, i) =>
+      `${i + 1}. ${d.persona}（${d.role}）：\n   最尖锐的意见：${d.sharpest}\n   引用原文：${d.quote || '（无）'}`,
+  )
+  .join('\n\n')}
+
+规则：
+1. exchanges：先让三人互相看到对方最尖锐的意见，每人给一句回应（认同/反驳/补充），
+   回应里必须提到至少一位其他读者。
+2. consensus：三人一致同意"必须改"的（≤3 条，point 写清改什么，quote 引用原文）。
+3. disputes：三人意见冲突、留给作者拍板的（≤3 条，topic + 双方观点 views）。
+4. priority：按"对读者伤害大小"排序的可执行行动（≤3 条，action/quote/why）。
+5. 不要客套，不要表扬，只给能直接改的结论。
+
+输出严格 JSON：
+{"exchanges":[{"persona":"","reply":""}],"consensus":[{"point":"","quote":""}],"disputes":[{"topic":"","views":[""]}],"priority":[{"action":"","quote":"","why":""}]}`;
+
+async function llmDebate(cfg, debaters, text) {
+  const content = await chatWithRetry(
+    cfg,
+    [
+      { role: 'system', content: '你是读者辩论主持人，输出严格 JSON。' },
+      {
+        role: 'user',
+        content: DEBATE_PROMPT({
+          excerpt: String(text || '').slice(0, 2400),
+          debaters,
+        }),
+      },
+    ],
+    { json: true, temperature: 0.55, maxTokens: 1800 },
+  );
+  const r = parseJsonContent(content, '读者辩论');
+  return {
+    exchanges: Array.isArray(r.exchanges) ? r.exchanges.slice(0, 3) : [],
+    consensus: Array.isArray(r.consensus) ? r.consensus.slice(0, 3) : [],
+    disputes: Array.isArray(r.disputes) ? r.disputes.slice(0, 3) : [],
+    priority: Array.isArray(r.priority) ? r.priority.slice(0, 3) : [],
+    mode: 'llm',
+  };
+}
+
+/**
+ * 读者交锋辩论：8 位"第一读者"反应（可复用 runAudience 结果）→ 3 位分歧最大者交锋 → 共识/争议/优先级。
+ * @param reactions 已跑过的群像反应（personas）；缺省先跑 runAudience。
+ */
+export async function runDebate(
+  cfg,
+  wsDir,
+  { file = null, quick = false, reactions = null } = {},
+) {
+  const workspace = ws.ensureWorkspace(wsDir);
+  const personas = reactions || (await runAudience(cfg, wsDir, { file, quick })).personas;
+  const draftFile = file ? path.resolve(file) : path.join(workspace, 'draft.md');
+  if (!fs.existsSync(draftFile)) {
+    throw new Error(`找不到要交锋的文稿: ${draftFile}（先 sculptor write，或 --file 指定）`);
+  }
+  const text = fs.readFileSync(draftFile, 'utf8');
+  const sections = splitSections(text);
+  const debaters = personas
+    .filter((p) => DEBATE_IDS.includes(p.id))
+    .slice(0, 3)
+    .map((p) => {
+      const moment = (p.moments || [])[0];
+      return {
+        persona: p.persona,
+        role: p.role,
+        sharpest: p.advice || moment?.thought || p.impression || '',
+        quote: moment?.at || '',
+      };
+    })
+    .filter((d) => d.sharpest);
+  if (!debaters.length) {
+    return {
+      file: draftFile,
+      mode: 'none',
+      exchanges: [],
+      consensus: [],
+      disputes: [],
+      priority: [],
+      reason: '没有可交锋的读者意见',
+    };
+  }
+  let report;
+  if (cfg.apiKey) {
+    try {
+      report = await llmDebate(cfg, debaters, text);
+    } catch {
+      report = deterministicDebate(debaters);
+    }
+  } else {
+    report = deterministicDebate(debaters);
+  }
+  report.file = draftFile;
+  report.sections = sections.map((s) => s.heading);
+  report.debaters = debaters.map((d) => d.persona);
+  ws.logContext(
+    workspace,
+    'debate',
+    `读者交锋：${debaters.map((d) => d.persona).join('、')} → 共识 ${report.consensus.length}、争议 ${report.disputes.length}、优先级 ${report.priority.length}`,
+  );
+  return report;
+}
+
+/** 人类可读的辩论报告。 */
+export function renderDebate(report) {
+  const out = [];
+  const line = '─'.repeat(46);
+  out.push(`\n${line}`, 'Sculptor 读者交锋 · 共识 / 争议 / 优先级', line);
+  if (report.mode === 'none') {
+    out.push(report.reason || '（无交锋）');
+    out.push(line);
+    return out.join('\n');
+  }
+  out.push(`交锋者：${(report.debaters || []).join('、')}（${report.mode === 'llm' ? 'LLM 交锋' : '确定性聚类兜底'}）`);
+  if (report.exchanges?.length) {
+    out.push('互看意见后的回应:');
+    for (const e of report.exchanges) out.push(`  · ${e.persona}：${e.reply}`);
+  }
+  if (report.consensus?.length) {
+    out.push('三人一致的共识（直接改）:');
+    for (const c of report.consensus)
+      out.push(`  · ${c.point}${c.quote ? `「${c.quote}」` : ''}`);
+  }
+  if (report.disputes?.length) {
+    out.push('争议（作者拍板）:');
+    for (const d of report.disputes) out.push(`  · ${d.topic}：${(d.views || []).join(' / ')}`);
+  }
+  if (report.priority?.length) {
+    out.push('优先级（按对读者伤害排序）:');
+    for (const p of report.priority)
+      out.push(`  ${report.priority.indexOf(p) + 1}. ${p.action}${p.quote ? `「${p.quote}」` : ''}（${p.why}）`);
   }
   out.push(line);
   return out.join('\n');

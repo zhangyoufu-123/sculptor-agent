@@ -11,10 +11,12 @@ import { clarifyStep, missingNeed } from './clarify.js';
 import { generateOutline } from './outline.js';
 import { writeSection } from './write.js';
 import { redteam } from './redteam.js';
-import { runAudience, renderAudience } from './reader-gallery.js';
+import { runAudience, renderAudience, runDebate, renderDebate } from './reader-gallery.js';
 import { restyle } from './restyle.js';
 import { applyStyleDirection } from './style.js';
 import { evaluateStyleFidelity, applyEvalFeedback } from './style-eval.js';
+import { distillStyleAdapter } from './style-adapter.js';
+import { factScan } from './fact-check.js';
 import { archiveDraft, distillCategory } from './library.js';
 import { exportDocx } from './io.js';
 
@@ -273,6 +275,16 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     const rendered = renderAudience(ar);
     ({ state, d } = load());
     state.audience = { personas: ar.personas.map((p) => p.persona), file: ar.file };
+    let debateRendered = '';
+    try {
+      const db = await runDebate(cfg, workspace, { reactions: ar.personas });
+      debateRendered = renderDebate(db);
+      state.debate = {
+        consensus: db.consensus.length,
+        disputes: db.disputes.length,
+        file: db.file,
+      };
+    } catch {}
     // 归档进个人写作库（按文体自动分类），并尽力导出 docx
     const archived = archiveDraft(workspace, state);
     if (archived) state.confirmed.libraryCategory = archived.category; // 供后续同类写作注入个人 skill
@@ -290,6 +302,17 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
         path.join(path.dirname(ar.file), 'draft.docx'),
       );
     } catch {}
+    let adapterNote = '';
+    try {
+      const ad = await distillStyleAdapter(cfg, workspace);
+      if (ad.distilled) {
+        const n = ad.card.sources.samples + ad.card.sources.pieces + ad.card.sources.edits;
+        adapterNote = `，已压缩风格适配卡（${n} 条素材，供持续微调）`;
+      }
+    } catch {}
+    const fc = factScan(fs.readFileSync(ar.file, 'utf8'), state.materials || []);
+    const fcVerify = fc.items.filter((i) => i.supported === 'verify').length;
+    state.factCheck = { total: fc.items.length, verify: fcVerify, ts: ws.nowIso() };
     const styleScore = state.styleEval?.score;
     d.stage = 'deliver';
     state.phase = 'deliver';
@@ -301,8 +324,9 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       archived: archived ? `已归档到个人写作库（${archived.category}）` : '',
       distilled: distilled || '',
       audience: rendered,
-      message: `整篇文章已完成：逐节写作 → 反 AI 审计 → 风格保真评估${styleScore === null || styleScore === undefined ? '（暂缺参照系）' : ` ${(styleScore * 100).toFixed(0)} 分`} → 8 位第一读者反馈。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}，同类文体下次会写得更快更像你。${docx ? `已导出 ${docx}。` : ''}交付前请核对事实细节；要改某一句用 point-edit，要整体换风格直接说方向（如"更克制一点"），我会重写。`,
-      next: 'sculptor redteam / sculptor audience / sculptor restyle / sculptor point-edit',
+      debate: debateRendered,
+      message: `整篇文章已完成：逐节写作 → 反 AI 审计 → 风格保真评估${styleScore === null || styleScore === undefined ? '（暂缺参照系）' : ` ${(styleScore * 100).toFixed(0)} 分`} → 8 位第一读者反馈 → 3 位读者交锋。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}${adapterNote}。${docx ? `已导出 ${docx}。` : ''}${fcVerify ? `⚠ 事实核查：${fcVerify} 处数字/年代/引文需核对（运行 sculptor fact-check 看明细）。` : ''}要改某一句用 point-edit，要整体换风格直接说方向（如"更克制一点"），我会重写。`,
+      next: 'sculptor redteam / sculptor audience / sculptor debate / sculptor fact-check / sculptor point-edit',
     };
   }
 
@@ -387,6 +411,7 @@ export async function agentInteractive(cfg, wsDir) {
       } else if (r.kind === 'deliver') {
         console.log(`\n✅ ${r.message}`);
         if (r.audience) console.log(r.audience.slice(0, 2200));
+        if (r.debate) console.log(r.debate.slice(0, 1600));
         const again = await ask('\n要继续调整吗？（说方向 / 某一句 / 直接回车结束）\n> ');
         if (!again.trim()) break;
         lastInput = again;

@@ -10,6 +10,7 @@ import { buildStyleShot } from './style-memory.js';
 import { latestStyleDirection } from './style.js';
 import { genreBrief, genreToCategory } from './genre.js';
 import { loadPersonalSkill } from './library.js';
+import { loadStyleAdapter } from './style-adapter.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -59,6 +60,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       personalSkill: loadPersonalSkill(workspace, {
         category: state.confirmed?.libraryCategory || genreToCategory(state.confirmed?.genre || ''),
       }),
+      styleAdapter: loadStyleAdapter(workspace, 600),
     };
     const body = await chatWithRetry(
       cfg,

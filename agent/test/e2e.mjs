@@ -13,12 +13,15 @@ import { buildStyleShot } from '../src/style-memory.js';
 import { applyStyleDirection } from '../src/style.js';
 import { detectGenre } from '../src/genre.js';
 import { loadPersonalSkill } from '../src/library.js';
+import { loadStyleAdapter } from '../src/style-adapter.js';
+import { factScan } from '../src/fact-check.js';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-e2e-'));
 const work = path.join(root, 'work');
 fs.mkdirSync(work, { recursive: true });
 const workspace = path.join(root, 'ws');
 process.env.SCULPTOR_WORKSPACE = workspace;
+process.env.SCULPTOR_LLM_API_KEY = 'e2e-mock-key'; // 配合下方 fetch stub：有密钥才走 LLM 分支，实际请求全部离线 mock
 
 let failures = 0;
 function check(name, cond, extra = '') {
@@ -554,6 +557,16 @@ try {
   );
   r = await run(['audience', '--quick']);
   check('--quick 快速模式', r.code === 0 && r.out.includes('读者群像'));
+  r = await run(['debate']);
+  check(
+    'debate 读者交锋收敛共识/争议/优先级',
+    r.code === 0 &&
+      r.out.includes('读者交锋') &&
+      r.out.includes('共识') &&
+      r.out.includes('争议') &&
+      r.out.includes('优先级'),
+    r.out.slice(0, 140),
+  );
   // skill 形态（scripts/sculptor.mjs）也必须提供读者群像与重写命令
   const skillScript = new URL('../../skills/sculptor/scripts/sculptor.mjs', import.meta.url)
     .pathname;
@@ -648,11 +661,8 @@ try {
   // 8.5 风格保真评估闭环：对照作者样本打分 + 历史记录 + 无参照系兜底
   r = await run(['style-eval']);
   check(
-    'style-eval 风格保真评估（LLM 对照作者旧稿/修改记录）',
-    r.code === 0 &&
-      r.out.includes('风格保真评估') &&
-      r.out.includes('保真度') &&
-      r.out.includes('78 分'),
+    'style-eval 风格保真评估（LLM+集成指标）',
+    r.code === 0 && r.out.includes('风格保真评估') && r.out.includes('保真度'),
     r.out.slice(0, 160),
   );
   const evalLog = path.join(workspace, 'vault', 'style-eval.jsonl');
@@ -675,6 +685,56 @@ try {
     r.out.slice(0, 120),
   );
   process.env.SCULPTOR_WORKSPACE = workspace;
+
+  // 8.6 风格持续微调基建：适配卡蒸馏 + 偏好对数据集 + 本地 LoRA 指引
+  r = await run(['style-adapter']);
+  check(
+    'style-adapter 状态显示素材量',
+    r.code === 0 && r.out.includes('风格微调状态') && r.out.includes('旧稿'),
+    r.out.slice(0, 120),
+  );
+  r = await run(['style-adapter', '--distill']);
+  check(
+    'style-adapter --distill 蒸馏风格适配卡',
+    r.code === 0 && fs.existsSync(path.join(workspace, 'vault', 'style-adapter.md')),
+    r.out.slice(0, 120),
+  );
+  check(
+    '风格适配卡限量注入（不污染上下文）',
+    loadStyleAdapter(workspace, 200).length <= 220,
+    `len=${loadStyleAdapter(workspace, 200).length}`,
+  );
+  r = await run(['style-adapter', '--dataset']);
+  check(
+    'style-adapter --dataset 生成偏好对 JSONL',
+    r.code === 0 &&
+      fs.existsSync(path.join(workspace, 'vault', 'style-adapter-dataset.jsonl')),
+    r.out.slice(0, 120),
+  );
+  r = await run(['style-adapter', '--lora']);
+  check(
+    'style-adapter --lora 未配置端点时给本地 LoRA 指引',
+    r.code === 0 && r.out.includes('style_lora.py'),
+    r.out.slice(0, 160),
+  );
+
+  // 8.7 事实核查：确定性扫描 + LLM 分级
+  const plantedFacts = '1987年《光明日报》刊登了相关报道，三百多座红砖楼如今剩不到三十座。';
+  const fsr = factScan(plantedFacts, []);
+  check(
+    'factScan 确定性标记年代/引文/数字',
+    fsr.items.some(
+      (i) => i.text.includes('1987') && i.supported === 'verify',
+    ) &&
+      fsr.items.some((i) => i.type === 'quote'),
+    JSON.stringify(fsr.items.map((i) => i.text)),
+  );
+  r = await run(['fact-check']);
+  check(
+    'fact-check 分级核查并给出 verify 项',
+    r.code === 0 && r.out.includes('事实核查') && r.out.includes('verify'),
+    r.out.slice(0, 140),
+  );
 
   // 9. panel / status / doctor
   r = await run(['panel', path.join(workspace, 'protocol', 'state.json')]);
@@ -777,7 +837,7 @@ try {
       .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
   );
   check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'sculptor');
-  check('MCP tools/list 22 个工具', byId[2]?.result?.tools?.length === 22);
+  check('MCP tools/list 25 个工具', byId[2]?.result?.tools?.length === 25);
   check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Sculptor 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
   const mcpInput2 = Readable.from([
@@ -829,6 +889,9 @@ try {
   const mcpInput6 = Readable.from([
     `${JSON.stringify({ jsonrpc: '2.0', id: 10, method: 'tools/call', params: { name: 'style_eval', arguments: { workspace } } })}\n`,
     `${JSON.stringify({ jsonrpc: '2.0', id: 11, method: 'tools/call', params: { name: 'outline_review', arguments: { workspace } } })}\n`,
+    `${JSON.stringify({ jsonrpc: '2.0', id: 12, method: 'tools/call', params: { name: 'reader_debate', arguments: { workspace } } })}\n`,
+    `${JSON.stringify({ jsonrpc: '2.0', id: 13, method: 'tools/call', params: { name: 'fact_check', arguments: { workspace } } })}\n`,
+    `${JSON.stringify({ jsonrpc: '2.0', id: 14, method: 'tools/call', params: { name: 'style_adapter', arguments: { workspace, action: 'status' } } })}\n`,
   ]);
   const mcpOut6 = [];
   const output6 = new Writable({
@@ -854,6 +917,19 @@ try {
     'MCP outline_review 返回评审报告',
     byId6[11]?.result?.content?.[0]?.text?.includes('大纲评审') &&
       byId6[11]?.result?.content?.[0]?.text?.includes('评分'),
+  );
+  check(
+    'MCP reader_debate 返回交锋',
+    byId6[12]?.result?.content?.[0]?.text?.includes('读者交锋'),
+  );
+  check(
+    'MCP fact_check 返回分级',
+    byId6[13]?.result?.content?.[0]?.text?.includes('事实核查'),
+  );
+  check(
+    'MCP style_adapter 返回素材状态',
+    byId6[14]?.result?.content?.[0]?.text?.includes('素材') &&
+      byId6[14]?.result?.content?.[0]?.text?.includes('适配卡'),
   );
 
   // 12. 生态位探测：主动触发判断

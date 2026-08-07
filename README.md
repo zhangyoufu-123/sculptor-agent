@@ -35,6 +35,12 @@ node $SCULPTOR init && node $SCULPTOR agent         # 导演模式：主导全�
 `node $SCULPTOR export --official [--redhead]` → A4 公文 docx（红头可选）。
 风格保真评估：交付前自动对照你的旧稿与亲手修改记录给成稿打"像不像你"的分数，低分自动针对性修订；
 `node $SCULPTOR style-eval` 手动运行。大纲评审：生成后自动按六条标准评审并自动微调（仍由你确认）。
+读者交锋：8 位"第一读者"反馈后，分歧最大的 3 位互看意见、收敛出共识/争议/优先级
+（`node $SCULPTOR debate`）。事实核查：把数字/年代/引文/人名/机构分级为
+material/common/verify，交付前必看（`node $SCULPTOR fact-check`）。
+风格持续微调：`node $SCULPTOR style-adapter --distill` 蒸馏风格适配卡（写作时最高优先级注入）、
+`--dataset` 生成偏好对 JSONL、`--lora` 提交微调（或本地 `scripts/finetune/style_lora.py`，
+Panza 式 <100 样本 + LoRA）。
 个人写作库：交付后作品自动分类归档并蒸馏出"这类文体你的写法"，同类文章越写越像你；
 `node $SCULPTOR library` 查看分类，`node $SCULPTOR library view 议论文` 查看蒸馏 skill。
 多模态：对话里直接给 docx/xlsx/图片 文件路径即可自动提取素材；`node $SCULPTOR export` 把成稿导出为 docx。

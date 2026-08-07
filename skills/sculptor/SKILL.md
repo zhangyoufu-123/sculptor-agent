@@ -75,6 +75,26 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 逐句标出最像/最不像的位置与可执行修订；低分时自动针对性重写一轮。
 `sculptor style-eval` 可手动运行，评估历史记录在 `vault/style-eval.jsonl`。
 
+### 读者交锋辩论（MAJ-EVAL 式）
+
+8 位"第一读者"各自反馈后，选分歧最大的 3 位进入交锋：互看最尖锐的意见 →
+收敛出**共识（直接改）/ 争议（作者拍板）/ 优先级（按对读者的伤害排序）**。
+`sculptor debate` 手动运行；导演交付链自动执行并随交付展示。
+
+### 风格持续微调（Panza 式：<100 样本 + PeFT + RAG）
+
+三层递进：① `sculptor style-adapter --distill` 把全部旧稿/作品/亲手修改对压缩成
+**风格适配卡**（写作时最高优先级注入）；② `--dataset` 生成 Reverse Instructions 式
+偏好对 JSONL（每次 point-edit 都是一条"原文→改后"偏好对）；③ `--lora` 提交微调
+（配置 `SCULPTOR_FT_ENDPOINT/API_KEY` 走 API；否则本地
+`python3 scripts/finetune/style_lora.py --dataset <jsonl>`）。导演交付时自动蒸馏适配卡。
+
+### 事实核查（交付前必看）
+
+把成稿里的**数字/年代/引文/人名/机构**分级：material（来自素材，放心）/
+common（低风险）/ verify（交付前必须核对）。`sculptor fact-check` 手动核查；
+导演交付时确定性扫描并提示"N 处需核对"。
+
 ### 个人写作库（分类整理 + 蒸馏成个人写作 skill）
 
 每次完成交付，作品自动归档进 `vault/library/<类别>/`（按内容自动分类：议论文/散文/记叙文/

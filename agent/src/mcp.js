@@ -11,13 +11,21 @@ import { dissect } from './dissect.js';
 import { pointEdit } from './point-edit.js';
 import { probeTask } from './observer.js';
 import { interviewStep } from './interview.js';
-import { runAudience, renderAudience } from './reader-gallery.js';
+import { runAudience, renderAudience, runDebate, renderDebate } from './reader-gallery.js';
 import { styleProgress } from './style.js';
 import { buildStyleShot } from './style-memory.js';
 import { restyle } from './restyle.js';
 import { agentStep } from './director.js';
 import { evaluateStyleFidelity, applyEvalFeedback, renderStyleEval } from './style-eval.js';
 import { reviewOutline, renderOutlineReview } from './outline-review.js';
+import {
+  adapterStatus,
+  buildStyleDataset,
+  distillStyleAdapter,
+  loadStyleAdapter,
+  submitFineTune,
+} from './style-adapter.js';
+import { factCheck, renderFactCheck } from './fact-check.js';
 
 const TOOLS = [
   {
@@ -83,6 +91,42 @@ const TOOLS = [
         workspace: { type: 'string' },
         file: { type: 'string' },
         quick: { type: 'boolean' },
+      },
+    },
+  },
+  {
+    name: 'reader_debate',
+    description:
+      '读者交锋（MAJ-EVAL 式）：分歧最大的 3 位"第一读者"互看意见后收敛出共识/争议/优先级——共识直接改，争议留给作者拍板。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        file: { type: 'string' },
+        quick: { type: 'boolean' },
+      },
+    },
+  },
+  {
+    name: 'fact_check',
+    description:
+      '事实核查：把成稿里的数字/年代/引文/人名/机构分级为 material（来自素材）/common（低风险）/verify（交付前必须核对）。',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' }, file: { type: 'string' } },
+    },
+  },
+  {
+    name: 'style_adapter',
+    description:
+      '风格持续微调基建：status 查看素材/适配卡/数据集；distill 蒸馏风格适配卡（写作时最高优先级注入）；dataset 生成偏好对 JSONL；lora 提交微调任务（未配置端点时给出本地 LoRA 指引）。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        action: { type: 'string', enum: ['status', 'distill', 'dataset', 'lora'] },
+        outFile: { type: 'string' },
+        model: { type: 'string' },
       },
     },
   },
@@ -286,6 +330,50 @@ async function callTool(name, args, cfg) {
       });
       return { text: renderAudience(r) };
     }
+    case 'reader_debate': {
+      const w = wsDir(args, cfg);
+      const r = await runDebate(cfg, w, {
+        file: args.file || null,
+        quick: Boolean(args.quick),
+      });
+      return { text: renderDebate(r) };
+    }
+    case 'fact_check': {
+      const w = wsDir(args, cfg);
+      const r = await factCheck(cfg, w, { file: args.file || null });
+      return { text: renderFactCheck(r) };
+    }
+    case 'style_adapter': {
+      const w = wsDir(args, cfg);
+      ws.ensureWorkspace(w);
+      const action = args.action || 'status';
+      if (action === 'status') {
+        const st = adapterStatus(w);
+        return {
+          text:
+            `素材: 旧稿 ${st.samples} · 作品 ${st.pieces} · 修改对 ${st.edits}\n` +
+            `适配卡: ${st.hasAdapter ? '✓ 已蒸馏' : '（未蒸馏）'}\n` +
+            `数据集: ${st.hasDataset ? '✓ 已生成' : '（未生成）'}`,
+        };
+      }
+      if (action === 'distill') {
+        const r = await distillStyleAdapter(cfg, w);
+        if (!r.distilled) return { text: '没有可蒸馏的风格素材。' };
+        return { text: `风格适配卡已蒸馏（${r.card.mode}）→ ${r.mdFile}\n${loadStyleAdapter(w, 900)}` };
+      }
+      if (action === 'dataset') {
+        const r = buildStyleDataset(w, { outFile: args.outFile || null });
+        return { text: `数据集已生成：${r.records} 条 → ${r.file}` };
+      }
+      if (action === 'lora') {
+        const r = await submitFineTune(cfg, w, {
+          file: args.outFile || null,
+          model: args.model || null,
+        });
+        return { text: r.submitted ? `微调任务已提交：${r.jobId}` : r.hint };
+      }
+      throw new Error(`未知 style_adapter 动作: ${action}`);
+    }
     case 'quote': {
       return {
         text: `〔Sculptor 引用〕《${String(args.text || '').trim()}》\n修改指令：<在这里写你要怎么改>`,
@@ -432,7 +520,7 @@ export async function runMcpServer({ input = process.stdin, output = process.std
         result: {
           protocolVersion: '2025-03-26',
           capabilities: { tools: {} },
-          serverInfo: { name: 'sculptor', version: '0.8.0' },
+          serverInfo: { name: 'sculptor', version: '0.9.0' },
         },
       });
     } else if (

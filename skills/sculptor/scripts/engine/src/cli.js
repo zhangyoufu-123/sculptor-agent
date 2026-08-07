@@ -18,7 +18,7 @@ import { extractInstruction } from './point-edit.js';
 import { parseQuoteArg } from './point-edit.js';
 import { probeTask } from './observer.js';
 import { interviewStep, interviewInteractive, interviewSummary } from './interview.js';
-import { runAudience, renderAudience } from './reader-gallery.js';
+import { runAudience, renderAudience, runDebate, renderDebate } from './reader-gallery.js';
 import { styleProgress, backfillFromContext, extractStyleFromSamples } from './style.js';
 import { renderStyleProfile } from './style.js';
 import { buildStyleShot } from './style-memory.js';
@@ -31,8 +31,16 @@ import { extractInput, exportDocx, exportOfficialDocx, docxAvailable } from './i
 import { GENRES, genreBrief, genreNames } from './genre.js';
 import { evaluateStyleFidelity, applyEvalFeedback, renderStyleEval } from './style-eval.js';
 import { reviewOutline, renderOutlineReview } from './outline-review.js';
+import {
+  adapterStatus,
+  buildStyleDataset,
+  distillStyleAdapter,
+  loadStyleAdapter,
+  submitFineTune,
+} from './style-adapter.js';
+import { factCheck, renderFactCheck } from './fact-check.js';
 
-const HELP = `Sculptor Agent v0.8 — 完整写作 Agent（导演模式 · 风格保真闭环 · 文体库 · 个人写作库 · 多模态）
+const HELP = `Sculptor Agent v0.9 — 完整写作 Agent（导演模式 · 风格保真闭环 · 读者交锋 · 持续微调 · 事实核查 · 多模态）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
@@ -53,12 +61,16 @@ const HELP = `Sculptor Agent v0.8 — 完整写作 Agent（导演模式 · 风�
   sculptor style-eval [--file x.md] [工作区]  风格保真评估：这篇像不像你（对照你的旧稿/修改记录打分）
   sculptor outline-review [工作区]    大纲评审：评审当前大纲（低分时自动给出修订版，仍需你确认）
   sculptor audience [--file x.md] [--quick] [工作区]  读者群像：8 个"第一读者"的感性反馈
+  sculptor debate [--file x.md] [--quick] [工作区]    读者交锋：分歧最大的 3 位读者互看意见后收敛出共识/争议/优先级
   sculptor dissect [--file x.md] [工作区]  感性解剖 5 维度
+  sculptor fact-check [--file x.md] [工作区]  事实核查：数字/年代/引文/人名/机构 → material/common/verify 分级
   sculptor quote "<原句>"             生成可粘贴的「Sculptor 引用」块
   sculptor hook <工作区> [payload]    宿主生命周期钩子 → 观察日志 + 压缩守卫
   sculptor checklist <工作区>         渲染需求访谈确认清单（不消耗 LLM）
   sculptor style [--memory 查询] [--export] [--backfill] [--extract] [工作区]
                                      风格档案进度；--memory 预览按论题检索到的旧稿与修改对；--export 导出人类可读档案（vault/style-profile.md）；--backfill 回填对话日志；--extract 提取风格底稿
+  sculptor style-adapter [--distill] [--dataset [out.jsonl]] [--lora] [工作区]
+                                     风格持续微调：--distill 蒸馏风格适配卡（最高优先级注入）；--dataset 生成偏好对 JSONL；--lora 提交微调（未配置端点时给出本地 LoRA 指引）
   sculptor genre [名称]               文体库：结构骨架 + 行文规范（公文/合同/通知/纪要/报告/议论文/散文/演讲稿/记叙文）
   sculptor library [工作区]           个人写作库：查看分类作品与蒸馏 skill
   sculptor library scan [工作区]      蒸馏每类作品的"个人写作 skill"（vault/skills/personal/）
@@ -205,6 +217,62 @@ export async function runCli(argv, io = {}) {
           quick: Boolean(flags.quick),
         });
         console.log(renderAudience(r));
+        break;
+      }
+      case 'debate': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        const r = await runDebate(cfg, w, {
+          file: flags.file || null,
+          quick: Boolean(flags.quick),
+        });
+        console.log(renderDebate(r));
+        break;
+      }
+      case 'fact-check': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        const r = await factCheck(cfg, w, { file: flags.file || null });
+        console.log(renderFactCheck(r));
+        break;
+      }
+      case 'style-adapter': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, workspace));
+        if (flags.distill) {
+          const r = await distillStyleAdapter(cfg, w);
+          if (!r.distilled) {
+            console.log('没有可蒸馏的风格素材：先贴旧稿、归档作品或做 point-edit。');
+          } else {
+            console.log(`风格适配卡已蒸馏（${r.card.mode}）→ ${r.mdFile}`);
+            console.log(loadStyleAdapter(w, 1200));
+          }
+        }
+        if (flags.dataset !== undefined) {
+          const ds = buildStyleDataset(w, {
+            outFile: flags.dataset && flags.dataset !== true ? String(flags.dataset) : null,
+          });
+          console.log(
+            `微调数据集已生成：${ds.records} 条（样本 ${ds.sources.samples} / 作品 ${ds.sources.pieces} / 修改对 ${ds.sources.edits}）→ ${ds.file}`,
+          );
+        }
+        if (flags.lora) {
+          const r = await submitFineTune(cfg, w, {
+            file: flags.dataset && flags.dataset !== true ? String(flags.dataset) : null,
+            model: flags.model ? String(flags.model) : null,
+          });
+          if (r.submitted) {
+            console.log(`微调任务已提交：${r.jobId}（文件 ${r.fileId}）`);
+          } else {
+            console.log(r.hint);
+          }
+        }
+        if (!flags.distill && flags.dataset === undefined && !flags.lora) {
+          const st = adapterStatus(w);
+          console.log(
+            `风格微调状态:\n` +
+              `  素材: 旧稿 ${st.samples} · 作品 ${st.pieces} · 修改对 ${st.edits}\n` +
+              `  适配卡: ${st.hasAdapter ? '✓ 已蒸馏' : '（未蒸馏，--distill）'}\n` +
+              `  数据集: ${st.hasDataset ? '✓ 已生成' : '（未生成，--dataset）'}`,
+          );
+        }
         break;
       }
       case 'quote': {

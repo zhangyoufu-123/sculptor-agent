@@ -153,6 +153,48 @@ export function respond(messages) {
       },
     });
   }
+  if (userMsg.includes('读者辩论主持人')) {
+    return JSON.stringify({
+      exchanges: [
+        { persona: '老教师', reply: '挑剔编辑说得对，结尾确实需要具体的人来兜住。' },
+        { persona: '挑剔评论家', reply: '年轻作家提到的 AI 味问题我同意，论点推进比文采更重要。' },
+        { persona: '年轻作家', reply: '我补充：开头三行留人，中段细节再实一点。' },
+      ],
+      consensus: [
+        { point: '结尾落到具体的人身上，不要只讲道理', quote: '历史从不缺席' },
+        { point: '去掉重复句式与 AI 套话', quote: '' },
+      ],
+      disputes: [
+        { topic: '结尾姿态', views: ['老教师认为要笃定收束', '评论家认为留白更好'] },
+      ],
+      priority: [
+        { action: '重写结尾，落到具体的人与场景', quote: '历史从不缺席', why: '三位读者都提到了结尾' },
+        { action: '清掉 AI 套话', quote: '', why: '年轻作家对 AI 味最敏感' },
+      ],
+    });
+  }
+  if (userMsg.includes('风格适配师')) {
+    return JSON.stringify({
+      voice: '句子长短交错，克制内敛，先写具体物象再收情绪',
+      rhythm: '短句收束、长句铺陈细节，节奏疏密有致',
+      vocabulary: '多用时间词（百年/当年/如今）与具体名词（石阶/窗台/灰）',
+      imagery: '用历史物象承载情感（旧朝宫人/磨光的石阶）',
+      sentencePatterns: ['以具体场景起笔', '关键句用短句独立成段'],
+      doNot: ['AI 套话', '同一个比喻用两次', '空泛口号'],
+      representativeSentence: '历史从不缺席，它只等一个人走进去。',
+      editPairs: [{ original: '历史从不缺席', changed: '历史从不等候，只等人走进去' }],
+    });
+  }
+  if (userMsg.includes('事实核查员')) {
+    return JSON.stringify({
+      items: [
+        { text: '1987年', type: 'year', supported: 'verify', reason: '需要核对具体年份与出处' },
+        { text: '《光明日报》', type: 'quote', supported: 'common', reason: '报刊名，风险低' },
+        { text: '三百多座', type: 'number', supported: 'verify', reason: '数字需要查证' },
+      ],
+      summary: '两处数字/年代需核对，一处常识性低风险',
+    });
+  }
   if (userMsg.includes('第一读者') && userMsg.includes('【文章】')) {
     const name = userMsg.match(/你是「(.+?)」/)?.[1] || '读者';
     const firstLine = (userMsg.match(/【文章】\n([\s\S]*?)\n\n输出严格 JSON/) || [])[1] || '';

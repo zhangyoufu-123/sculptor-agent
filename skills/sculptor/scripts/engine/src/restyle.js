@@ -11,6 +11,7 @@ import { buildStyleShot } from './style-memory.js';
 import { latestStyleDirection, applyStyleDirection } from './style.js';
 import { genreBrief, genreToCategory } from './genre.js';
 import { loadPersonalSkill } from './library.js';
+import { loadStyleAdapter } from './style-adapter.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -88,6 +89,7 @@ export async function restyle(cfg, wsDir, { direction = '', section = null, forc
       personalSkill: loadPersonalSkill(workspace, {
         category: state.confirmed?.libraryCategory || genreToCategory(state.confirmed?.genre || ''),
       }),
+      styleAdapter: loadStyleAdapter(workspace, 600),
       text: body,
     };
     const content = await chatWithRetry(

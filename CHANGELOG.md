@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.9.0 (2026-08-07)
+
+### Added
+
+- **读者交锋辩论（MAJ-EVAL 式多智能体评审）**：8 位"第一读者"反应后，选分歧最大的
+  3 位进入交锋——互看最尖锐意见 → 收敛出共识（直接改）/ 争议（作者拍板）/
+  优先级（按对读者的伤害排序）；LLM 失败时确定性主题聚类兜底。
+  CLI `sculptor debate`，MCP 工具 `reader_debate`；导演交付链自动执行。
+- **风格持续微调基建（Panza 式：<100 样本 + PeFT + RAG）**：
+  `style-adapter.js` —— ① `--distill` 把旧稿/个人写作库/亲手修改对压缩成风格适配卡
+  （写作/大纲/重写时最高优先级限量注入）；② `--dataset` 生成 Reverse Instructions 式
+  偏好对 JSONL（point-edit 修改对即偏好对）；③ `--lora` 走 OpenAI 兼容微调接口
+  （上传 /files → 创建 /fine_tuning/jobs），未配置端点时给出本地 LoRA 指引；
+  新增 `scripts/finetune/style_lora.py`（torch+transformers+peft 本地训练）。
+  CLI `sculptor style-adapter`，MCP 工具 `style_adapter`；导演交付时自动蒸馏适配卡。
+- **事实核查**：`fact-check.js` —— 确定性扫描数字/年代/引文/人名/机构（零 LLM），
+  LLM 复核分级 material（来自素材）/ common（低风险）/ verify（交付前必须核对）；
+  记录落 `vault/fact-check.jsonl`。CLI `sculptor fact-check`，MCP 工具 `fact_check`；
+  导演交付时确定性扫描并在交付消息里提示"N 处需核对"。
+- **风格评估集成评分**：LLM 判断 + 确定性统计按 0.82/0.18 加权（参考 arxiv 2508.06374：
+  集成指标优于单一指标）。
+
+### Changed
+
+- 版本 0.8.0 → 0.9.0（CLI HELP / MCP serverInfo / package.json 同步）；
+  MCP 工具 22 → 25；导演交付链：… → 风格保真评估 → 读者群像 → **读者交锋** →
+  交付（含事实核查提示 + 风格适配卡自动蒸馏）。
+
 ## 0.8.0 (2026-08-07)
 
 ### Added
