@@ -32,6 +32,17 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 4. **MCP 被动。** 宿主不调用工具就不执行任何动作；不观察对话、不自动运行、不主动出现。
 5. **宁可不动，不可覆盖。** 检测到任何外部改动就让路：报告冲突、等待用户决定，而不是擅自写回。
 
+## 凭据自动发现（开箱即用）
+
+未显式配置 `SCULPTOR_LLM_API_KEY` 时，自动读取宿主已配置的可用 API：
+Codex `~/.codex/config.toml`（model_providers 的 `base_url` + `experimental_bearer_token`/
+`env_key`）、Claude Code `~/.claude/settings.json`（env 块）、OpenCode
+`~/.config/opencode/opencode.json`，以及常见 `*_API_KEY` 环境变量。规则：
+显式 `SCULPTOR_LLM_*` 永远优先；只自动采用 OpenAI 兼容协议（Anthropic 仅检测提示）；
+密钥绝不打印（只显示来源与末 4 位）；`SCULPTOR_CREDENTIALS=auto|ask|off` 控制模式。
+`sculptor credentials` 列出/采用候选，`--ask` 交互选择或手动输入（保存到
+`.sculptor/credentials.json`，0600），`--clear` 清除。
+
 ## 不可妥协的底线
 
 1. **问题从用户的话里长出来，不套模板。** 一次只问一个问题，每个问题给出你的建议/理解。用户连续两次说"没更多了/你决定"，立即停止澄清进入下一阶段。

@@ -1,6 +1,6 @@
 {
   "name": "sculptor",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "深度协作写作 Agent：多轮澄清、大纲评审、逐节写作、静默质量门、读者群像、联网 RAG、多格式导出。",
   "author": {
     "name": "Sculptor Team"

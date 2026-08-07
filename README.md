@@ -4,6 +4,11 @@
 
 > 📄 产品文档（功能 / 工作流 / 设计思路 / 设计亮点 / 路线图）：[docs/PRODUCT.md](docs/PRODUCT.md)
 
+## 开箱即用（无需重复填 key）
+
+未配置 `SCULPTOR_LLM_API_KEY` 时自动读取宿主已配置的 API（Codex / Claude Code / OpenCode /
+常见 `*_API_KEY`），只显示来源与末 4 位、绝不打印密钥；`sculptor credentials --ask` 可交互选择。
+
 > Agent 还是 Skill？——**Skill 优先，Agent 级协议**。分发靠 skill 包（目录即产品），深度靠协议（state.json / requests.jsonl / 风格金库）。
 
 ## 快速开始（一键安装）

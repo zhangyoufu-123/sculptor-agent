@@ -20,6 +20,17 @@ import { proofScan } from '../src/proofread.js';
 import { formatReference } from '../src/citation.js';
 import { originalityScan } from '../src/originality.js';
 import { buildSearchQueries, ingestSearchResults } from '../src/rag.js';
+import {
+  discoverFromEnv,
+  discoverFromCodex,
+  redact,
+  describeCandidate,
+  saveCredentials,
+  clearCredentials,
+  credentialsFile,
+  loadWorkspaceCredentials,
+} from '../src/credentials.js';
+import { loadConfig } from '../src/config.js';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-e2e-'));
 const work = path.join(root, 'work');
@@ -1061,6 +1072,62 @@ try {
     'originality CLI 可手动查看',
     r.code === 0 && r.out.includes('risk'),
     r.out.slice(0, 100),
+  );
+
+  // 8.10 凭据发现：env/Codex 自动读取 + 脱敏 + 显式配置优先 + 工作区存取
+  const envCand = discoverFromEnv({ OPENAI_API_KEY: 'sk-abcdef1234' });
+  check(
+    '凭据发现：env 候选',
+    envCand.length === 1 &&
+      envCand[0].source === 'env:OPENAI_API_KEY' &&
+      envCand[0].protocol === 'openai',
+    JSON.stringify(envCand.map((c) => c.source)),
+  );
+  check(
+    '凭据脱敏：不泄露完整 key',
+    redact('sk-abcdef1234') === '***1234' && !describeCandidate(envCand[0]).includes('sk-abcdef1234'),
+  );
+  const fakeHome = path.join(root, 'fakehome');
+  fs.mkdirSync(path.join(fakeHome, '.codex'), { recursive: true });
+  fs.writeFileSync(
+    path.join(fakeHome, '.codex', 'config.toml'),
+    'model = "deepseek-v4-flash"\nmodel_provider = "deepseek"\n\n[model_providers.deepseek]\nname = "deepseek"\nbase_url = "https://api.deepseek.com/"\nwire_api = "responses"\nexperimental_bearer_token = "sk-xyz7890"\n',
+  );
+  const codexCand = discoverFromCodex({}, fakeHome);
+  check(
+    '凭据发现：Codex config 解析（active provider + model）',
+    codexCand.length === 1 &&
+      codexCand[0].source === 'codex-config:deepseek' &&
+      codexCand[0].active === true &&
+      codexCand[0].model === 'deepseek-v4-flash',
+    JSON.stringify(codexCand.map((c) => c.source)),
+  );
+  check(
+    'Codex 候选同样脱敏',
+    !describeCandidate(codexCand[0]).includes('sk-xyz7890'),
+  );
+  const cfgExplicit = loadConfig({ SCULPTOR_LLM_API_KEY: 'sk-explicit', OPENAI_API_KEY: 'sk-env' });
+  check('显式 SCULPTOR 配置优先于宿主发现', cfgExplicit.apiKey === 'sk-explicit');
+  const cf = saveCredentials(ws6, {
+    baseUrl: 'https://example.com/v1',
+    apiKey: 'sk-saved',
+    model: 'm',
+    source: 'manual',
+  });
+  check(
+    'saveCredentials 写入 0600 并可回读',
+    fs.existsSync(cf) &&
+      (fs.statSync(cf).mode & 0o777) === 0o600 &&
+      loadWorkspaceCredentials(ws6)?.apiKey === 'sk-saved',
+    cf,
+  );
+  clearCredentials(ws6);
+  check('clearCredentials 清除工作区凭据', !fs.existsSync(cf));
+  r = await run(['credentials']);
+  check(
+    'credentials CLI 列出凭据状态（脱敏）',
+    r.code === 0 && r.out.includes('当前生效') && !r.out.includes('sk-explicit'),
+    r.out.slice(0, 120),
   );
 
   // 9. panel / status / doctor

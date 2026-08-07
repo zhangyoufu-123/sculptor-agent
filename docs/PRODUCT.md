@@ -2,7 +2,11 @@
 
 > 深度协作写作 Agent · 不只是生成器，而是"懂你的写作搭子"
 
-版本：v0.13.0 · 形态：可一键安装的 skill 包（内嵌完整 agent 引擎）+ 独立 CLI + MCP 服务器
+版本：v0.14.0 · 形态：可一键安装的 skill 包（内嵌完整 agent 引擎）+ 独立 CLI + MCP 服务器
+
+**开箱即用**：未配置 `SCULPTOR_LLM_API_KEY` 时自动读取宿主已配置的 API（Codex / Claude Code /
+OpenCode / 常见环境变量），只显示来源与末 4 位、绝不打印密钥；`sculptor credentials --ask`
+可交互选择或手动输入（保存到 `.sculptor/credentials.json`，0600）。
 
 ## 一、这是什么
 

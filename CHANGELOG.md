@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.14.0 (2026-08-07)
+
+### Added
+
+- **凭据自动发现** `credentials.js`：未显式配置 `SCULPTOR_LLM_API_KEY` 时，自动读取宿主
+  已配置的可用 API——Codex `~/.codex/config.toml`（model_providers 的 `base_url` +
+  `experimental_bearer_token`/`env_key`）、Claude Code settings.json（env 块）、
+  OpenCode 配置、常见 `*_API_KEY` 环境变量。显式 `SCULPTOR_LLM_*` 永远优先；
+  只自动采用 OpenAI 兼容协议（Anthropic 仅检测提示）；密钥绝不打印（只显示来源与末 4 位）。
+  `SCULPTOR_CREDENTIALS=auto|ask|off` 控制模式（默认 auto）。
+- **CLI `credentials`**：列出/采用候选（`--use N`）、交互选择或手动输入（`--ask`，
+  保存到 `.sculptor/credentials.json`，0600）、`--clear` 清除；`doctor` 显示凭据来源（脱敏）。
+
+### Changed
+
+- 版本 0.13.0 → 0.14.0（CLI HELP / MCP serverInfo / package.json / 插件清单同步）；
+  e2e 全绿（含凭据脱敏/Codex 解析/显式优先/0600 存取断言）。
+
 ## 0.13.0 (2026-08-07)
 
 ### Added

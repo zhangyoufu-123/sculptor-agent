@@ -2,6 +2,7 @@
 // Sculptor Agent CLI 入口。
 import fs from 'node:fs';
 import path from 'node:path';
+import readline from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { loadConfig } from './config.js';
 import { chat } from './llm.js';
@@ -71,8 +72,16 @@ import {
   ragStatus,
 } from './rag.js';
 import { originalityScan } from './originality.js';
+import {
+  discoverCredentials,
+  describeCandidate,
+  redact,
+  saveCredentials,
+  clearCredentials,
+  credentialsFile,
+} from './credentials.js';
 
-const HELP = `Sculptor Agent v0.13 — 完整写作 Agent（导演模式 · 联网 RAG · 静默质量门 · 风格脉搏 · 改写矩阵 · 多模态）
+const HELP = `Sculptor Agent v0.14 — 完整写作 Agent（导演模式 · 凭据自动发现 · 联网 RAG · 静默质量门 · 多模态）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
@@ -133,6 +142,9 @@ const HELP = `Sculptor Agent v0.13 — 完整写作 Agent（导演模式 · 联�
   sculptor panel [state.json]         渲染玻璃面板
   sculptor status [工作区]            工作区摘要
   sculptor doctor [--ping]            自检（可选连通性测试）
+  sculptor credentials [--ask] [--use N] [--clear] [工作区]
+                                     凭据发现：自动读取 Codex/Claude/OpenCode/env 已配置的 API；
+                                     --use N 采用候选；--ask 交互选择或手动输入；--clear 清除工作区凭据
   sculptor mcp                       启动 MCP stdio 服务器（供 Codex/Claude Code/OpenCode 调用）
   sculptor setup [--dry-run] [--dir 项目] [--engine 引擎路径] [--hosts codex,claude,opencode]
                                      自动接入：检测宿主→原生注册→装 skill→复用本机凭据
@@ -145,6 +157,7 @@ const HELP = `Sculptor Agent v0.13 — 完整写作 Agent（导演模式 · 联�
   SCULPTOR_LLM_MAX_TOKENS  SCULPTOR_LLM_TIMEOUT_MS  SCULPTOR_WORKSPACE
   SCULPTOR_QUICK=1          快速模式：读者 3 人、跳过交锋与适配卡重蒸馏（交付更快）
   SCULPTOR_RAG_ENDPOINT/SCULPTOR_RAG_API_KEY  直连检索端点（POST /search {queries}）；不配置则走宿主代检（requests.jsonl）
+  SCULPTOR_CREDENTIALS=auto|ask|off  凭据发现模式：auto 自动采用宿主最佳候选（默认）/ ask 交互 / off 只用显式配置
 `;
 
 function parseArgs(argv) {
@@ -174,6 +187,9 @@ async function doctor(cfg, { ping = false } = {}) {
   );
   report.push(
     `LLM 端点: ${cfg.baseUrl}（模型 ${cfg.model}）${cfg.apiKey ? '✓ 已配置密钥' : '⚠ 未配置密钥（可用 mock 或本地服务）'}`,
+  );
+  report.push(
+    `凭据来源: ${cfg.credentialsSource ? `${cfg.credentialsSource}（自动发现，密钥已脱敏）` : cfg.apiKey ? '显式 SCULPTOR_LLM_API_KEY' : '（未配置，可用 sculptor credentials --ask 选择或输入）'}`,
   );
   const w = ws.resolveWorkspace(cfg, '');
   report.push(`工作区: ${w} ${fs.existsSync(w) ? '✓' : '（未初始化）'}`);
@@ -837,6 +853,78 @@ export async function runCli(argv, io = {}) {
       case 'setup':
         await runSetup(flags);
         break;
+      case 'credentials': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''), {
+          create: true,
+        });
+        const candidates = discoverCredentials(process.env);
+        if (flags.clear) {
+          clearCredentials(w);
+          console.log(`已清除工作区凭据 → ${credentialsFile(w)}`);
+          break;
+        }
+        if (flags.use) {
+          const idx = Number(flags.use) - 1;
+          const c = candidates[idx];
+          if (!c) throw new Error(`候选索引无效（1-${candidates.length}）`);
+          const file = saveCredentials(w, c);
+          console.log(`已采用 [${c.source}]（key ${redact(c.apiKey)}，${c.baseUrl}）→ ${file}`);
+          break;
+        }
+        if (flags.ask) {
+          const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+          const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
+          console.log('检测到的可用凭据:');
+          candidates.forEach((c, i) => console.log(`  ${i + 1}. ${describeCandidate(c)}`));
+          console.log(`  0. 手动输入 API key（用于 ${cfg.baseUrl}）`);
+          const ans = (await ask('选择编号或粘贴 key（回车跳过）: ')).trim();
+          rl.close();
+          if (/^\d+$/.test(ans)) {
+            const n = Number(ans);
+            if (n === 0) {
+              const key = (await ask('粘贴 API key: ')).trim();
+              if (!key) {
+                console.log('未输入，取消。');
+                break;
+              }
+              const file = saveCredentials(w, {
+                baseUrl: cfg.baseUrl,
+                apiKey: key,
+                model: cfg.model,
+                source: 'manual',
+              });
+              console.log(`已保存手动凭据（key ${redact(key)}）→ ${file}`);
+            } else {
+              const c = candidates[n - 1];
+              if (!c) throw new Error(`候选索引无效（1-${candidates.length}）`);
+              const file = saveCredentials(w, c);
+              console.log(`已采用 [${c.source}]（key ${redact(c.apiKey)}）→ ${file}`);
+            }
+          } else if (ans) {
+            const file = saveCredentials(w, {
+              baseUrl: cfg.baseUrl,
+              apiKey: ans,
+              model: cfg.model,
+              source: 'manual',
+            });
+            console.log(`已保存手动凭据（key ${redact(ans)}）→ ${file}`);
+          } else {
+            console.log('未保存（回车跳过）。');
+          }
+          break;
+        }
+        console.log(
+          `当前生效: ${cfg.credentialsSource ? cfg.credentialsSource : cfg.apiKey ? '显式 SCULPTOR_LLM_API_KEY' : '（未配置）'}`,
+        );
+        if (!candidates.length) {
+          console.log('未发现宿主凭据。可配置 SCULPTOR_LLM_API_KEY，或运行: sculptor credentials --ask');
+        } else {
+          console.log(`检测到 ${candidates.length} 个可用凭据:`);
+          candidates.forEach((c, i) => console.log(`  ${i + 1}. ${describeCandidate(c)}`));
+          console.log('采用: sculptor credentials --use <编号>；交互选择: --ask');
+        }
+        break;
+      }
       case 'point-edit': {
         const instruction = positional[1] || extractInstruction(positional[0] || '');
         if (!positional[0] || !instruction)
