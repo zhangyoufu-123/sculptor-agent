@@ -50,6 +50,10 @@ export const OUTLINE_PROMPT = (
 【支撑论点】${(ctx.arguments || []).map((a, i) => `${i + 1}. ${a}`).join('\n') || '未明确'}
 【读者】${ctx.audience || '未明确'}
 【总目标字数】${ctx.targetWords} 字
+【篇幅预算】${ctx.budget?.label || ''}
+（预算说明：${ctx.targetWords} 字需要拆约 ${ctx.budget?.sections || '?'} 节、每节约 ${ctx.budget?.perSection || '?'} 字；
+用户已确认素材 ${(ctx.materials || []).length} 条，按预算至少需要 ${ctx.budget?.materialsMin || '?'} 条——
+素材不足时，大纲里对应的节要把"需要补充什么素材"写进该节 keyPoints/materials，绝不允许把节数硬拆开注水。）
 【素材】${(ctx.materials || []).map((m) => `- ${m}`).join('\n')}
 
 【写作风格（write-style，语言层）】${ctx.writeStyle}
@@ -65,9 +69,12 @@ ${ctx.styleAdapter ? `【风格适配卡（压缩自你的全部样本，最高�
 1. 每节一句话功能（铺垫/转折/细节/收束/升华），连续段落不要做同一件事。
 2. 段落长短错落：短段 1-2 句与长段 4-6 句交替。
 3. 节与节之间有衔接，不是并列堆叠。
-4. 总长度与文体匹配：演讲稿 4-6 节，散文 3-5 节，报告 5-8 节。
+4. 节数由篇幅预算决定：${ctx.targetWords} 字 → 约 ${ctx.budget?.sections || '?'} 节，每节 ${ctx.budget?.perSection || '?'} 字左右；
+   不要为了凑节数硬拆，也不要节数过少导致每节超载（每节超过 550 字必然注水）。
 5. 为每节分配目标字数（加总 ≈ 总目标字数），写入各节 "words" 字段。
 6. **每节必须挂一个支撑论点**（"thesis" 字段）：节的功能与论点一一对应，全篇围绕核心立意展开，不跑题、不空转。
+7. **每节必须分配至少一条用户已确认素材**（"materials" 字段引用上面的【素材】原文）；
+   没有可用素材的节要么删掉、要么明确写"本节需补充素材：××"。
 
 输出严格 JSON：
 {"title":"标题","sections":[{"heading":"节标题","function":"铺垫/转折/细节/收束/升华","thesis":"支撑的论点","words":200,"keyPoints":["要点"],"materials":["用到的素材"]}]}`;
@@ -118,10 +125,13 @@ export const EXPAND_PROMPT = (ctx) => `你是 Sculptor 的写作者。本节字�
 【本节】${ctx.heading}（功能：${ctx.function}）
 【目标字数】${ctx.target} 字（中文字符）
 【当前字数】${ctx.actual} 字
+【本节可用素材】${(ctx.materials || []).join('；') || '（无分配素材）'}
 
 ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
 
 扩写要求：保持原意与风格；补充具体细节、画面、引文、场景；不注水、不重复、不堆套话。
+**素材纪律**：优先把【本节可用素材】写透（场景、动作、数据、引文展开），严禁用"在当今/值得注意的是/这不仅…更是…"
+这类空转句凑字数；若可用素材已写尽仍不足，在扩写结果末尾用【素材不足：还需要××】标注缺口，而不是注水。
 【原文】
 ${ctx.text}
 

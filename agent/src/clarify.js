@@ -14,6 +14,7 @@ import {
 import { pulseAfterClarify, pushPulseToState } from './style-pulse.js';
 import { refreshStyleVector } from './style-vector.js';
 import { detectGenre, genreBlueprint } from './genre.js';
+import { parseTargetWords, guessTargetWords } from './budget.js';
 import { extractInput } from './io.js';
 
 const LOW_WILL = /没(有|什么)?更多|你决定|你自己决定|就这样|先这样|可以了|够了|你看着办/;
@@ -49,6 +50,12 @@ const FALLBACK_QUESTIONS = [
     need: 'audience',
     ask: '这篇文章主要给谁看？',
     recommendation: '老师、同学、家长、还是陌生读者？这决定信息密度',
+  },
+  {
+    need: 'targetWords',
+    ask: '这篇打算写多长？大概多少字？',
+    recommendation:
+      '比如"大约一千字"或"三千字左右"。篇幅决定素材要备多少条、大纲要拆几节——说个大概就行，写前会再和你对齐',
   },
   {
     need: 'materials',
@@ -149,6 +156,7 @@ function classifyAnswer(question, _answer) {
   if (/依据|缘由|出台背景|必要性/.test(q)) return { field: 'basis' };
   if (/主送|对象|收件人|当事人|甲方|乙方/.test(q)) return { field: 'recipient' };
   if (/读者|给谁|听众/.test(q)) return { field: 'audience' };
+  if (/字数|多长|篇幅|多少字|写多长|长文|短文|长一点|短一点/.test(q)) return { field: 'targetWords' };
   if (/主题|写什么|什么事|想写/.test(q)) return { field: 'topic' };
   if (/风格|写过|类似|文体|文风|旧稿|底稿/.test(q)) return { field: 'style' };
   if (/事项|要点|条款|具体安排|内容要求/.test(q)) return { field: 'items' };
@@ -197,6 +205,11 @@ function applyAnswer(state, field, answer) {
   } else if (field === 'recipient') state.confirmed.recipient = a;
   else if (field === 'basis') state.confirmed.basis = a;
   else if (field === 'plot') state.confirmed.plot = a;
+  else if (field === 'targetWords') {
+    const n = parseTargetWords(a) || guessTargetWords(a);
+    if (n > 0) state.confirmed.targetWords = n;
+    else state.confirmed.targetWordsNote = a; // 解析不到也记录，避免丢用户意图
+  }
   else {
     state.materials = state.materials || [];
     if (!state.materials.includes(a)) state.materials.push(a);
@@ -211,7 +224,9 @@ function applyAnswer(state, field, answer) {
 
 /** 当前文体对应的澄清蓝图（默认散文型）。 */
 export function activeBlueprint(state) {
-  return genreBlueprint(state?.confirmed?.genre || '');
+  return genreBlueprint(state?.confirmed?.genre || '', {
+    targetWords: state?.confirmed?.targetWords || 0,
+  });
 }
 
 function fieldDone(state, f) {
@@ -220,6 +235,7 @@ function fieldDone(state, f) {
   if (f.list === 'arguments') return (c.arguments || []).length >= (f.count || 1);
   if (f.list === 'items') return (c.items || []).length >= (f.count || 1);
   if (f.key === 'styleSample') return Boolean(c.styleSample);
+  if (f.key === 'targetWords') return Boolean(c.targetWords);
   // 蓝图 key 与状态存储的别名映射（emotion→emotionalCurve, ending→endingTaste）
   const valueKey =
     f.key === 'emotion' ? 'emotionalCurve' : f.key === 'ending' ? 'endingTaste' : f.key;

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { chatWithRetry, parseJsonContent } from './llm.js';
 import * as ws from './workspace.js';
 import { genreBrief } from './genre.js';
+import { contentBudget } from './budget.js';
 
 const REVIEW_SCORE_OK = 0.75; // LLM 评分低于此且给出修订版 → 自动采用修订版
 
@@ -29,6 +30,41 @@ function deterministicReview(outline, ctx) {
   const total = sections.reduce((s, x) => s + Number(x.words || 0), 0);
   if (!sections.length) issues.push({ severity: 'high', target: '大纲', issue: '没有 sections' });
   if (!outline.title) issues.push({ severity: 'mid', target: '标题', issue: '缺少标题' });
+  // 篇幅预算：目标字数 → 节数 / 每节字数 / 素材分配（长文注水的硬检查）
+  if (target > 0 && sections.length) {
+    const b = contentBudget({ genre: ctx.genre || '', targetWords: target });
+    if (sections.length < b.sections) {
+      issues.push({
+        severity: 'high',
+        target: '节数',
+        issue: `${target} 字需要约 ${b.sections} 节（每节约 ${b.perSection} 字），当前仅 ${sections.length} 节、每节 ${Math.round(total / sections.length)} 字 → 必注水`,
+      });
+    }
+    if (total / Math.max(1, sections.length) > 550) {
+      issues.push({
+        severity: 'mid',
+        target: '篇幅',
+        issue: `每节平均 ${Math.round(total / sections.length)} 字，超过 550 字/节的舒适上限，节内没有新材料支撑时会注水`,
+      });
+    }
+    const noMat = sections.filter((s) => !(s.materials || []).length);
+    if (noMat.length) {
+      issues.push({
+        severity: 'high',
+        target: '素材分配',
+        issue: `${noMat.length} 节没有分配任何用户素材（${noMat.map((s) => s.heading).join('、')}），写作时只能空泛扩写`,
+      });
+    }
+    const used = new Set((sections.flatMap((s) => s.materials || [])).map((m) => String(m).slice(0, 8)));
+    const idle = (ctx.materials || []).filter((m) => !used.has(String(m).slice(0, 8))).length;
+    if (idle >= 2) {
+      issues.push({
+        severity: 'mid',
+        target: '素材利用',
+        issue: `有 ${idle} 条已确认素材没有分配到任何节（素材闲置 = 白问）`,
+      });
+    }
+  }
   const range = GENRE_SECTION_RANGE[ctx.genre] || [3, 7];
   if (sections.length && (sections.length < range[0] || sections.length > range[1])) {
     issues.push({
@@ -91,6 +127,9 @@ function reviewPromptArgs(ctx) {
   const materialLines = (ctx.materials || []).map((m) => `- ${m}`).join('\n');
   const corrections = ctx.corrections?.length ? `【用户修正意见】${ctx.corrections.join('；')}` : '';
   const gb = ctx.genreBrief ? `【文体范式】\n${ctx.genreBrief}` : '';
+  const budget = ctx.budget
+    ? `【篇幅预算】${ctx.budget.label}\n（素材下限 ${ctx.budget.materialsMin} 条；每节必须分配用户素材，缺素材的节要标"需补充"。）`
+    : '';
   return `你是 Sculptor 的大纲评审师（CogWriter 式规划-评审-重规划）。用户已确认主题、立意、论点与素材，下面是你评审对象——一份待确认的大纲。
 
 【主题】${ctx.topic}
@@ -100,6 +139,7 @@ function reviewPromptArgs(ctx) {
 ${corrections}
 ${gb}
 【目标字数】${ctx.targetWords} 字
+${budget}
 
 【大纲】
 ${JSON.stringify(ctx.outline, null, 2)}
@@ -142,7 +182,11 @@ export async function reviewOutline(cfg, wsDir, { outline = null } = {}) {
     corrections: state.blueprint?.corrections || [],
     genre: state.confirmed?.genre || '',
     genreBrief: genreBrief(state.confirmed?.genre || ''),
-    targetWords: state.targetWords || 1000,
+    targetWords: Number(state.confirmed?.targetWords) || state.targetWords || 1000,
+    budget: contentBudget({
+      genre: state.confirmed?.genre || '',
+      targetWords: Number(state.confirmed?.targetWords) || state.targetWords || 1000,
+    }),
     outline: current,
   };
   let report;

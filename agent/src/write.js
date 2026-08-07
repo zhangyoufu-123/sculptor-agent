@@ -94,6 +94,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
               target: words,
               actual,
               text,
+              materials: section.materials || [],
               styleShot: ctx.styleShot, // 扩写同样注入少样本，防止风格漂移
             }),
           },

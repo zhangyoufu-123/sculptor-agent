@@ -1,6 +1,7 @@
 // 文体库：公文/合同等公式化内容的"结构骨架 + 行文规范"。
 // 写作时按文体注入大纲与写作提示词，让公式化内容不靠模型临场发挥，而是按既定范式产出。
 // 个人写作库（library.js）在此基础上叠加"这类文体你个人的写法"，两者互补。
+import { contentBudget } from './budget.js';
 
 export const GENRES = {
   公文: {
@@ -462,8 +463,37 @@ export function genreNames() {
  * 论文要论点×N，散文不要论点）。
  * 字段 key 与 clarify 状态机对齐：list 字段（materials/arguments/items）计数收集。
  */
-export function genreBlueprint(name) {
-  const F = (fields) => fields;
+export function genreBlueprint(name, opts = {}) {
+  const b = contentBudget({
+    genre: name,
+    targetWords: Number(opts.targetWords) || 0,
+  });
+  // 目标字数必问：篇幅决定素材要备多少、大纲要拆几节——长文注水的第一道闸门。
+  // 素材/论点/事项下限随篇幅动态放大（如 3000 字 → 素材 ≥8 条、论点 ≥3 个）。
+  const F = (fields) => {
+    const scaled = fields.map((f) => {
+      if (f.key === 'materials' && f.count) {
+        const n = Math.max(f.count, b.materialsMin);
+        return { ...f, count: n, label: f.label.replace(/≥\d+/, `≥${n}`) };
+      }
+      if (f.key === 'argument' && f.count && b.argumentsMin > 0) {
+        const n = Math.max(f.count, b.argumentsMin);
+        return { ...f, count: n, label: f.label.replace(/≥\d+/, `≥${n}`) };
+      }
+      if (f.key === 'items' && f.count && b.itemsMin > 0) {
+        const n = Math.max(f.count, b.itemsMin);
+        return { ...f, count: n, label: f.label.replace(/≥\d+/, `≥${n}`) };
+      }
+      return f;
+    });
+    const out = [...scaled];
+    out.splice(1, 0, {
+      key: 'targetWords',
+      label: `目标字数（${b.label}）`,
+      required: true,
+    });
+    return out;
+  };
   switch (name) {
     case '议论文':
     case '学术论文':

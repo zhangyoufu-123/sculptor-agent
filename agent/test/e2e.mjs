@@ -95,10 +95,12 @@ try {
   // 2. clarify --once：首轮空输入拿第一个问题，然后逐轮回答上一个问题
   const answers = [
     '我想写百年历久的北大红楼',
+    '大约一千字',
     '让读者感到历史可以走进去',
     '老师和同学',
     '我在门口站了很久，想象百年前的脚步声',
     '纪念牌上写着：百年征程波澜壮阔，百年初心历久弥坚',
+    '二楼西侧有一扇窗，窗台积着灰，灰上有细痕',
     '历史不是展品，而是可以站进去的现场',
     '现场感来自具体的人，而非抽象的时间',
     '每一个细节都是过去的证词',
@@ -419,9 +421,37 @@ try {
   );
   check(
     '动态蓝图：论文要论点×2，散文不要论点',
-    bpAcademic.some((f) => f.key === 'argument' && f.required && f.count === 2) &&
+    bpAcademic.some((f) => f.key === 'argument' && f.required && f.count >= 2) &&
       !bpProse.some((f) => f.key === 'argument') &&
       bpProse.some((f) => f.key === 'theme'),
+  );
+  check(
+    '动态蓝图：目标字数进入蓝图（必问）',
+    bpProse.some((f) => f.key === 'targetWords' && f.required),
+  );
+  check(
+    '篇幅预算：素材/论点下限随字数放大',
+    genreBlueprint('散文', { targetWords: 3000 }).find((f) => f.key === 'materials').count >= 8 &&
+      genreBlueprint('学术论文', { targetWords: 2000 }).find((f) => f.key === 'argument').count >= 2,
+  );
+  const { parseTargetWords, contentBudget } = await import('../src/budget.js');
+  check(
+    '目标字数解析：中文数字/阿拉伯数字',
+    parseTargetWords('大约一千字') === 1000 &&
+      parseTargetWords('三千字左右') === 3000 &&
+      parseTargetWords('3000字') === 3000,
+  );
+  const b3000 = contentBudget({ targetWords: 3000 });
+  const b1000 = contentBudget({ targetWords: 1000 });
+  check(
+    '篇幅预算：3000 字 → 约 8 节/每节 ~380/素材 ≥8',
+    b3000.sections >= 7 && b3000.materialsMin >= 8 && b3000.perSection <= 450,
+    JSON.stringify(b3000),
+  );
+  check(
+    '篇幅预算：1000 字 → 素材 ≥2 节数 3',
+    b1000.materialsMin >= 2 && b1000.sections === 3,
+    JSON.stringify(b1000),
   );
   const ws9 = path.join(root, 'ws9');
   process.env.SCULPTOR_WORKSPACE = ws9;
@@ -441,10 +471,20 @@ try {
   ensureWs(ws10, { create: true });
   writeWs(ws10, {
     phase: 'clarify',
-    confirmed: { genre: '散文', topic: 't', stance: 's', theme: 'm' },
-    materials: ['a', 'b'],
+    confirmed: { genre: '散文', topic: 't', stance: 's', theme: 'm', targetWords: 1000 },
+    materials: ['a', 'b', 'c'],
   });
   check('大纲门槛动态：散文不强制论点', gate(ws10).ok === true);
+  writeWs(ws10, {
+    phase: 'clarify',
+    confirmed: { genre: '散文', topic: 't', stance: 's', theme: 'm', targetWords: 3000 },
+    materials: ['a', 'b', 'c'],
+  });
+  check(
+    '大纲门槛动态：3000 字缺素材被拦截（≥8 条）',
+    gate(ws10).ok === false && gate(ws10).missing.join().includes('素材'),
+    gate(ws10).missing.join(),
+  );
   writeWs(ws10, { phase: 'clarify', confirmed: { genre: '公文', topic: 't' }, materials: [] });
   check('大纲门槛动态：公文缺事项/依据被拦截', gate(ws10).ok === false);
 

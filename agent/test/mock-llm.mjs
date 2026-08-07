@@ -7,6 +7,11 @@ const CLARIFY_QUESTIONS = [
     options: [],
   },
   {
+    question: '这篇打算写多长？大概多少字？',
+    recommendation: '比如"大约一千字"或"三千字左右"——篇幅决定素材要备多少、大纲要拆几节',
+    options: [],
+  },
+  {
     question: '写完这篇发言稿，你想让读者相信什么？立场是什么？',
     recommendation: '比如"历史不是橱窗里的展品，而是可以站进去的现场"',
     options: [],
@@ -132,14 +137,15 @@ export function respond(messages) {
     const argCount = (ctx.match(/^argument:/gm) || []).length;
     let q;
     if (!has(/^topic:/m)) q = CLARIFY_QUESTIONS[0];
-    else if (!has(/^stance:/m)) q = CLARIFY_QUESTIONS[1];
-    else if (!has(/^audience:/m)) q = CLARIFY_QUESTIONS[2];
-    else if (materialCount < 2) q = CLARIFY_QUESTIONS[materialCount === 0 ? 3 : 4];
-    else if (!has(/^theme:/m)) q = CLARIFY_QUESTIONS[5];
-    else if (argCount < 2) q = CLARIFY_QUESTIONS[argCount === 0 ? 6 : 7];
-    else if (!has(/^emotionalCurve:/m)) q = CLARIFY_QUESTIONS[8];
-    else if (!has(/^endingTaste:/m)) q = CLARIFY_QUESTIONS[9];
-    else if (!has(/^styleSample:/m)) q = CLARIFY_QUESTIONS[10];
+    else if (!has(/^targetWords:/m)) q = CLARIFY_QUESTIONS[1];
+    else if (!has(/^stance:/m)) q = CLARIFY_QUESTIONS[2];
+    else if (!has(/^audience:/m)) q = CLARIFY_QUESTIONS[3];
+    else if (materialCount < 3) q = CLARIFY_QUESTIONS[materialCount === 0 ? 4 : 5];
+    else if (!has(/^theme:/m)) q = CLARIFY_QUESTIONS[6];
+    else if (argCount < 2) q = CLARIFY_QUESTIONS[argCount === 0 ? 7 : 8];
+    else if (!has(/^emotionalCurve:/m)) q = CLARIFY_QUESTIONS[9];
+    else if (!has(/^endingTaste:/m)) q = CLARIFY_QUESTIONS[10];
+    else if (!has(/^styleSample:/m)) q = CLARIFY_QUESTIONS[11];
     else q = { question: null, recommendation: null, options: [], stop: true };
     // 蓝图增量：模拟 LLM 从回答里读出"整篇文章"的结构信息，随澄清逐步合并进 state.blueprint
     return JSON.stringify({

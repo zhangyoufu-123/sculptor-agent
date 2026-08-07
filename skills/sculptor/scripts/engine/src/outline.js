@@ -7,6 +7,7 @@ import * as ws from './workspace.js';
 import { buildStyleShot } from './style-memory.js';
 import { latestStyleDirection } from './style.js';
 import { genreBrief, genreToCategory, isOfficialGenre } from './genre.js';
+import { contentBudget } from './budget.js';
 import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
 import { reviewOutline } from './outline-review.js';
@@ -33,6 +34,11 @@ export function gate(workspace) {
   const missing = [];
   if (!state.confirmed?.topic) missing.push('主题');
   const g = state.confirmed?.genre || '';
+  if (!state.confirmed?.targetWords) missing.push('目标字数');
+  const b = contentBudget({
+    genre: g,
+    targetWords: Number(state.confirmed?.targetWords) || 0,
+  });
   const official = isOfficialGenre(g);
   const argumentative = ['议论文', '学术论文', '报告'].includes(g);
   if (official) {
@@ -43,10 +49,12 @@ export function gate(workspace) {
     if (!state.confirmed?.basis && !state.confirmed?.stance) missing.push('依据/缘由');
   } else {
     if (!state.confirmed?.stance) missing.push('立场/目的');
-    if ((state.materials || []).length < 2) missing.push('具体素材（≥2条）');
+    if ((state.materials || []).length < b.materialsMin)
+      missing.push(`具体素材（≥${b.materialsMin}条）`);
     if (!state.confirmed?.theme) missing.push('核心立意');
     // 散文/小说/演讲稿不强制"支撑论点"——只有议论文/学术/报告要。
-    if (argumentative && (state.confirmed?.arguments || []).length < 2) missing.push('支撑论点（≥2个）');
+    if (argumentative && (state.confirmed?.arguments || []).length < b.argumentsMin)
+      missing.push(`支撑论点（≥${b.argumentsMin}个）`);
   }
   return { ok: missing.length === 0, missing, state };
 }
@@ -64,7 +72,11 @@ export async function generateOutline(cfg, wsDir) {
     stance: state.confirmed.stance,
     arguments: state.confirmed.arguments || [],
     audience: state.confirmed.audience,
-    targetWords: cfg.targetWords,
+    targetWords: Number(state.confirmed?.targetWords) || cfg.targetWords,
+    budget: contentBudget({
+      genre: state.confirmed?.genre || '',
+      targetWords: Number(state.confirmed?.targetWords) || cfg.targetWords,
+    }),
     materials: state.materials,
     writeStyle: styleSummary(path.join(workspace, 'vault', 'write-style.json')),
     readStyle: styleSummary(path.join(workspace, 'vault', 'read-style.json')),
