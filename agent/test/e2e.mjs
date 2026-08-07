@@ -1130,6 +1130,27 @@ try {
     r.out.slice(0, 120),
   );
 
+  // 8.11 装完即用：agent/interview/clarify 无需先 init
+  const ws8 = path.join(root, 'ws8');
+  process.env.SCULPTOR_WORKSPACE = ws8;
+  r = await run(['agent', '--once']);
+  check(
+    'agent 自动初始化工作区并提问（无需先 init）',
+    r.code === 0 && JSON.parse(r.out).kind === 'ask',
+    r.out.slice(0, 120),
+  );
+  check(
+    'agent 自动 init 生成 state',
+    fs.existsSync(path.join(ws8, 'protocol', 'state.json')),
+  );
+  r = await run(['interview', '--once']);
+  check(
+    'interview 自动初始化并返回问题',
+    r.code === 0 && Boolean(JSON.parse(r.out).question),
+    r.out.slice(0, 100),
+  );
+  process.env.SCULPTOR_WORKSPACE = workspace;
+
   // 9. panel / status / doctor
   r = await run(['panel', path.join(workspace, 'protocol', 'state.json')]);
   check('玻璃面板渲染', r.out.includes('玻璃面板'));

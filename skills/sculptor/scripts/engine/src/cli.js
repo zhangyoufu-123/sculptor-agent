@@ -234,7 +234,7 @@ export async function runCli(argv, io = {}) {
         break;
       }
       case 'agent': {
-        const w = ws.resolveWorkspace(cfg, workspace);
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, workspace), { create: true });
         if (flags.once) {
           const r = await agentStep(cfg, w, { lastInput: io.input || '' });
           console.log(JSON.stringify(r, null, 2));
@@ -256,7 +256,7 @@ export async function runCli(argv, io = {}) {
         break;
       }
       case 'clarify': {
-        const w = ws.resolveWorkspace(cfg, workspace);
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, workspace), { create: true });
         if (flags.once) {
           const r = await clarifyOnce(cfg, w, { input: io.input });
           console.log(JSON.stringify(r, null, 2));
@@ -266,7 +266,7 @@ export async function runCli(argv, io = {}) {
         break;
       }
       case 'interview': {
-        const w = ws.resolveWorkspace(cfg, workspace);
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, workspace), { create: true });
         if (flags.once) {
           const r = await interviewStep(cfg, w, { lastInput: io.input || '' });
           console.log(JSON.stringify(r, null, 2));

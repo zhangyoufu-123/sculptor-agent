@@ -128,7 +128,12 @@ cat <<EOF
 
 DONE.
 - Skill (with full engine): $DEST
-- Run in your writing project: node $DEST/scripts/sculptor.mjs interview
+- Zero manual steps (recommended): run once
+    node $DEST/scripts/sculptor.mjs setup
+  -> auto-registers this project's MCP + skill + credentials for
+     Codex/Claude Code/OpenCode; open a NEW chat and just describe your
+     writing task - Sculptor starts on its own.
+- Or start the director manually: node $DEST/scripts/sculptor.mjs agent
 - Or let the host agent call it per $DEST/SKILL.md
 - Rollback: move $DEST.bak.* back to $DEST if needed
 - Docs: https://github.com/zhangyoufu-123/sculptor-agent

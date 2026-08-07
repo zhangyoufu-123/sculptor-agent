@@ -17,6 +17,8 @@
 
 - 版本 0.13.0 → 0.14.0（CLI HELP / MCP serverInfo / package.json / 插件清单同步）；
   e2e 全绿（含凭据脱敏/Codex 解析/显式优先/0600 存取断言）。
+- **装完即用增强**：`agent` / `interview` / `clarify` 自动初始化工作区（无需先 `init`）；
+  `install.sh` 收尾提示 `setup` 一键注册宿主 MCP + skill + 凭据——新开对话直接说需求即启动。
 
 ## 0.13.0 (2026-08-07)
 
