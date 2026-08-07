@@ -26,8 +26,11 @@ import { restyle } from './restyle.js';
 import { runHook } from './hook.js';
 import { renderChecklist } from './interview.js';
 import { agentStep, agentInteractive } from './director.js';
+import { listLibrary, viewCategory, addPiece, distillAll } from './library.js';
+import { extractInput, exportDocx, docxAvailable } from './io.js';
+import { GENRES, genreBrief, genreNames } from './genre.js';
 
-const HELP = `Sculptor Agent v0.6 — 完整写作 Agent（导演模式 · 自主决策 · 独立运行 + MCP 协作）
+const HELP = `Sculptor Agent v0.7 — 完整写作 Agent（导演模式 · 文体库 · 个人写作库 · 多模态）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
@@ -52,6 +55,13 @@ const HELP = `Sculptor Agent v0.6 — 完整写作 Agent（导演模式 · 自�
   sculptor checklist <工作区>         渲染需求访谈确认清单（不消耗 LLM）
   sculptor style [--memory 查询] [--export] [--backfill] [--extract] [工作区]
                                      风格档案进度；--memory 预览按论题检索到的旧稿与修改对；--export 导出人类可读档案（vault/style-profile.md）；--backfill 回填对话日志；--extract 提取风格底稿
+  sculptor genre [名称]               文体库：结构骨架 + 行文规范（公文/合同/通知/纪要/报告/议论文/散文/演讲稿/记叙文）
+  sculptor library [工作区]           个人写作库：查看分类作品与蒸馏 skill
+  sculptor library scan [工作区]      蒸馏每类作品的"个人写作 skill"（vault/skills/personal/）
+  sculptor library view <类别> [工作区]  查看某类的蒸馏 skill 与作品清单
+  sculptor library add <file> [--category 类别] [--session 标识] [工作区]  归档一篇作品（自动分类）
+  sculptor ingest <file...> [工作区]  多模态输入：docx/xlsx/图片/md → 提取成素材
+  sculptor export [--docx out.docx] [--md out.md] [工作区]  把 draft.md 导出为 docx/md
   sculptor absorb <工作区> <edit.json>   吸收定点修改进风格档案
   sculptor fingerprint <工作区>       刷新压缩守卫风格指纹
   sculptor panel [state.json]         渲染玻璃面板
@@ -306,6 +316,96 @@ export async function runCli(argv, io = {}) {
             console.log(`  ${s.index}. ${s.heading}：跳过（本节为空）`);
           } else {
             console.log(`  ${s.index}. ${s.heading}：${s.oldLen} 字 → ${s.newLen} 字`);
+          }
+        }
+        break;
+      }
+      case 'genre': {
+        const name = positional[0] || '';
+        if (!name || name === 'list') {
+          console.log(`文体库（${genreNames().length} 种）: ${genreNames().join('、')}`);
+          console.log('查看规范: sculptor genre <名称>');
+        } else if (GENRES[name]) {
+          console.log(genreBrief(name));
+        } else {
+          throw new Error(`未知文体「${name}」。可用: ${genreNames().join('、')}`);
+        }
+        break;
+      }
+      case 'library': {
+        // 子命令占用了 positional[0]，工作区统一走 --workspace 或 SCULPTOR_WORKSPACE
+        const w = ws.resolveWorkspace(cfg, flags.workspace || '');
+        ws.ensureWorkspace(w);
+        const sub = positional[0] || 'list';
+        if (sub === 'list') {
+          console.log(listLibrary(w));
+        } else if (sub === 'scan') {
+          const r = await distillAll(w, cfg);
+          for (const x of r)
+            console.log(
+              `  ${x.category}: ${x.distilled ? `已蒸馏（${x.pieces} 篇）` : '（无作品）'}`,
+            );
+        } else if (sub === 'view') {
+          if (positional.length < 2) throw new Error('用法: sculptor library view <类别>');
+          console.log(viewCategory(w, positional[1]));
+        } else if (sub === 'add') {
+          if (positional.length < 2)
+            throw new Error('用法: sculptor library add <file> [--category 类别]');
+          const file = positional[1];
+          const text = fs.readFileSync(file, 'utf8');
+          const r = addPiece(w, {
+            title: flags.title || path.basename(file, path.extname(file)),
+            text,
+            source: file,
+            category: flags.category || '',
+            session: flags.session || '',
+          });
+          console.log(`已归档 → ${r.file}（分类: ${r.category}）`);
+        } else {
+          throw new Error(`未知子命令「${sub}」。可用: list / scan / view / add`);
+        }
+        break;
+      }
+      case 'ingest': {
+        if (!positional.length) throw new Error('用法: sculptor ingest <file...>');
+        const w = ws.resolveWorkspace(cfg, flags.workspace || '');
+        ws.ensureWorkspace(w);
+        const state = ws.readState(w);
+        state.materials = state.materials || [];
+        for (const f of positional) {
+          const r = extractInput(f, cfg);
+          if (r.kind === 'text') {
+            state.materials.push(`[文件 ${path.basename(f)}] ${r.text.slice(0, 2000)}`);
+            console.log(`✓ ${f}（${r.source}，${r.text.length} 字）→ 素材`);
+          } else {
+            console.log(`✗ ${f}: ${r.hint || '无法提取'}`);
+          }
+        }
+        ws.writeState(w, state);
+        break;
+      }
+      case 'export': {
+        const w = ws.resolveWorkspace(cfg, flags.workspace || '');
+        ws.ensureWorkspace(w);
+        const draft = path.join(w, 'draft.md');
+        if (!fs.existsSync(draft)) throw new Error('没有 draft.md，先 sculptor write');
+        const text = fs.readFileSync(draft, 'utf8');
+        let out = '';
+        if (flags.docx) {
+          out = exportDocx(text, path.resolve(String(flags.docx)));
+          console.log(`已导出 docx → ${out}`);
+        } else if (flags.md) {
+          out = path.resolve(String(flags.md));
+          fs.writeFileSync(out, text);
+          console.log(`已导出 md → ${out}`);
+        } else {
+          if (docxAvailable()) {
+            out = exportDocx(text, path.join(w, 'draft.docx'));
+            console.log(`已导出 docx → ${out}`);
+          } else {
+            console.log('本机没有 python-docx，改用 md 导出:');
+            out = path.join(w, 'draft.md');
+            console.log(`  draft 即 md → ${out}`);
           }
         }
         break;

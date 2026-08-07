@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.7.0 (2026-08-07)
+
+### Added
+
+- **文体库（公式化内容）**：公文/合同/通知/会议纪要/报告/议论文/散文/演讲稿/记叙文——
+  每种有结构骨架与行文规范（`sculptor genre <名称>` 查看）；对话中识别文体
+  （"写一份关于××的通知/合同"）并在大纲/写作/重写阶段按范式产出。
+- **个人写作库**：作品自动分类归档 `vault/library/<类别>/`（议论文/散文/公文/合同…），
+  蒸馏成"这类文体你个人的写法"（`vault/skills/personal/<类别>.md`），写作时限量注入
+  （不污染上下文）；`sculptor library / scan / view / add` 供查看与维护。
+- **多模态输入输出**：对话中给文件路径自动提取（docx 用 python-docx、xlsx 用内置
+  zipfile 解析、图片走视觉模型 SCULPTOR_VISION_MODEL）；`sculptor ingest` 提取素材、
+  `sculptor export` 导出 docx（导演交付自动导出 draft.docx）。
+- 导演交付后自动：归档作品 → 蒸馏个人 skill → 导出 docx。
+
+### Changed
+
+- 版本 0.6.0 → 0.7.0（CLI HELP / MCP serverInfo / package.json 同步）。
+
 ## 0.6.0 (2026-08-06)
 
 ### Added

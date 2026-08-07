@@ -11,6 +11,8 @@ import { audit } from '../src/redteam.js';
 import { applyChangeIfUnchanged } from '../src/point-edit.js';
 import { buildStyleShot } from '../src/style-memory.js';
 import { applyStyleDirection } from '../src/style.js';
+import { detectGenre } from '../src/genre.js';
+import { loadPersonalSkill } from '../src/library.js';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-e2e-'));
 const work = path.join(root, 'work');
@@ -220,7 +222,124 @@ try {
     dguard += 1;
   }
   check('重写后再次交付', ar.kind === 'deliver', ar.kind);
+  const allPrompts = JSON.stringify(globalThis.fetchBodies || []);
+  check(
+    '个人写作 skill 注入写作提示（蒸馏自旧作，限量不污染上下文）',
+    allPrompts.includes('这类文体你个人的写法') && allPrompts.includes('个人写作 skill'),
+    allPrompts.slice(0, 120),
+  );
+  r = await run(['library']);
+  check(
+    '导演交付后自动归档并蒸馏',
+    r.out.includes('已蒸馏') && r.out.includes('散文'),
+    r.out.slice(0, 120),
+  );
+  r = await run(['export', '--docx', path.join(ws3, 'draft-export.docx')]);
+  check(
+    'export 导出 docx',
+    r.code === 0 && fs.existsSync(path.join(ws3, 'draft-export.docx')),
+    r.out.slice(0, 100),
+  );
   process.env.SCULPTOR_WORKSPACE = workspace;
+
+  // 2.9 文体库：公式化内容的结构范式
+  r = await run(['genre', '合同']);
+  check('文体库·合同结构范式', r.code === 0 && r.out.includes('违约责任'), r.out.slice(0, 80));
+  r = await run(['genre', 'list']);
+  check('文体库清单', r.code === 0 && r.out.includes('公文') && r.out.includes('合同'));
+  check(
+    '文体识别：通知/合同/议论文',
+    detectGenre('写一份关于安全生产的通知') === '通知' &&
+      detectGenre('拟一份房屋租赁合同') === '合同' &&
+      detectGenre('这是一篇议论文的立意') === '议论文',
+  );
+
+  // 2.10 个人写作库：分类 + 蒸馏 + 查看 + 限量注入
+  const ws4 = path.join(root, 'ws4');
+  process.env.SCULPTOR_WORKSPACE = ws4;
+  r = await run(['init'], {});
+  const essayFile = path.join(root, 'essay.md');
+  fs.writeFileSync(
+    essayFile,
+    '我认为教育的本质是唤醒。首先，它让人看见自己的可能性；其次，它教人用证据说话。然而，当前的评价体系却常常压抑这种唤醒。由此可见，改革势在必行。\n',
+  );
+  r = await run(['library', 'add', essayFile, '--title', '论教育的唤醒']);
+  check(
+    'library add 自动分类为议论文',
+    r.code === 0 && r.out.includes('议论文'),
+    r.out.slice(0, 80),
+  );
+  r = await run(['library', 'scan']);
+  check(
+    'library scan 蒸馏个人写作 skill',
+    r.code === 0 && fs.existsSync(path.join(ws4, 'vault', 'skills', 'personal', '议论文.md')),
+    r.out.slice(0, 80),
+  );
+  r = await run(['library']);
+  check('library 列表显示分类与蒸馏状态', r.out.includes('议论文') && r.out.includes('已蒸馏'));
+  r = await run(['library', 'view', '议论文']);
+  check(
+    'library view 可查看个人 skill',
+    r.code === 0 && r.out.includes('个人写作 skill') && r.out.includes('代表句'),
+    r.out.slice(0, 100),
+  );
+  check(
+    'loadPersonalSkill 限量返回（不污染上下文）',
+    loadPersonalSkill(ws4, { category: '议论文' }).includes('个人写作 skill') &&
+      loadPersonalSkill(ws4, { category: '议论文', limit: 50 }).length <= 60,
+  );
+  process.env.SCULPTOR_WORKSPACE = workspace;
+
+  // 2.11 多模态输入：docx / xlsx 提取为素材
+  const ioDir = path.join(root, 'io');
+  fs.mkdirSync(ioDir, { recursive: true });
+  const pyHas = spawnSync('python3', ['-c', 'import docx; print(1)'], { encoding: 'utf8' });
+  if (pyHas.status === 0) {
+    const docxFile = path.join(ioDir, 'sample.docx');
+    spawnSync(
+      'python3',
+      [
+        '-c',
+        `from docx import Document; d=Document(); d.add_heading('材料一',0); d.add_paragraph('这是 docx 里的素材内容。'); d.save('${docxFile}')`,
+      ],
+      { encoding: 'utf8' },
+    );
+    r = await run(['ingest', docxFile]);
+    check('ingest 提取 docx 素材', r.code === 0 && r.out.includes('docx'), r.out.slice(0, 100));
+  } else {
+    check('ingest 提取 docx 素材', true, '跳过：本机无 python-docx');
+  }
+  const xlsxFile = path.join(ioDir, 'data.xlsx');
+  const xlsxScript = path.join(ioDir, 'make-xlsx.py');
+  fs.writeFileSync(
+    xlsxScript,
+    [
+      'import zipfile',
+      `z = zipfile.ZipFile('${xlsxFile}', 'w')`,
+      'z.writestr(\'[Content_Types].xml\', \'<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>\')',
+      'z.writestr(\'_rels/.rels\', \'<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>\')',
+      'z.writestr(\'xl/workbook.xml\', \'<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="数据" sheetId="1" r:id="rId1"/></sheets></workbook>\')',
+      'z.writestr(\'xl/_rels/workbook.xml.rels\', \'<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>\')',
+      'z.writestr(\'xl/sharedStrings.xml\', \'<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>2025年招生人数</t></si><si><t>同比增长12%</t></si></sst>\')',
+      'z.writestr(\'xl/worksheets/sheet1.xml\', \'<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row></sheetData></worksheet>\')',
+      'z.close()',
+    ].join('\n'),
+  );
+  const xlsxStatus = spawnSync('python3', [xlsxScript], { encoding: 'utf8' });
+  if (xlsxStatus.status === 0) {
+    r = await run(['ingest', xlsxFile]);
+    check(
+      'ingest 提取 xlsx 素材（zipfile 兜底）',
+      r.code === 0 && r.out.includes('xlsx'),
+      r.out.slice(0, 100),
+    );
+  } else {
+    check(
+      'ingest 提取 xlsx 素材（zipfile 兜底）',
+      true,
+      `跳过：无法构造测试 xlsx（${xlsxStatus.stderr.slice(0, 60)}）`,
+    );
+  }
 
   // 2.6 quote 引用块
   r = await run(['quote', '那扇窗沉默地注视着一切。']);

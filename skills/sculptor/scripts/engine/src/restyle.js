@@ -9,6 +9,8 @@ import * as ws from './workspace.js';
 import { styleSummary } from './outline.js';
 import { buildStyleShot } from './style-memory.js';
 import { latestStyleDirection, applyStyleDirection } from './style.js';
+import { genreBrief, genreToCategory } from './genre.js';
+import { loadPersonalSkill } from './library.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -81,6 +83,10 @@ export async function restyle(cfg, wsDir, { direction = '', section = null, forc
         topic: outline.title || state.confirmed?.topic || '',
         genre: state.confirmed?.genre || '',
         section: s,
+      }),
+      genreBrief: genreBrief(state.confirmed?.genre || ''),
+      personalSkill: loadPersonalSkill(workspace, {
+        category: state.confirmed?.libraryCategory || genreToCategory(state.confirmed?.genre || ''),
       }),
       text: body,
     };

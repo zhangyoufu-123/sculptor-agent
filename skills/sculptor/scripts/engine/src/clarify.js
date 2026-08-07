@@ -11,6 +11,8 @@ import {
   styleProgress,
   extractStyleFromSamples,
 } from './style.js';
+import { detectGenre } from './genre.js';
+import { extractInput } from './io.js';
 
 const LOW_WILL = /没(有|什么)?更多|你决定|你自己决定|就这样|先这样|可以了|够了|你看着办/;
 const NEED_LABELS = {
@@ -301,6 +303,29 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
   };
   if (lastInput) {
     state.lastInput = lastInput;
+    // 文体识别：用户说"写一份关于××的通知/合同/请示…" → 记录文体，后续按范式写作。
+    const genre = detectGenre(lastInput);
+    if (genre) {
+      state.confirmed.genre = genre;
+      ws.logContext(workspace, 'clarify', `识别文体：${genre}`);
+    }
+    // 多模态输入：用户给出文件路径（docx/xlsx/图片/md）→ 提取成文本素材。
+    if (fs.existsSync(String(lastInput).trim())) {
+      const ing = extractInput(String(lastInput).trim(), cfg);
+      if (ing.kind === 'text') {
+        state.materials = state.materials || [];
+        state.materials.push(
+          `[文件 ${path.basename(String(lastInput).trim())}] ${ing.text.slice(0, 2000)}`,
+        );
+        ws.logContext(
+          workspace,
+          'ingest',
+          `已提取 ${path.basename(String(lastInput).trim())}（${ing.source}，${ing.text.length} 字）`,
+        );
+      } else if (ing.hint) {
+        ws.logContext(workspace, 'ingest', ing.hint);
+      }
+    }
     // 答案归类到"上一个问题"的意图；提问时就推断并保存该意图。
     const field = state.lastField || 'material';
     applyAnswer(state, field, lastInput);

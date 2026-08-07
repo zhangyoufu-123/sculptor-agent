@@ -54,6 +54,28 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 
 ## 工作流
 
+### 文体库（公式化内容：公文/合同/通知/纪要/报告…）
+
+`node scripts/sculptor.mjs genre <名称>` 查看每种文体的**结构骨架与行文规范**（公文/合同/
+通知/会议纪要/报告/议论文/散文/演讲稿/记叙文）。用户说"写一份关于××的通知/合同/请示"时，
+自动识别文体并在大纲与写作阶段按范式产出：结构固定、措辞规范、要素齐全，不靠临场发挥。
+
+### 个人写作库（分类整理 + 蒸馏成个人写作 skill）
+
+每次完成交付，作品自动归档进 `vault/library/<类别>/`（按内容自动分类：议论文/散文/记叙文/
+公文/合同/演讲稿…）并蒸馏出"这类文体你个人的写法"（`vault/skills/personal/<类别>.md`）。
+后续写同类文章时，只把该类的蒸馏精华（限量）注入提示词——**不污染上下文**，却让文章越来越像你。
+查看：`sculptor library`（分类与蒸馏状态）、`sculptor library view <类别>`（蒸馏 skill + 作品清单）、
+`sculptor library scan`（手动重新蒸馏）、`sculptor library add <file>`（手动归档）。
+Web 端将按 session 为单元组织这些作品。
+
+### 多模态输入输出（docx / xlsx / 图片 / md）
+
+- 输入：对话里直接给出文件路径（docx/xlsx/md/txt/图片）→ 自动提取成素材；
+  或 `sculptor ingest <file...>`。docx 用 python-docx，xlsx 用内置 zipfile 解析（零第三方依赖）；
+  图片走视觉模型（`SCULPTOR_VISION_MODEL`），未配置时给出明确降级提示。
+- 输出：`sculptor export` 把 draft.md 导出为 docx（python-docx）；导演交付时自动导出 draft.docx。
+
 ### 导演模式（自主决策 · 主导对话）
 
 默认用 `node scripts/sculptor.mjs agent`（或 MCP `agent_step`）驱动：**每次收到用户消息，
@@ -142,6 +164,10 @@ node scripts/sculptor.mjs style --memory "论题" .sculptor      # 预览按论�
 node scripts/sculptor.mjs style --export .sculptor             # 导出人类可读风格档案（vault/style-profile.md）
 node scripts/sculptor.mjs point-edit "原句" "指令" --dir 项目   # 深度定点修改并吸收进风格档案
 node scripts/sculptor.mjs hook .sculptor                       # 宿主生命周期钩子 → 观察日志 + 压缩守卫
+node scripts/sculptor.mjs genre 合同                           # 文体库：公式化内容的结构范式
+node scripts/sculptor.mjs library / library scan / library view 议论文   # 个人写作库：分类+蒸馏+查看
+node scripts/sculptor.mjs ingest 材料.docx                     # 多模态输入：docx/xlsx/图片 → 素材
+node scripts/sculptor.mjs export                               # draft → docx（多模态输出）
 node scripts/sculptor.mjs panel / status / checklist / absorb / fingerprint / quote
 ```
 

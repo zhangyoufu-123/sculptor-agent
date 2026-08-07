@@ -8,6 +8,8 @@ import * as ws from './workspace.js';
 import { styleSummary } from './outline.js';
 import { buildStyleShot } from './style-memory.js';
 import { latestStyleDirection } from './style.js';
+import { genreBrief, genreToCategory } from './genre.js';
+import { loadPersonalSkill } from './library.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -53,6 +55,10 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
         section,
       }),
       styleDirection: latestStyleDirection(workspace)?.phrase || '',
+      genreBrief: genreBrief(state.confirmed?.genre || ''),
+      personalSkill: loadPersonalSkill(workspace, {
+        category: state.confirmed?.libraryCategory || genreToCategory(state.confirmed?.genre || ''),
+      }),
     };
     const body = await chatWithRetry(
       cfg,

@@ -187,6 +187,15 @@ export function respond(messages) {
       attentionFocus: { 生命: 0.8, 死亡: 0.7, 苦难: 0.6 },
     });
   }
+  if (userMsg.includes('写作方法分析师')) {
+    return JSON.stringify({
+      structure: '通常从一个具体场景切入，中段铺细节，结尾收束不点破。',
+      voice: '句子长短交错，多用具体名词，语气克制、有画面感。',
+      devices: '善用比喻与留白，关键处引原文原话。',
+      pitfalls: '容易在结尾滑向空泛抒情或排比堆砌。',
+      example: '历史从不等候，只等人走进去。',
+    });
+  }
   if (userMsg.includes('提纲设计师')) return JSON.stringify(OUTLINE);
   if (userMsg.includes('⟦待修改⟧') && userMsg.includes('修改指令')) {
     return '那扇窗没有开口，却什么都知道。';

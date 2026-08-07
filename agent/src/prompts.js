@@ -55,6 +55,8 @@ export const OUTLINE_PROMPT = (
 ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
 ${ctx.corrections?.length ? `【你的修正意见】${ctx.corrections.join('；')}` : ''}
 ${ctx.styleDirection ? `【最新风格方向】${ctx.styleDirection}` : ''}
+${ctx.genreBrief ? `【文体范式（公式化内容按此产出）】\n${ctx.genreBrief}` : ''}
+${ctx.personalSkill ? `【这类文体你个人的写法（蒸馏自你的旧作）】\n${ctx.personalSkill}` : ''}
 
 要求：
 1. 每节一句话功能（铺垫/转折/细节/收束/升华），连续段落不要做同一件事。
@@ -88,6 +90,8 @@ ${ctx.readStyle || '（未知，默认：节奏错落、信息密度适中、开
 
 ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
 ${ctx.styleDirection ? `【最新风格方向】${ctx.styleDirection}——按这个方向写，让整篇文章口吻统一。` : ''}
+${ctx.genreBrief ? `【文体范式（公式化内容按此产出）】\n${ctx.genreBrief}` : ''}
+${ctx.personalSkill ? `【这类文体你个人的写法（蒸馏自你的旧作）】\n${ctx.personalSkill}` : ''}
 
 硬性要求：
 1. 黑名单禁用：在当今社会/随着/近年来/众所周知/毋庸置疑/不可否认/值得注意的是/不难发现/事实上/总而言之/底层逻辑/赋能 等 AI 套话一律不用。
@@ -128,6 +132,8 @@ export const RESTYLE_PROMPT = (
 【新风格方向】${ctx.direction}
 ${ctx.writeStyle ? `【写作风格档案】${ctx.writeStyle}` : ''}
 ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
+${ctx.genreBrief ? `【文体范式（公式化内容按此产出）】\n${ctx.genreBrief}` : ''}
+${ctx.personalSkill ? `【这类文体你个人的写法（蒸馏自你的旧作）】\n${ctx.personalSkill}` : ''}
 【原文】
 ${ctx.text}
 

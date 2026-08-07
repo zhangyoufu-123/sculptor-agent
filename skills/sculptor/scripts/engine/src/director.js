@@ -4,6 +4,7 @@
 // （主题/立场/素材/立意/论点/大纲确认/风格方向）才停下等用户。
 // 用法：sculptor agent（交互）或 MCP agent_step（宿主逐条转发用户消息）。
 import path from 'node:path';
+import fs from 'node:fs';
 import readline from 'node:readline';
 import * as ws from './workspace.js';
 import { clarifyStep, missingNeed } from './clarify.js';
@@ -13,6 +14,8 @@ import { redteam } from './redteam.js';
 import { runAudience, renderAudience } from './reader-gallery.js';
 import { restyle } from './restyle.js';
 import { applyStyleDirection } from './style.js';
+import { archiveDraft, distillCategory } from './library.js';
+import { exportDocx } from './io.js';
 
 const OUTLINE_CONFIRM_RE = /^(对|对的|可以|可以的|没问题|就是这样|好的?|同意|ok|嗯|是|就这样)$/i;
 const OUTLINE_CORRECT_RE =
@@ -226,15 +229,34 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     const rendered = renderAudience(ar);
     ({ state, d } = load());
     state.audience = { personas: ar.personas.map((p) => p.persona), file: ar.file };
+    // 归档进个人写作库（按文体自动分类），并尽力导出 docx
+    const archived = archiveDraft(workspace, state);
+    if (archived) state.confirmed.libraryCategory = archived.category; // 供后续同类写作注入个人 skill
+    let distilled = '';
+    if (archived) {
+      try {
+        const dr = await distillCategory(workspace, archived.category, cfg);
+        distilled = dr.distilled ? `已蒸馏「${dr.category}」个人写作 skill` : '';
+      } catch {}
+    }
+    let docx = '';
+    try {
+      docx = exportDocx(
+        fs.readFileSync(ar.file, 'utf8'),
+        path.join(path.dirname(ar.file), 'draft.docx'),
+      );
+    } catch {}
     d.stage = 'deliver';
     state.phase = 'deliver';
     ws.writeState(workspace, state);
     return {
       kind: 'deliver',
       draftFile: ar.file,
+      docx: docx || '',
+      archived: archived ? `已归档到个人写作库（${archived.category}）` : '',
+      distilled: distilled || '',
       audience: rendered,
-      message:
-        '整篇文章已完成：逐节写作 → 反 AI 审计 → 8 位第一读者反馈。交付前请核对事实细节；要改某一句用 point-edit，要整体换风格直接说方向（如"更克制一点"），我会重写。',
+      message: `整篇文章已完成：逐节写作 → 反 AI 审计 → 8 位第一读者反馈。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}，同类文体下次会写得更快更像你。${docx ? `已导出 ${docx}。` : ''}交付前请核对事实细节；要改某一句用 point-edit，要整体换风格直接说方向（如"更克制一点"），我会重写。`,
       next: 'sculptor redteam / sculptor audience / sculptor restyle / sculptor point-edit',
     };
   }

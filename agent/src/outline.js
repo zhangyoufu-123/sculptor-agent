@@ -6,6 +6,8 @@ import { OUTLINE_PROMPT } from './prompts.js';
 import * as ws from './workspace.js';
 import { buildStyleShot } from './style-memory.js';
 import { latestStyleDirection } from './style.js';
+import { genreBrief, genreToCategory } from './genre.js';
+import { loadPersonalSkill } from './library.js';
 
 export function styleSummary(file) {
   try {
@@ -56,6 +58,10 @@ export async function generateOutline(cfg, wsDir) {
     }),
     corrections: state.blueprint?.corrections || [],
     styleDirection: latestStyleDirection(workspace)?.phrase || '',
+    genreBrief: genreBrief(state.confirmed?.genre || ''),
+    personalSkill: loadPersonalSkill(workspace, {
+      category: state.confirmed?.libraryCategory || genreToCategory(state.confirmed?.genre || ''),
+    }),
   };
   const content = await chatWithRetry(
     cfg,

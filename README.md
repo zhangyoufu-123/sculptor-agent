@@ -29,6 +29,11 @@ node $SCULPTOR init && node $SCULPTOR agent         # 导演模式：主导全�
 交付后说"整篇更克制一点"这类风格方向 → 全文自动按新方向重写并再走一轮审计与群像。
 深度定点修改：选中一句话 → `node $SCULPTOR point-edit "原句" "指令" --dir 项目`（macOS 可装右键服务，见 extras/）。
 宿主 agent（Codex / Claude Code / OpenCode）安装后可直接按 `SKILL.md` 自动调用全部流程。
+公式化内容（公文/合同/通知/纪要/报告）：对话里说"写一份关于××的通知/合同"即自动按文体范式产出；
+`node $SCULPTOR genre 合同` 可查看每种文体的结构规范。
+个人写作库：交付后作品自动分类归档并蒸馏出"这类文体你的写法"，同类文章越写越像你；
+`node $SCULPTOR library` 查看分类，`node $SCULPTOR library view 议论文` 查看蒸馏 skill。
+多模态：对话里直接给 docx/xlsx/图片 文件路径即可自动提取素材；`node $SCULPTOR export` 把成稿导出为 docx。
 
 ## 双形态
 
@@ -72,6 +77,11 @@ node $SCULPTOR init && node $SCULPTOR agent         # 导演模式：主导全�
 - **读者群像（Audience）**：交付前模拟 8 个第一读者（老教师/挑剔编辑/中学生/挑剔评论家/
   焦虑家长/历史爱好者/随性读者/年轻作家）第一次阅读的心理反应——在哪里停下来、哪里走神、
   哪句记住了、最想对作者说什么。详见 [agent/README.md](agent/README.md)。
+- **文体库（Genre）**：公文/合同/通知/会议纪要/报告等公式化内容的"结构骨架 + 行文规范"，
+  自动识别文体并按范式产出；与个人写作库叠加，公式化内容既规范又像你。
+- **个人写作库（Library）**：作品自动分类归档 + 蒸馏成个人写作 skill（限量注入，不污染上下文），
+  用户可随时查看自己的作品与整理出的 skill；Web 端将以 session 为单元组织。
+- **多模态 IO**：docx/xlsx/图片输入自动提取为素材；成稿一键导出 docx（python-docx）。
 - **感性解剖**：5 维度（立场导向 / 局限边界 / 困惑混乱 / 多视角代入 / 风格兑现度），把文本隐藏的感性结构照亮给作者。详见 [skills/sculptor/references/sensibility.md](skills/sculptor/references/sensibility.md)。
 - **反 AI 痕迹硬规则**：零容忍黑名单、重复比喻/句式禁令、人类化统计指标。详见 [skills/sculptor/references/anti-ai.md](skills/sculptor/references/anti-ai.md)。
 - **压缩守卫**：上下文压缩前把风格指纹写回 vault，记忆会丢、风格不丢。
