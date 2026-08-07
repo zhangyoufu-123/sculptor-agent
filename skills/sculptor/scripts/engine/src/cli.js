@@ -60,6 +60,7 @@ import {
 } from './style-adapter.js';
 import { factCheck, renderFactCheck } from './fact-check.js';
 import { recentPulses, renderPulse } from './style-pulse.js';
+import { vectorSummary, renderVectorSummary, refreshStyleVector } from './style-vector.js';
 import { proofread, proofScan, renderProofread } from './proofread.js';
 import { transform, PRESETS } from './transform.js';
 import { listHistory, rollback } from './history.js';
@@ -82,7 +83,7 @@ import {
 } from './credentials.js';
 import { runReview, renderReview } from './review.js';
 
-const HELP = `Sculptor Agent v0.16 — 完整写作 Agent（导演模式 · 对话级双风格提炼 · 深度审阅 · 多模态）
+const HELP = `Sculptor Agent v0.17 — 完整写作 Agent（导演模式 · 四层复合风格向量 · 深度审阅 · 多模态）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
@@ -121,6 +122,7 @@ const HELP = `Sculptor Agent v0.16 — 完整写作 Agent（导演模式 · 对�
   sculptor style [--memory 查询] [--export] [--backfill] [--extract] [工作区]
                                      风格档案进度；--memory 预览按论题检索到的旧稿与修改对；--export 导出人类可读档案（vault/style-profile.md）；--backfill 回填对话日志；--extract 提取风格底稿
   sculptor style --pulses [工作区]    风格脉搏：查看澄清/大纲/每节写作/修改建议的即时评估记录
+  sculptor style-vector [--refresh] [工作区]  四层复合风格向量：连续向量(EMA) + 动态维度 + 困惑度签名 + 偏好对；--refresh 立即从档案重算
   sculptor style-adapter [--distill] [--dataset [out.jsonl]] [--lora] [工作区]
                                      风格持续微调：--distill 蒸馏风格适配卡（最高优先级注入）；--dataset 生成偏好对 JSONL；--lora 提交微调（未配置端点时给出本地 LoRA 指引）
   sculptor genre [名称]               文体库：结构骨架 + 行文规范（公文/合同/通知/纪要/报告/议论文/散文/演讲稿/记叙文）
@@ -159,6 +161,10 @@ const HELP = `Sculptor Agent v0.16 — 完整写作 Agent（导演模式 · 对�
   SCULPTOR_LLM_MAX_TOKENS  SCULPTOR_LLM_TIMEOUT_MS  SCULPTOR_WORKSPACE
   SCULPTOR_QUICK=1          快速模式：读者 3 人、跳过交锋与适配卡重蒸馏（交付更快）
   SCULPTOR_RAG_ENDPOINT/SCULPTOR_RAG_API_KEY  直连检索端点（POST /search {queries}）；不配置则走宿主代检（requests.jsonl）
+  SCULPTOR_EMBED_BASE_URL/SCULPTOR_EMBED_API_KEY/SCULPTOR_EMBED_MODEL  风格向量升级为真实 embedding（OpenAI 兼容 /embeddings）；不配置则用稀疏字符二元组
+  SCULPTOR_PERPLEXITY_ENDPOINT  困惑度签名真实端点（POST {text} → {perplexity}）；不配置则用确定性代理
+  SCULPTOR_STYLE_EMA  风格向量 EMA 系数（默认 0.75：越大越稳、越小越跟手）
+  SCULPTOR_BASELINE_TEXT  通用语料文件路径；配置后连续向量输出"作者−基线"偏离方向
   SCULPTOR_CREDENTIALS=auto|ask|off  凭据发现模式：auto 自动采用宿主最佳候选（默认）/ ask 交互 / off 只用显式配置
 `;
 
@@ -514,6 +520,17 @@ export async function runCli(argv, io = {}) {
             );
           }
         }
+        break;
+      }
+      case 'style-vector': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, workspace));
+        if (flags.refresh) {
+          const r = await refreshStyleVector(cfg, w, { kind: 'manual', evidence: '手动刷新' });
+          console.log(
+            `已刷新风格向量：模式 ${r.mode} · 动态维度 ${r.dynamic} · 困惑度采样 ${r.samples}`,
+          );
+        }
+        console.log(renderVectorSummary(vectorSummary(w)));
         break;
       }
       case 'outline': {

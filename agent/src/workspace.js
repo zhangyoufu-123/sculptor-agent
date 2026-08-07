@@ -37,6 +37,7 @@ export function ensureWorkspace(ws, { create = false } = {}) {
     seed('vault/write-style.json', 'write-style.template.json');
     seed('vault/read-style.json', 'read-style.template.json');
     seed('vault/style-fingerprint.json', 'style-fingerprint.template.json');
+    seed('vault/style-vector.json', 'style-vector.template.json');
     for (const f of ['protocol/requests.jsonl', 'protocol/context.jsonl', 'vault/edits.jsonl']) {
       const dest = path.join(ws, f);
       if (!fs.existsSync(dest)) fs.writeFileSync(dest, '');
@@ -187,6 +188,24 @@ export function refreshFingerprint(ws) {
     }
   }
   const vector = write.vector || {};
+  let sv = {};
+  try {
+    sv = readJson(path.join(vaultDir, 'style-vector.json'));
+  } catch {
+    // 风格向量尚未初始化时跳过
+  }
+  const now = Date.now();
+  const dynamicDims = [];
+  for (const [group, dims] of Object.entries(sv.dynamic || {})) {
+    for (const [key, d] of Object.entries(dims || {})) {
+      if (!d || !(d.w || 0)) continue;
+      const ageDays = d.lastTs ? (now - new Date(d.lastTs).getTime()) / 86400000 : 0;
+      const eff = (d.w || 0) * Math.exp(-Math.max(0, ageDays) / 120);
+      if (eff >= 0.05) {
+        dynamicDims.push({ group, key, weight: Number(eff.toFixed(2)), count: d.count || 0 });
+      }
+    }
+  }
   const fingerprint = {
     schemaVersion: '0.1',
     generatedAt: nowIso(),
@@ -198,6 +217,13 @@ export function refreshFingerprint(ws) {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
         .map(([k]) => k),
+    },
+    styleVector: {
+      mode: sv.continuous?.mode || 'sparse',
+      signals: sv.learnedFrom?.signals || 0,
+      dynamicDims: dynamicDims.sort((a, b) => b.weight - a.weight).slice(0, 8),
+      perplexity: sv.perplexity || { proxy: true, samples: 0 },
+      preferencePairs: (sv.preferencePairs || []).length,
     },
     learnedFrom: {
       writeEdits: write.learnedFrom?.edits || 0,

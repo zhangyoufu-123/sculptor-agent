@@ -12,6 +12,7 @@ import { genreBrief, genreToCategory } from './genre.js';
 import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
 import { pulseAfterWrite, pushPulseToState } from './style-pulse.js';
+import { refreshStyleVector } from './style-vector.js';
 import { snapshot } from './history.js';
 
 function fileHash(text) {
@@ -105,6 +106,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
     }
     parts[i] = `## ${section.heading}\n\n${text}\n`;
     const pulse = pulseAfterWrite(workspace, text, { section, index: i + 1, previous: prevPulse });
+    await refreshStyleVector(cfg, workspace, { text, kind: 'write', evidence: `第 ${i + 1} 节` });
     prevPulse = pulse;
     pushPulseToState(state, pulse);
     report.push({

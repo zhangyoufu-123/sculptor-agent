@@ -1,10 +1,11 @@
 // 风格记忆检索层（RAG 风格注入）：从作者本人的旧稿、亲手修改记录、对话日志中，
-// 按"当前论题 + 文体 + 高置信风格维度"检索少样本，注入写作/大纲/红队修订提示。
-// 零依赖：中文按字符二元组做 BM25；评分 = 相关度 + 时间衰减 + 重要性 加权。
+// 按"当前论题 + 文体 + 高置信风格维度 + 实时风格向量"检索少样本，注入写作/大纲/红队修订提示。
+// 零依赖混合检索：BM25（字符二元组）+ 向量余弦（同一表示层）；评分 = 相关度 + 向量 + 时间衰减 + 重要性。
 // 设计依据：Generative Agents 的 recency+importance+relevance 记忆评分、
 // StyleMC 的对比式风格表示（正例 + 反例）、MemGPT 的档案记忆分层。
 import fs from 'node:fs';
 import path from 'node:path';
+import { readVector, topDynamicDims, cosineSparse } from './style-vector.js';
 
 // 作者绝不会写的 AI 腔反例（与红队黑名单同源，压缩成句式级样例）。
 const NEGATIVE_EXAMPLES = [
@@ -16,7 +17,7 @@ const NEGATIVE_EXAMPLES = [
 ];
 
 const RECENCY_HALF_DAYS = 120; // 风格随时间缓慢漂移：120 天衰减一半权重
-const WEIGHTS = { relevance: 0.62, recency: 0.22, importance: 0.16 };
+const WEIGHTS = { relevance: 0.42, vector: 0.26, recency: 0.18, importance: 0.14 };
 const SAMPLE_CAP = 360; // 每段旧稿注入的字符上限，控制上下文开销
 
 /** 中文分词：去除标点后取字符二元组（含至少一个汉字），兼容中英混排。 */
@@ -220,29 +221,46 @@ export function queryStyleMemory(
     .filter(Boolean)
     .join(' ');
   if (!docs.length) {
+    const sv = readVector(workspace);
+    const pp = sv?.perplexity;
     return {
       query: queryText,
       samples: [],
       edits: [],
       associations: [],
       techniques: [],
+      vectorDims: topDynamicDims(sv, 8),
+      perplexity:
+        pp && pp.samples
+          ? { samples: pp.samples, mean: Number(pp.mean.toFixed(2)), max: Number(pp.max.toFixed(2)), real: !pp.proxy }
+          : null,
       negatives: NEGATIVE_EXAMPLES.slice(0, 4),
       empty: true,
     };
   }
-  for (const d of docs) d.grams = tokenize(d.text || [d.original, d.changed, d.intent].join(' '));
+  for (const d of docs) {
+    const grams = tokenize(d.text || [d.original, d.changed, d.intent].join(' '));
+    d.grams = grams;
+    d.gramMap = new Map();
+    for (const g of grams) d.gramMap.set(g, (d.gramMap.get(g) || 0) + 1);
+  }
   const raw = bm25Scores(docs, queryText);
   const max = Math.max(...raw, 1e-9);
+  const qMap = new Map();
+  for (const g of tokenize(queryText)) qMap.set(g, (qMap.get(g) || 0) + 1);
   const scored = docs
     .map((d, i) => ({
       ...d,
       score:
         WEIGHTS.relevance * (raw[i] / max) +
+        WEIGHTS.vector * cosineSparse(qMap, d.gramMap) +
         WEIGHTS.recency * recencyScore(d.ts) +
         WEIGHTS.importance * d.importance,
     }))
     .sort((a, b) => b.score - a.score);
   const profile = readProfile(workspace);
+  const sv = readVector(workspace);
+  const pp = sv?.perplexity;
   return {
     query: queryText,
     samples: scored
@@ -264,14 +282,19 @@ export function queryStyleMemory(
       })),
     associations: profile.associations.slice(0, 5),
     techniques: profile.techniques.slice(0, 5),
+    vectorDims: topDynamicDims(sv, 8),
+    perplexity:
+      pp && pp.samples
+        ? { samples: pp.samples, mean: Number(pp.mean.toFixed(2)), max: Number(pp.max.toFixed(2)), real: !pp.proxy }
+        : null,
     negatives: NEGATIVE_EXAMPLES.slice(0, 4),
     empty: false,
   };
 }
 
-/** 供提示词注入的完整少样本块；无记忆时返回 null（写作照常进行）。 */
+/** 供提示词注入的完整少样本块；无记忆且无实时向量维度时返回 null（写作照常进行）。 */
 export function buildStyleShot(workspace, opts = {}) {
   const shot = queryStyleMemory(workspace, opts);
-  if (shot.empty || (!shot.samples.length && !shot.edits.length)) return null;
+  if (!shot.samples.length && !shot.edits.length && !shot.vectorDims.length) return null;
   return shot;
 }

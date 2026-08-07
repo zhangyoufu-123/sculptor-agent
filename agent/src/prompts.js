@@ -248,4 +248,6 @@ ${(shot.edits || [])
   .join('\n\n')}
 ${shot.associations?.length ? `【作者的联想库】${shot.associations.join('、')}` : ''}
 ${shot.techniques?.length ? `【作者惯用技巧】${shot.techniques.join('、')}` : ''}
+${shot.vectorDims?.length ? `【风格向量 · 实时维度】按权重从高到低：${shot.vectorDims.map((d) => `${d.label}（${d.weight}）`).join('；')}` : ''}
+${shot.perplexity?.samples ? `【人类化签名】这位作者 ${shot.perplexity.samples} 次采样，文本平均困惑度 ${shot.perplexity.mean}、峰值 ${shot.perplexity.max}。AI 平滑文本的困惑度往往显著低于这个值——写完挑 3 句对照，凡比"人话"更平滑、更对仗、更工整的，就是 AI 痕迹，按作者习惯改掉。` : ''}
 【反例 · 作者绝不会这样写】${(shot.negatives || []).join('；')}`;

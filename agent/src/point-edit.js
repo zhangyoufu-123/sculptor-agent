@@ -5,6 +5,7 @@ import path from 'node:path';
 import { chatWithRetry } from './llm.js';
 import * as ws from './workspace.js';
 import { styleSummary } from './outline.js';
+import { refreshStyleVector } from './style-vector.js';
 
 /** 解析"引用"粘贴格式：〔Sculptor 引用〕《原文》 或 直接原文 */
 export function parseQuoteArg(raw) {
@@ -206,6 +207,13 @@ export async function pointEdit(cfg, wsDir, { quote, instruction, dir, file }) {
     evidence: `point-edit: ${String(instruction).slice(0, 40)}`,
     writeDims: dims.write,
     readDims: dims.read,
+  });
+  // L4 偏好对 + L2 偏好轴 + L1 连续向量：亲手修改是最高权重风格信号
+  await refreshStyleVector(cfg, workspace, {
+    text: `${instruction} ${replacement}`,
+    kind: 'edit',
+    edit: { original: hit.matched, changed: replacement, intent: instruction },
+    evidence: 'point-edit 亲手修改',
   });
   ws.logContext(
     workspace,

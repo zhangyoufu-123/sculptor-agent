@@ -5,6 +5,7 @@ import { chatWithRetry } from './llm.js';
 import { REDTEAM_FIX_PROMPT } from './prompts.js';
 import * as ws from './workspace.js';
 import { buildStyleShot } from './style-memory.js';
+import { readVector, perplexityProxy } from './style-vector.js';
 import { snapshot } from './history.js';
 
 function fileHash(text) {
@@ -73,7 +74,7 @@ function paragraphs(text) {
     .filter((p) => p.length > 0);
 }
 
-export function audit(text) {
+export function audit(text, opts = {}) {
   const report = {
     blacklistHits: [],
     repeatedMetaphors: [],
@@ -81,6 +82,7 @@ export function audit(text) {
     metrics: {},
     passed: true,
     suggestions: [],
+    smoothness: null,
   };
   const all = paragraphs(text).join('\n');
 
@@ -164,6 +166,25 @@ export function audit(text) {
     report.suggestions.push(`句首去重率 ${report.metrics.sentenceStartDedup}% < 75%，句首太重复`);
   if (report.metrics.bigramTtr < 0.7) report.suggestions.push('词汇二元 TTR < 0.7，用词重复偏高');
 
+  // 困惑度签名对照：作者基线均值 vs 本文 surprisal（软提示，不计入硬失败）
+  const sig = perplexityProxy(all);
+  const baseline = opts.vectorSignature;
+  if (sig && baseline && baseline.samples >= 3 && baseline.mean) {
+    if (sig.surprisal < baseline.mean * 0.75) {
+      report.smoothness = {
+        hint: `平滑度偏离：本文 surprisal ${sig.surprisal.toFixed(3)}，低于作者基线均值 ${Number(baseline.mean).toFixed(3)}（×0.75）——比作者本人更"顺"，可能是 AI 平滑痕迹`,
+        textSurprisal: Number(sig.surprisal.toFixed(3)),
+        authorMean: Number(baseline.mean.toFixed(3)),
+      };
+    } else if (report.blacklistHits.length === 0) {
+      report.smoothness = {
+        hint: `本文 surprisal ${sig.surprisal.toFixed(3)}，与作者基线均值 ${Number(baseline.mean).toFixed(3)} 同一量级，人类化通过`,
+        textSurprisal: Number(sig.surprisal.toFixed(3)),
+        authorMean: Number(baseline.mean.toFixed(3)),
+      };
+    }
+  }
+
   report.passed =
     report.blacklistHits.length === 0 &&
     report.repeatedMetaphors.length === 0 &&
@@ -194,12 +215,15 @@ export async function redteam(cfg, wsDir, { fix = false } = {}) {
   try {
     state = ws.readState(workspace); // state 缺失时不影响审计（仅风格检索退化为论题为空）
   } catch {}
+  const sv = readVector(workspace);
+  const pp = sv?.perplexity;
+  const vectorSignature = pp && pp.samples >= 3 ? { samples: pp.samples, mean: pp.mean } : null;
   const styleShot = buildStyleShot(workspace, {
     topic: state.confirmed?.topic || state.outline?.title || '',
     genre: state.confirmed?.genre || '',
   });
   let text = fs.readFileSync(draftFile, 'utf8');
-  let report = audit(text);
+  let report = audit(text, { vectorSignature });
 
   if (fix && !report.passed) {
     const issues = collectIssues(report);
@@ -228,7 +252,7 @@ export async function redteam(cfg, wsDir, { fix = false } = {}) {
   ws.logContext(
     workspace,
     'redteam',
-    `审计: 黑名单 ${report.blacklistHits.length}、重复比喻 ${report.repeatedMetaphors.length}、句式 ${report.repeatedPatterns.length}、通过=${report.passed}`,
+    `审计: 黑名单 ${report.blacklistHits.length}、重复比喻 ${report.repeatedMetaphors.length}、句式 ${report.repeatedPatterns.length}、通过=${report.passed}${report.smoothness?.hint ? '、' + report.smoothness.hint : ''}`,
   );
   return { report, draftFile };
 }

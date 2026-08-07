@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "0.1",
+  "continuous": {
+    "mode": "sparse",
+    "sparse": {},
+    "dense": null,
+    "baseline": null,
+    "direction": {},
+    "alpha": 0.75,
+    "embedModel": "",
+    "updatedAt": null
+  },
+  "dynamic": {
+    "base": {},
+    "imagery": {},
+    "preference": {},
+    "material": {}
+  },
+  "preferencePairs": [],
+  "perplexity": {
+    "proxy": true,
+    "samples": 0,
+    "min": null,
+    "mean": null,
+    "max": null
+  },
+  "learnedFrom": {
+    "signals": 0,
+    "clarify": 0,
+    "conversation": 0,
+    "outline": 0,
+    "write": 0,
+    "transform": 0,
+    "edit": 0,
+    "correction": 0,
+    "direction": 0,
+    "manual": 0
+  },
+  "lastUpdated": null
+}

@@ -11,6 +11,7 @@ import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
 import { reviewOutline } from './outline-review.js';
 import { pulseAfterOutline, pushPulseToState } from './style-pulse.js';
+import { refreshStyleVector } from './style-vector.js';
 
 export function styleSummary(file) {
   try {
@@ -123,6 +124,13 @@ export async function generateOutline(cfg, wsDir) {
   if (review.revised) state.summary += '（已按内部评审自动微调）';
   const pulse = pulseAfterOutline(workspace, outline);
   pushPulseToState(state, pulse);
+  await refreshStyleVector(cfg, workspace, {
+    text: outline.sections
+      .map((s) => `${s.heading || ''} ${s.thesis || ''} ${(s.keyPoints || []).join(' ')}`)
+      .join(' '),
+    kind: 'outline',
+    evidence: '大纲生成',
+  });
   if (pulse.suggestion) state.summary += `（大纲脉搏建议：${pulse.suggestion}）`;
   state.targetWords = targetWords;
   state.nextStep = '确认大纲后运行 sculptor write';

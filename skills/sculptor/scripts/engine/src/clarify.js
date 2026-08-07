@@ -12,6 +12,7 @@ import {
   extractStyleFromSamples,
 } from './style.js';
 import { pulseAfterClarify, pushPulseToState } from './style-pulse.js';
+import { refreshStyleVector } from './style-vector.js';
 import { detectGenre, genreBlueprint } from './genre.js';
 import { extractInput } from './io.js';
 
@@ -394,6 +395,8 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
         `被动采集到风格信号 ${style.writeUpdated} 维（write）+ ${style.readUpdated} 维（read）`,
       );
     }
+    // 四层复合风格向量：澄清每轮实时刷新（连续向量 EMA + 动态维度 + 困惑度签名）
+    await refreshStyleVector(cfg, workspace, { text: lastInput, kind: 'clarify', evidence: '澄清回答' });
     clarifyPulse = pulseAfterClarify(workspace, lastInput);
     pushPulseToState(state, clarifyPulse);
     if (clarifyPulse.suggestion) {
@@ -402,6 +405,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     // 风格方向：用户说"整篇更豪迈/更克制…"→ 落档案；已有草稿则标记需要全文重写。
     const dir = applyStyleDirection(workspace, lastInput);
     if (dir.applied) {
+      await refreshStyleVector(cfg, workspace, { text: lastInput, kind: 'direction', evidence: dir.phrase });
       if (fs.existsSync(path.join(workspace, 'draft.md'))) state.needsRestyle = true;
       ws.logContext(workspace, 'style', `风格方向变化：${dir.phrase}（影响 ${dir.updated} 维）`);
     }

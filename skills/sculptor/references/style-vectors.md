@@ -92,3 +92,14 @@ node scripts/sculptor.mjs fingerprint .sculptor/vault        # 刷新风格指�
 - 注入不是贴标签，是**约束生成分布**：写每句时先问"这句他会怎么写？"
 - 对比检查：写完后挑 3 句，问"换成 AI 默认会怎么写"——差异处就是风格兑现处。
 - 风格不足时：宁可用更"笨拙但真实"的表达，不用更"流畅但 AI"的表达。
+
+## 实现状态（v0.17）
+
+- **已落地**：L1 连续向量（EMA 增量更新，默认稀疏字符二元组，`SCULPTOR_EMBED_*` 可升级 dense）；
+  L2 动态稀疏维度（base 14+7 轴 / 意象子维 / 偏好轴 / 素材维，权重 × 新鲜度衰减，限量注入）；
+  L3 困惑度签名（确定性代理开箱即用，`SCULPTOR_PERPLEXITY_ENDPOINT` 可换真实端点，红队审计对照本文）；
+  L4 偏好对（point-edit (原文→改后→意图) 同步更新偏好轴与连续向量）。
+  混合检索（BM25 + 余弦）已接入风格记忆层；澄清/大纲/写作/改写/修改每轮自动刷新 `vault/style-vector.json`。
+- **升级路径**：真实 embedding 模型（配置三个 `SCULPTOR_EMBED_*` 环境变量即可，无需改代码）；
+  真实 perplexity 端点；通用基线语料文件（`SCULPTOR_BASELINE_TEXT`）。模型内部激活的
+  steering 需要本地模型环境，API 环境无法拿到，故设计上留到本地模型接入。

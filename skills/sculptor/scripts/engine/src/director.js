@@ -15,6 +15,7 @@ import { runAudience, renderAudience, runDebate, renderDebate } from './reader-g
 import { restyle } from './restyle.js';
 import { applyStyleDirection, extractStyleFromConversation } from './style.js';
 import { applyCorrectionFeedback } from './style-pulse.js';
+import { refreshStyleVector } from './style-vector.js';
 import { distillStyleAdapter, adapterStale } from './style-adapter.js';
 import { factScan } from './fact-check.js';
 import { proofScan } from './proofread.js';
@@ -136,6 +137,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     // 让没贴旧稿的用户也能在进入大纲前建立高层次风格档案；失败静默，不阻塞。
     try {
       await extractStyleFromConversation(cfg, workspace);
+      await refreshStyleVector(cfg, workspace, { kind: 'conversation', evidence: '澄清收尾整体提炼' });
     } catch {}
     d.stage = 'outline';
     ws.writeState(workspace, state);
@@ -167,6 +169,11 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       } else {
         // 大纲修改意见也是风格反馈（如"结尾不要留白"→ 收束习惯调整）。
         applyCorrectionFeedback(workspace, String(lastInput));
+        await refreshStyleVector(cfg, workspace, {
+          text: String(lastInput),
+          kind: 'correction',
+          evidence: '大纲修改意见',
+        });
         state.blueprint = state.blueprint || {};
         state.blueprint.corrections = state.blueprint.corrections || [];
         state.blueprint.corrections.push(String(lastInput).trim());
@@ -372,6 +379,13 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
   if (d.stage === 'deliver') {
     const corr = applyCorrectionFeedback(workspace, lastInput);
     const dir = applyStyleDirection(workspace, lastInput);
+    if (corr.applied || dir.applied) {
+      await refreshStyleVector(cfg, workspace, {
+        text: String(lastInput),
+        kind: dir.applied ? 'direction' : 'correction',
+        evidence: dir.applied ? dir.phrase : corr.phrase,
+      });
+    }
     ({ state, d } = load());
     if (dir.applied) {
       d.stage = 'restyle';

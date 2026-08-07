@@ -168,6 +168,25 @@ RAG 检索请求——全部写进 `state.quality` 与 context 日志，用户�
 write-read 差异（如"想写克制低气压，读者需要最后一点亮的余味"），
 合并进档案（带"对话整体提炼"证据）。用户没贴旧稿也能在进入大纲前建立高层次风格档案。
 
+### 四层复合风格向量（v0.17：每轮实时刷新，不是一次定型）
+
+风格不是标签，是**持续更新的向量**。每轮澄清/大纲/写作/修改后自动刷新
+`vault/style-vector.json`（无需手动跑；`sculptor style-vector` 查看/`--refresh` 重算）：
+
+- **L1 连续向量**：作者语料 vs 基线语料的 embedding 方向差，EMA 增量更新
+  （默认稀疏字符二元组，零依赖；配置 `SCULPTOR_EMBED_BASE_URL/API_KEY/MODEL` 可升级真实 embedding，
+  `SCULPTOR_STYLE_EMA` 调跟手度，`SCULPTOR_BASELINE_TEXT` 提供通用基线 → 输出"作者−基线"偏离方向）。
+- **L2 动态稀疏维度**：基础 14+7 轴（write/read 高置信维度）+ 意象子维（联想库/注意力焦点）
+  + 偏好轴（修改意图归类）+ 素材维（反复出现的实词）。权重 × 新鲜度衰减，每次只注入前 8 个进提示词。
+- **L3 困惑度签名**：人类文本 surprisal 高于 AI 平滑文本（少见二元组占比 + 低重复率 + 句长方差）。
+  作者采样累计 min/mean/max；红队审计时对照本文——**本文 surprisal 明显低于作者基线 → 标记"比本人更顺"的 AI 平滑痕迹**。
+  配置 `SCULPTOR_PERPLEXITY_ENDPOINT`（POST {text} → {perplexity}）可换真实端点。
+- **L4 偏好对**：每次 point-edit / 修改建议 = (原文, 改后, 意图) 对比信号，最高权重风格证据，
+  落 `vault/edits.jsonl` + `preferencePairs`，并同步更新偏好轴与连续向量。
+
+风格记忆检索已是**混合检索**：BM25 + 向量余弦加权（相关度 0.42 / 向量 0.26 / 时间衰减 0.18 / 重要性 0.14），
+并随少样本一起注入实时向量维度与人类化签名。
+
 ### 深度审阅 Review（红队 + 读者 = 核心闭环）
 
 `sculptor review [--fix] [--quick]`：一次聚合**红队审计 + 校对 + 事实核查 + 原创性 +
@@ -296,6 +315,7 @@ node scripts/sculptor.mjs restyle .sculptor --direction "更克制一点"  # 风
 node scripts/sculptor.mjs dissect .sculptor                    # 感性解剖 5 维度（立场/局限/困惑/多视角/风格兑现度）
 node scripts/sculptor.mjs style --memory "论题" .sculptor      # 预览按论题检索到的旧稿与修改对
 node scripts/sculptor.mjs style --export .sculptor             # 导出人类可读风格档案（vault/style-profile.md）
+node scripts/sculptor.mjs style-vector .sculptor               # 四层复合风格向量：连续向量/动态维度/困惑度签名/偏好对
 node scripts/sculptor.mjs point-edit "原句" "指令" --dir 项目   # 深度定点修改并吸收进风格档案
 node scripts/sculptor.mjs hook .sculptor                       # 宿主生命周期钩子 → 观察日志 + 压缩守卫
 node scripts/sculptor.mjs genre 合同                           # 文体库：公式化内容的结构范式

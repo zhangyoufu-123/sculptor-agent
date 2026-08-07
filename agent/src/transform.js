@@ -13,6 +13,7 @@ import { genreBrief, genreToCategory } from './genre.js';
 import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
 import { pulseAfterWrite, pushPulseToState } from './style-pulse.js';
+import { refreshStyleVector } from './style-vector.js';
 import { snapshot } from './history.js';
 
 export const PRESETS = {
@@ -186,6 +187,7 @@ export async function transform(
     const oldLen = (body.match(/[\u4e00-\u9fff]/g) || []).length;
     const newLen = (rewritten.match(/[\u4e00-\u9fff]/g) || []).length;
     const pulse = pulseAfterWrite(workspace, rewritten, { section: s, index: i + 1 });
+    await refreshStyleVector(cfg, workspace, { text: rewritten, kind: 'transform', evidence: `${p.label}改写` });
     pushPulseToState(state, pulse);
     pulses.push(pulse);
     report.push({ index: i + 1, heading, oldLen, newLen, target: wordsTarget });

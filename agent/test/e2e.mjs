@@ -1473,6 +1473,102 @@ try {
     byId6[22]?.result?.content?.[0]?.text?.includes('深度审阅'),
   );
 
+  // 12.5 四层复合风格向量：L1 连续向量 / L2 动态维度 / L3 困惑度签名 / L4 偏好对
+  {
+    const svmod = await import('../src/style-vector.js');
+    const { ensureWorkspace } = await import('../src/workspace.js');
+    const vecWs = path.join(root, 'ws-vector');
+    fs.mkdirSync(vecWs, { recursive: true });
+    ensureWorkspace(vecWs, { create: true });
+
+    // L1 稀疏嵌入与余弦
+    const a = svmod.embedSparse('桂花树下的祖母摇着蒲扇，讲起旧年的故事');
+    const b = svmod.embedSparse('祖母在桂花树下摇蒲扇，说起很久以前的旧事');
+    const c = svmod.embedSparse('宏观经济周期与货币政策工具的组合运用');
+    check(
+      'L1 余弦：同义文本得分高于无关文本',
+      svmod.cosineSparse(a, b) > svmod.cosineSparse(a, c),
+      `${svmod.cosineSparse(a, b).toFixed(3)} vs ${svmod.cosineSparse(a, c).toFixed(3)}`,
+    );
+
+    // L3 困惑度签名：人类文本 surprisal 高于 AI 腔
+    const human = svmod.perplexityProxy(
+      '那天傍晚我站在门口，忽然想起祖母摇蒲扇的样子，蒲扇的边缘已经磨得发亮，风从巷口吹过来。',
+    );
+    const aiish = svmod.perplexityProxy(
+      '值得注意的是，随着时代的发展，我们不难发现，在当今社会中，这是一个值得关注的重要问题。',
+    );
+    check(
+      'L3 困惑度签名：人类文本 surprisal 高于 AI 腔',
+      human && aiish && human.surprisal > aiish.surprisal,
+      `${human?.surprisal} vs ${aiish?.surprisal}`,
+    );
+
+    // L1+L2+L4 实时刷新
+    await svmod.refreshStyleVector({}, vecWs, {
+      text: '桂花树 桂花树 蒲扇 蒲扇 祖母 祖母 旧事 旧事',
+      kind: 'clarify',
+      evidence: '测试澄清',
+    });
+    await svmod.refreshStyleVector({}, vecWs, {
+      text: '石阶 石阶 窗 窗 红砖 红砖 磨得发亮 磨得发亮',
+      kind: 'write',
+      evidence: '测试写作',
+    });
+    await svmod.refreshStyleVector({}, vecWs, {
+      kind: 'edit',
+      edit: { original: '像有人跟在后面', changed: '像旧朝宫人踏过回廊', intent: '更克制收敛' },
+      evidence: '测试修改',
+    });
+    const svFile = path.join(vecWs, 'vault', 'style-vector.json');
+    const sv = JSON.parse(fs.readFileSync(svFile, 'utf8'));
+    check(
+      'L1 EMA 连续向量已累积',
+      sv.continuous.mode === 'sparse' && Object.keys(sv.continuous.sparse).length > 0,
+    );
+    check(
+      'L2 动态素材维已衍生',
+      Object.keys(sv.dynamic.material || {}).length >= 2 &&
+        Object.keys(sv.dynamic.imagery || {}).length >= 0,
+      `material=${Object.keys(sv.dynamic.material || {}).length}`,
+    );
+    check(
+      'L2 偏好轴从修改意图归类',
+      Object.keys(sv.dynamic.preference || {}).some((k) => k.includes('克制')),
+      JSON.stringify(Object.keys(sv.dynamic.preference || {})),
+    );
+    check(
+      'L3 困惑度签名已累计',
+      sv.perplexity.samples >= 2 && typeof sv.perplexity.mean === 'number',
+      `samples=${sv.perplexity.samples}`,
+    );
+    check(
+      'L4 偏好对已记录',
+      sv.preferencePairs.length === 1 && sv.preferencePairs[0].intent.includes('克制'),
+    );
+    const vs = svmod.vectorSummary(vecWs);
+    check('向量摘要含动态维度', vs.topDims.length >= 1);
+
+    // 混合检索注入：无旧稿也有实时向量维度
+    const shot = buildStyleShot(vecWs, { topic: '桂花树' });
+    check(
+      '混合检索注入实时向量维度',
+      shot && shot.vectorDims && shot.vectorDims.length >= 1,
+      shot ? JSON.stringify(shot.vectorDims) : 'null',
+    );
+
+    // CLI 可查看
+    const oldWs = process.env.SCULPTOR_WORKSPACE;
+    process.env.SCULPTOR_WORKSPACE = vecWs;
+    const vr = await run(['style-vector']);
+    process.env.SCULPTOR_WORKSPACE = oldWs;
+    check(
+      'CLI style-vector 可运行',
+      vr.code === 0 && (vr.out.includes('风格向量') || vr.out.includes('实时动态维度')),
+      vr.out.slice(0, 80),
+    );
+  }
+
   // 12. 生态位探测：主动触发判断
   r = await run(['probe', '帮我写一篇关于北大红楼的演讲稿，要有我的风格']);
   const p1 = JSON.parse(r.out);
