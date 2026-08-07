@@ -3,8 +3,8 @@
 # The skill ships the complete agent engine inside it - no separate CLI needed.
 #
 # Usage (either):
-#   curl -fsSL https://raw.githubusercontent.com/sculptor-agent/sculptor-agent/main/install.sh | bash
-#   git clone https://github.com/sculptor-agent/sculptor-agent && cd sculptor-agent && ./install.sh
+#   curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/install.sh | bash
+#   git clone https://github.com/zhangyoufu-123/sculptor-agent && cd sculptor-agent && ./install.sh
 #
 # Options:
 #   --project <dir>   project-scoped install into <dir>/.codex/skills/sculptor (default: current dir)
@@ -19,7 +19,7 @@ PROJECT_DIR=""
 GLOBAL=0
 WITH_CLI=0
 MCP_CODEX=0
-REPO_URL="${SCULPTOR_REPO_URL:-https://github.com/sculptor-agent/sculptor-agent}"
+REPO_URL="${SCULPTOR_REPO_URL:-https://github.com/zhangyoufu-123/sculptor-agent}"
 
 usage() {
   sed -n '1,18p' "$0"
@@ -131,5 +131,5 @@ DONE.
 - Run in your writing project: node $DEST/scripts/sculptor.mjs interview
 - Or let the host agent call it per $DEST/SKILL.md
 - Rollback: move $DEST.bak.* back to $DEST if needed
-- Docs: https://github.com/sculptor-agent/sculptor-agent
+- Docs: https://github.com/zhangyoufu-123/sculptor-agent
 EOF

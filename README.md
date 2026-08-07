@@ -10,10 +10,10 @@
 
 ```bash
 # 方式一：一行命令（curl | bash，目录级安装到当前项目）
-curl -fsSL https://raw.githubusercontent.com/sculptor-agent/sculptor-agent/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/install.sh | bash
 
 # 方式二：git clone
-git clone https://github.com/sculptor-agent/sculptor-agent
+git clone https://github.com/zhangyoufu-123/sculptor-agent
 cd sculptor-agent && ./install.sh --project ~/我的写作项目
 ```
 

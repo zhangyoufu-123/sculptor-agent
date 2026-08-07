@@ -136,9 +136,9 @@ sculptor-agent/
 
 ```bash
 # 一键安装（目录级，不影响其他项目）
-curl -fsSL https://raw.githubusercontent.com/sculptor-agent/sculptor-agent/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/install.sh | bash
 # 或
-git clone https://github.com/sculptor-agent/sculptor-agent && cd sculptor-agent && ./install.sh
+git clone https://github.com/zhangyoufu-123/sculptor-agent && cd sculptor-agent && ./install.sh
 
 # 配置 LLM（默认 DeepSeek 端点）
 export SCULPTOR_LLM_API_KEY=sk-xxx
