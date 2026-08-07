@@ -12,6 +12,7 @@ import { latestStyleDirection, applyStyleDirection } from './style.js';
 import { genreBrief, genreToCategory } from './genre.js';
 import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
+import { snapshot } from './history.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -37,6 +38,7 @@ export async function restyle(cfg, wsDir, { direction = '', section = null, forc
       'draft.md 在最后一次写作后被外部修改过，Sculptor 已退让、不覆盖。确认要重写请运行: sculptor restyle --force',
     );
   }
+  snapshot(workspace, 'restyle');
   const stored = latestStyleDirection(workspace);
   const dirText = String(direction || '').trim() || stored?.phrase || '';
   if (!dirText) {

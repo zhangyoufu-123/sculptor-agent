@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.12.0 (2026-08-07)
+
+### Added（P1 四项：改写矩阵 / 版本快照 / 全局档案 / 引文管理）
+
+- **一键改写矩阵** `transform.js`：expand 扩写 / condense 缩写（`--target` 指定字数）/
+  continue 续写 / polish 润色 / imitate 仿写 / tone:formal|casual|warm|authoritative
+  改语气。复用 restyle 的分节改写 + 退让协议（独立实现，不耦合既有模块），改写前后自动快照。
+- **版本快照 + 回滚** `history.js`：write / restyle / redteam --fix / transform 前自动
+  快照到 `vault/history/`（内容相同跳过，最多 30 份）；`sculptor history` / `rollback [N]`
+  （回滚前先存当前版本）。修复 redteam-fix 与 rollback 后草稿哈希不同步、导致误判"外部修改"的问题。
+- **全局风格档案** `profile.js`：`sculptor profile export/import` —— 导出 write/read 档案、
+  旧稿样本、修改记录、适配卡为 bundle；导入合并语义保守（本地高置信维度不覆盖、证据并集、
+  样本/修改按内容去重、本地适配卡不覆盖）。
+- **引文管理**：`sculptor citations [--file]` 提取文中《引文》清单；
+  `--append refs.json [--style gbt7714|apa]` 先快照再追加参考文献附录。
+- MCP 工具 26 → 32（transform / history / rollback / profile_export / profile_import / citations）；
+  e2e 170 项全绿。
+
+### Changed
+
+- 版本 0.11.0 → 0.12.0（CLI HELP / MCP serverInfo / package.json 同步）。
+
 ## 0.11.0 (2026-08-07)
 
 ### Added（补齐 P0：语音口述 / 格式与导出 / 校对纠错）

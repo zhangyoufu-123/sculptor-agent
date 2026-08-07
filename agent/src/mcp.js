@@ -1,6 +1,8 @@
 // MCP stdio server：让 Codex / Claude Code / OpenCode 等宿主通过标准 MCP 调用 Sculptor。
 // 协议：换行分隔的 JSON-RPC 2.0。宿主自己决定何时调用，Sculptor 不监听宿主任何事件。
 import readline from 'node:readline';
+import fs from 'node:fs';
+import path from 'node:path';
 import { loadConfig } from './config.js';
 import * as ws from './workspace.js';
 import { clarifyStep } from './clarify.js';
@@ -27,6 +29,10 @@ import {
 } from './style-adapter.js';
 import { factCheck, renderFactCheck } from './fact-check.js';
 import { proofread, renderProofread } from './proofread.js';
+import { transform, PRESETS } from './transform.js';
+import { listHistory, rollback, snapshot } from './history.js';
+import { exportProfile, importProfile, profileStatus } from './profile.js';
+import { extractCitations, formatReferences, readEntriesFile, citationStyles } from './citation.js';
 
 const TOOLS = [
   {
@@ -124,6 +130,71 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: { workspace: { type: 'string' }, file: { type: 'string' } },
+    },
+  },
+  {
+    name: 'transform',
+    description:
+      '一键改写矩阵：preset 为 expand 扩写 / condense 缩写 / continue 续写 / polish 润色 / imitate 仿写 / tone 改语气（tone:formal|casual|warm|authoritative）。与 restyle 同退让协议。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        preset: { type: 'string' },
+        target: { type: 'integer' },
+        tone: { type: 'string' },
+        section: { type: 'integer' },
+        force: { type: 'boolean' },
+      },
+      required: ['preset'],
+    },
+  },
+  {
+    name: 'history',
+    description: '版本快照列表（write/restyle/redteam-fix/transform 前自动生成，最多 30 份）。',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' } },
+    },
+  },
+  {
+    name: 'rollback',
+    description: '回滚到第 N 份快照（1=最新）；回滚前先快照当前版本，保证可恢复。',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' }, index: { type: 'integer' } },
+    },
+  },
+  {
+    name: 'profile_export',
+    description: '导出全局风格档案 bundle（write/read 档案 + 样本 + 修改记录 + 适配卡）。',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' }, to: { type: 'string' } },
+    },
+  },
+  {
+    name: 'profile_import',
+    description: '导入合并风格档案 bundle（本地高置信维度不被动覆盖，证据并集）。',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' }, file: { type: 'string' } },
+      required: ['file'],
+    },
+  },
+  {
+    name: 'citations',
+    description:
+      '引文管理：extract 提取文中《书名号》引文清单；append 把 refs.json 的参考文献附录（gbt7714/apa）追加到草稿。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        file: { type: 'string' },
+        action: { type: 'string', enum: ['extract', 'append'] },
+        refs: { type: 'string' },
+        style: { type: 'string' },
+      },
     },
   },
   {
@@ -358,6 +429,87 @@ async function callTool(name, args, cfg) {
       const r = await proofread(cfg, w, { file: args.file || null });
       return { text: renderProofread(r) };
     }
+    case 'transform': {
+      const w = wsDir(args, cfg);
+      const r = await transform(cfg, w, {
+        preset: String(args.preset || ''),
+        tone: String(args.tone || ''),
+        target: args.target !== undefined ? Number(args.target) : 0,
+        section: args.section !== undefined ? Number(args.section) : null,
+        force: Boolean(args.force),
+      });
+      return {
+        text:
+          `已改写 ${r.sections} 节 → ${r.draftFile}\n` +
+          r.report
+            .map((s) =>
+              s.skipped
+                ? `${s.index}. ${s.heading}：跳过`
+                : `${s.index}. ${s.heading}：${s.oldLen} → ${s.newLen} 字`,
+            )
+            .join('\n'),
+      };
+    }
+    case 'history': {
+      const w = wsDir(args, cfg);
+      ws.ensureWorkspace(w);
+      const list = listHistory(w);
+      return {
+        text: list.length
+          ? `版本快照（${list.length} 份，新→旧）:\n` +
+            list
+              .map(
+                (h, i) =>
+                  `${i + 1}. ${h.ts || '?'} [${h.reason}] ${h.chars} 字${h.preview ? ' — ' + h.preview : ''}`,
+              )
+              .join('\n')
+          : '（还没有版本快照）',
+      };
+    }
+    case 'rollback': {
+      const w = wsDir(args, cfg);
+      ws.ensureWorkspace(w);
+      const r = rollback(w, { index: Number(args.index || 1) });
+      return { text: `已回滚到 [${r.reason}] ${r.ts}（${r.chars} 字）→ draft.md` };
+    }
+    case 'profile_export': {
+      const w = wsDir(args, cfg);
+      ws.ensureWorkspace(w);
+      const r = exportProfile(w, args.to || '');
+      return { text: `风格档案已导出 → ${r.file}（样本 ${r.samples}、修改记录 ${r.edits}）` };
+    }
+    case 'profile_import': {
+      const w = wsDir(args, cfg);
+      ws.ensureWorkspace(w);
+      const r = importProfile(w, args.file || '');
+      return {
+        text: `已导入合并：${r.dimsMerged} 维、样本 +${r.samplesAdded}、修改记录 +${r.editsAdded}`,
+      };
+    }
+    case 'citations': {
+      const w = wsDir(args, cfg);
+      ws.ensureWorkspace(w);
+      const action = args.action || 'extract';
+      if (action === 'append') {
+        const draft = path.join(w, 'draft.md');
+        if (!fs.existsSync(draft)) throw new Error('没有 draft.md');
+        const style = args.style && citationStyles().includes(args.style) ? args.style : 'gbt7714';
+        const entries = readEntriesFile(args.refs || '');
+        const list = formatReferences(entries, style);
+        snapshot(w, 'citations-append');
+        const md = fs.readFileSync(draft, 'utf8').trimEnd();
+        fs.writeFileSync(draft, `${md}\n\n## 参考文献\n\n${list.map((x) => `- ${x}`).join('\n')}\n`);
+        return { text: `已追加 ${list.length} 条参考文献（${style}）` };
+      }
+      const file = args.file ? path.resolve(args.file) : path.join(w, 'draft.md');
+      if (!fs.existsSync(file)) throw new Error(`找不到文稿: ${file}`);
+      const cites = extractCitations(fs.readFileSync(file, 'utf8'));
+      return {
+        text: cites.length
+          ? `文中引文（${cites.length} 处）:\n` + cites.map((c) => `· 《${c.title}》`).join('\n')
+          : '（文稿中没有《书名号》引文）',
+      };
+    }
     case 'style_adapter': {
       const w = wsDir(args, cfg);
       ws.ensureWorkspace(w);
@@ -535,7 +687,7 @@ export async function runMcpServer({ input = process.stdin, output = process.std
         result: {
           protocolVersion: '2025-03-26',
           capabilities: { tools: {} },
-          serverInfo: { name: 'sculptor', version: '0.11.0' },
+          serverInfo: { name: 'sculptor', version: '0.12.0' },
         },
       });
     } else if (

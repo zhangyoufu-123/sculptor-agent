@@ -72,6 +72,31 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 `sculptor export` 支持：`--docx`（普通/`--official` 公文/`--academic` 学术）、
 `--html`（零依赖）、`--pdf`（reportlab 内置中文）、`--srt`（视频脚本台词转字幕，4 字/秒估算）。
 
+### 一键改写矩阵（Preset Transforms）
+
+`sculptor transform <预设> [--target N] [--tone x] [--section N] [--force]`：
+**expand 扩写 / condense 缩写（--target 指定字数）/ continue 续写 / polish 润色 /
+imitate 仿写 / tone:formal|casual|warm|authoritative 改语气**。与 restyle 同退让协议，
+改写前后自动存版本快照。
+
+### 版本快照与回滚（不丢稿）
+
+write / restyle / redteam --fix / transform 前自动把当前 draft.md 存到
+`vault/history/`（内容相同则跳过，最多 30 份）。`sculptor history` 查看、
+`sculptor rollback [N]` 回滚（回滚前先存当前版本，保证可恢复）。
+
+### 全局风格档案（跨工作区）
+
+`sculptor profile export [--to file]` 把 write/read 档案、旧稿样本、修改记录、适配卡
+导出成 bundle（默认 `SCULPTOR_HOME` 或工作区 vault）；`sculptor profile import <file>`
+导入合并——本地高置信维度不被动覆盖，证据求并集。
+
+### 引文管理
+
+`sculptor citations [--file]` 提取文中《书名号》引文清单；
+`sculptor citations --append refs.json [--style gbt7714|apa]` 把参考文献附录追加到草稿
+（先快照再追加）。
+
 ### 语音口述（Voice / Dictation）
 
 `sculptor dictate <音频文件...> [--to-draft]`：whisper/whisper.cpp 转录为素材

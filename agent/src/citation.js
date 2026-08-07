@@ -98,3 +98,19 @@ export function readEntriesFile(file) {
 export function citationStyles() {
   return ['gbt7714', 'apa'];
 }
+
+/** 从文稿中提取《书名号》引文（确定性）。 */
+export function extractCitations(text) {
+  const out = [];
+  const re = /《([^》]{2,40})》/g;
+  let m;
+  while ((m = re.exec(String(text || '')))) {
+    out.push({
+      title: m[1],
+      context: String(text)
+        .slice(Math.max(0, m.index - 15), m.index + m[1].length + 18)
+        .replace(/\s+/g, ''),
+    });
+  }
+  return out;
+}

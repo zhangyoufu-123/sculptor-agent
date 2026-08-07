@@ -40,7 +40,13 @@ import {
   detectWhisper,
   transcribeAudio,
 } from './io.js';
-import { formatReferences, parseEntries, readEntriesFile, citationStyles } from './citation.js';
+import {
+  formatReferences,
+  parseEntries,
+  readEntriesFile,
+  citationStyles,
+  extractCitations,
+} from './citation.js';
 import { GENRES, genreBrief, genreNames } from './genre.js';
 import { evaluateStyleFidelity, applyEvalFeedback, renderStyleEval } from './style-eval.js';
 import { reviewOutline, renderOutlineReview } from './outline-review.js';
@@ -54,8 +60,11 @@ import {
 import { factCheck, renderFactCheck } from './fact-check.js';
 import { recentPulses, renderPulse } from './style-pulse.js';
 import { proofread, proofScan, renderProofread } from './proofread.js';
+import { transform, PRESETS } from './transform.js';
+import { listHistory, rollback } from './history.js';
+import { exportProfile, importProfile, profileStatus } from './profile.js';
 
-const HELP = `Sculptor Agent v0.11 — 完整写作 Agent（导演模式 · 风格脉搏贯穿每轮 · 语音口述 · 多格式导出 · 校对 · 多模态）
+const HELP = `Sculptor Agent v0.12 — 完整写作 Agent（导演模式 · 风格脉搏贯穿每轮 · 一键改写矩阵 · 版本快照 · 语音口述 · 多格式导出 · 校对 · 多模态）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
@@ -71,6 +80,13 @@ const HELP = `Sculptor Agent v0.11 — 完整写作 Agent（导演模式 · 风�
   sculptor write --section N [工作区] 只写第 N 节
   sculptor restyle [--direction 方向] [--section N] [--force] [工作区]
                                      按新风格方向重写整篇（或指定节）；缺省用档案最近一条方向
+  sculptor transform <预设> [--target N] [--tone x] [--section N] [--force] [工作区]
+                                     一键改写矩阵：expand 扩写 / condense 缩写 / continue 续写 /
+                                     polish 润色 / imitate 仿写 / tone:formal|casual|warm|authoritative 改语气
+  sculptor history [工作区]           版本快照列表（write/restyle/redteam-fix/transform 前自动生成）
+  sculptor rollback [N] [工作区]      回滚到第 N 份快照（1=最新；回滚前先存当前版本）
+  sculptor profile export [--to file] [工作区]  导出全局风格档案（默认 SCULPTOR_HOME 或工作区 vault）
+  sculptor profile import <file> [工作区]  导入合并风格档案（本地高置信维度不被动覆盖）
   sculptor redteam [--fix] [工作区]   反 AI 审计（可选 LLM 修订）
   sculptor redteam --file x.md        直接审计任意文件
   sculptor redteam --proofread [工作区]  反 AI 审计 + 确定性校对
@@ -101,6 +117,7 @@ const HELP = `Sculptor Agent v0.11 — 完整写作 Agent（导演模式 · 风�
   sculptor export --academic [--docx out.docx] [工作区]  按学术论文排版导出 docx（宋体小四/黑体标题）
   sculptor export --html out.html / --srt out.srt / --pdf out.pdf [工作区]  导出 HTML / 字幕 SRT / PDF
   sculptor cite "<json条目或数组>" [--style gbt7714|apa] [--file refs.json]  生成参考文献（期刊/图书/网页/报纸/论文/报告）
+  sculptor citations [--file x.md] [--append refs.json] [工作区]  提取文中《引文》清单；--append 把参考文献附录追加到草稿
   sculptor absorb <工作区> <edit.json>   吸收定点修改进风格档案
   sculptor fingerprint <工作区>       刷新压缩守卫风格指纹
   sculptor panel [state.json]         渲染玻璃面板
@@ -304,6 +321,31 @@ export async function runCli(argv, io = {}) {
         }
         break;
       }
+      case 'profile': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const sub = positional[0] || 'status';
+        if (sub === 'export') {
+          const r = exportProfile(w, flags.to ? String(flags.to) : '');
+          console.log(
+            `风格档案已导出 → ${r.file}（样本 ${r.samples}、修改记录 ${r.edits}${r.hasAdapter ? '、适配卡' : ''}）`,
+          );
+        } else if (sub === 'import') {
+          if (positional.length < 2) throw new Error('用法: sculptor profile import <bundle.json>');
+          const r = importProfile(w, positional[1]);
+          console.log(
+            `已导入合并：${r.dimsMerged} 维、样本 +${r.samplesAdded}、修改记录 +${r.editsAdded}（本地高置信维度未被动覆盖）`,
+          );
+        } else {
+          const st = profileStatus(w);
+          console.log(
+            `风格档案状态:\n` +
+              `  write ${st.write}/14 维 · read ${st.read}/7 维\n` +
+              `  样本 ${st.samples} · 修改记录 ${st.edits} · 适配卡 ${st.hasAdapter ? '✓' : '（无）'}\n` +
+              `  全局路径: ${st.globalPath || '（未设置 SCULPTOR_HOME；export 默认导出到工作区 vault/style-profile-export.json）'}`,
+          );
+        }
+        break;
+      }
       case 'quote': {
         const raw = positional.join(' ');
         if (!raw) throw new Error('用法: sculptor quote "<选中的原句>"');
@@ -449,6 +491,47 @@ export async function runCli(argv, io = {}) {
             console.log(`  ${s.index}. ${s.heading}：${s.oldLen} 字 → ${s.newLen} 字`);
           }
         }
+        break;
+      }
+      case 'transform': {
+        const w = ws.resolveWorkspace(cfg, flags.workspace || '');
+        const preset = positional[0];
+        if (!preset || !Object.keys(PRESETS).some((k) => preset === k || preset.startsWith(k + ':'))) {
+          throw new Error(`用法: sculptor transform <预设>，可用: ${Object.keys(PRESETS).join(' / ')}（tone 可用 tone:formal）`);
+        }
+        const r = await transform(cfg, w, {
+          preset,
+          tone: flags.tone ? String(flags.tone) : '',
+          target: flags.target !== undefined ? Number(flags.target) : 0,
+          section: flags.section !== undefined ? Number(flags.section) : null,
+          force: Boolean(flags.force),
+        });
+        console.log(`已${r.preset === 'tone' ? '改语气' : PRESETS[r.preset].label} ${r.sections} 节 → ${r.draftFile}`);
+        for (const s of r.report) {
+          if (s.skipped) console.log(`  ${s.index}. ${s.heading}：跳过`);
+          else console.log(`  ${s.index}. ${s.heading}：${s.oldLen} → ${s.newLen} 字（目标 ${s.target}）`);
+        }
+        break;
+      }
+      case 'history': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const list = listHistory(w);
+        if (!list.length) {
+          console.log('（还没有版本快照：write/restyle/redteam --fix/transform 会自动生成）');
+        } else {
+          console.log(`版本快照（${list.length} 份，新→旧）:`);
+          for (const h of list) {
+            console.log(
+              `  ${list.indexOf(h) + 1}. ${h.ts || '?'} [${h.reason}] ${h.chars} 字 ${h.preview ? '— ' + h.preview : ''}`,
+            );
+          }
+        }
+        break;
+      }
+      case 'rollback': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const r = rollback(w, { index: Number(positional[0] || 1) });
+        console.log(`已回滚到第 ${positional[0] || 1} 份快照（[${r.reason}] ${r.ts}，${r.chars} 字）→ draft.md`);
         break;
       }
       case 'genre': {
@@ -619,6 +702,33 @@ export async function runCli(argv, io = {}) {
           : parseEntries(positional[0]);
         if (!entries.length) throw new Error('没有可格式化的条目');
         console.log(formatReferences(entries, style).join('\n'));
+        break;
+      }
+      case 'citations': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        ws.ensureWorkspace(w);
+        if (flags.append) {
+          const draft = path.join(w, 'draft.md');
+          if (!fs.existsSync(draft)) throw new Error('没有 draft.md，先 sculptor write');
+          const style = flags.style ? String(flags.style) : 'gbt7714';
+          const entries = readEntriesFile(path.resolve(String(flags.append)));
+          const list = formatReferences(entries, style);
+          const { snapshot } = await import('./history.js');
+          snapshot(w, 'citations-append');
+          const md = fs.readFileSync(draft, 'utf8').trimEnd();
+          fs.writeFileSync(draft, `${md}\n\n## 参考文献\n\n${list.map((x) => `- ${x}`).join('\n')}\n`);
+          console.log(`已追加 ${list.length} 条参考文献（${style}）→ ${draft}`);
+        } else {
+          const file = flags.file ? path.resolve(String(flags.file)) : path.join(w, 'draft.md');
+          if (!fs.existsSync(file)) throw new Error(`找不到文稿: ${file}`);
+          const cites = extractCitations(fs.readFileSync(file, 'utf8'));
+          if (!cites.length) {
+            console.log('（文稿中没有检测到《书名号》引文）');
+          } else {
+            console.log(`文中引文（${cites.length} 处）:`);
+            for (const c of cites) console.log(`  · 《${c.title}》${c.context ? `（${c.context.slice(0, 50)}…）` : ''}`);
+          }
+        }
         break;
       }
       case 'redteam': {

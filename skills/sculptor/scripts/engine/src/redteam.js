@@ -1,9 +1,15 @@
 // Phase 4 红队审计：确定性反 AI 检查（黑名单/重复比喻/重复句式/统计指标）+ 可选 LLM 修订。
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { chatWithRetry } from './llm.js';
 import { REDTEAM_FIX_PROMPT } from './prompts.js';
 import * as ws from './workspace.js';
 import { buildStyleShot } from './style-memory.js';
+import { snapshot } from './history.js';
+
+function fileHash(text) {
+  return createHash('sha1').update(text).digest('hex').slice(0, 16);
+}
 
 export const BLACKLIST = [
   '在当今社会',
@@ -211,8 +217,11 @@ export async function redteam(cfg, wsDir, { fix = false } = {}) {
       ],
       { temperature: 0.7, maxTokens: 6000 },
     );
+    snapshot(workspace, 'redteam-fix');
     fs.writeFileSync(draftFile, fixed.trim() + '\n');
     text = fs.readFileSync(draftFile, 'utf8');
+    state.lastDraftHash = fileHash(text); // 修订即写作：同步哈希，避免后续改写误判"外部修改"
+    ws.writeState(workspace, state);
     report = audit(text);
     report.fixedBy = 'llm';
   }

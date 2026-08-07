@@ -12,6 +12,7 @@ import { genreBrief, genreToCategory } from './genre.js';
 import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
 import { pulseAfterWrite, pushPulseToState } from './style-pulse.js';
+import { snapshot } from './history.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -35,6 +36,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       'draft.md 在最后一次写作后被外部修改过，Sculptor 已退让、不覆盖。确认要重写请运行: sculptor write --force',
     );
   }
+  snapshot(workspace, 'write');
   const parts = existing ? existing.split(/\n(?=## )/) : [];
   const report = [];
   let prevPulse = null;

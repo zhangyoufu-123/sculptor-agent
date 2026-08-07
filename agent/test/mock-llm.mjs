@@ -280,6 +280,13 @@ export function respond(messages) {
     const idx = OUTLINE.sections.findIndex((s) => s.heading === heading);
     return RESTYLED_SECTIONS[idx >= 0 ? idx : 0];
   }
+  if (userMsg.includes('预设改写')) {
+    const match = userMsg.match(/【本节】(.+?)（/);
+    const heading = match ? match[1].trim() : '一、站在门口';
+    const idx = OUTLINE.sections.findIndex((s) => s.heading === heading);
+    const pool = [...SECTIONS, ...RESTYLED_SECTIONS];
+    return pool[idx >= 0 ? idx % pool.length : 0];
+  }
   if (userMsg.includes('当前字数') && userMsg.includes('目标字数')) {
     const match = userMsg.match(/【本节】(.+?)（/);
     const heading = match ? match[1].trim() : '一、站在门口';

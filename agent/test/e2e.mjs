@@ -889,6 +889,98 @@ try {
     r.out.slice(0, 120),
   );
 
+  // 8.8 P1 四项：一键改写矩阵 / 版本快照+回滚 / 全局风格档案 / 引文管理
+  const draftBeforeTransform = fs.readFileSync(path.join(workspace, 'draft.md'), 'utf8');
+  r = await run(['transform', 'polish']);
+  check(
+    'transform polish 一键润色（分节改写）',
+    r.code === 0 && r.out.includes('已润色') && r.out.includes('节'),
+    r.out.slice(0, 120),
+  );
+  const draftAfterTransform = fs.readFileSync(path.join(workspace, 'draft.md'), 'utf8');
+  check('transform 后草稿已更新', draftAfterTransform !== draftBeforeTransform);
+  r = await run(['transform', 'condense', '--target', '300']);
+  check(
+    'transform condense 缩写到目标字数',
+    r.code === 0 && r.out.includes('已缩写'),
+    r.out.slice(0, 120),
+  );
+  r = await run(['history']);
+  check(
+    'history 版本快照列表（write/restyle/transform 自动生成）',
+    r.code === 0 && r.out.includes('版本快照') && r.out.includes('write'),
+    r.out.slice(0, 120),
+  );
+  r = await run(['rollback', '1']);
+  check(
+    'rollback 回滚到最新快照并刷新哈希',
+    r.code === 0 && r.out.includes('已回滚'),
+    r.out.slice(0, 120),
+  );
+  const profileFile = path.join(root, 'style-bundle.json');
+  r = await run(['profile', 'export', '--to', profileFile]);
+  check(
+    'profile export 导出全局风格档案 bundle',
+    r.code === 0 && fs.existsSync(profileFile),
+    r.out.slice(0, 100),
+  );
+  const ws6 = path.join(root, 'ws6');
+  process.env.SCULPTOR_WORKSPACE = ws6;
+  r = await run(['init'], {});
+  check('profile 导入前 init', r.code === 0);
+  r = await run(['profile', 'import', profileFile]);
+  check(
+    'profile import 导入合并（本地高置信不覆盖）',
+    r.code === 0 && r.out.includes('已导入合并'),
+    r.out.slice(0, 120),
+  );
+  const importedWrite = JSON.parse(
+    fs.readFileSync(path.join(ws6, 'vault', 'write-style.json'), 'utf8'),
+  );
+  check(
+    '导入后档案维度已合并',
+    (importedWrite.dimensions?.temperature?.confidence || 0) > 0,
+    JSON.stringify(importedWrite.dimensions?.temperature),
+  );
+  process.env.SCULPTOR_WORKSPACE = workspace;
+  const citeTextFile = path.join(root, 'cites.md');
+  fs.writeFileSync(citeTextFile, '文中引用了《我与地坛》和《国史大纲》，值得进一步展开。\n');
+  r = await run(['citations', '--file', citeTextFile]);
+  check(
+    'citations 提取《引文》清单',
+    r.code === 0 && r.out.includes('我与地坛') && r.out.includes('国史大纲'),
+    r.out.slice(0, 120),
+  );
+  const refsFile = path.join(root, 'refs.json');
+  fs.writeFileSync(
+    refsFile,
+    JSON.stringify([
+      {
+        type: 'journal',
+        authors: ['史铁生'],
+        year: 1990,
+        title: '我与地坛',
+        journal: '上海文学',
+        issue: 1,
+        pages: '1-20',
+      },
+    ]),
+  );
+  const ws7 = path.join(root, 'ws7');
+  process.env.SCULPTOR_WORKSPACE = ws7;
+  r = await run(['init'], {});
+  check('citations 前 init', r.code === 0);
+  fs.writeFileSync(path.join(ws7, 'draft.md'), '正文内容，引用《我与地坛》。\n');
+  r = await run(['citations', '--append', refsFile]);
+  check(
+    'citations --append 参考文献附录',
+    r.code === 0 &&
+      fs.readFileSync(path.join(ws7, 'draft.md'), 'utf8').includes('## 参考文献') &&
+      fs.readFileSync(path.join(ws7, 'draft.md'), 'utf8').includes('我与地坛[J]'),
+    r.out.slice(0, 120),
+  );
+  process.env.SCULPTOR_WORKSPACE = workspace;
+
   // 9. panel / status / doctor
   r = await run(['panel', path.join(workspace, 'protocol', 'state.json')]);
   check('玻璃面板渲染', r.out.includes('玻璃面板'));
@@ -990,7 +1082,7 @@ try {
       .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
   );
   check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'sculptor');
-  check('MCP tools/list 26 个工具', byId[2]?.result?.tools?.length === 26);
+  check('MCP tools/list 32 个工具', byId[2]?.result?.tools?.length === 32);
   check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Sculptor 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
   const mcpInput2 = Readable.from([
@@ -1046,6 +1138,10 @@ try {
     `${JSON.stringify({ jsonrpc: '2.0', id: 13, method: 'tools/call', params: { name: 'fact_check', arguments: { workspace } } })}\n`,
     `${JSON.stringify({ jsonrpc: '2.0', id: 14, method: 'tools/call', params: { name: 'style_adapter', arguments: { workspace, action: 'status' } } })}\n`,
     `${JSON.stringify({ jsonrpc: '2.0', id: 15, method: 'tools/call', params: { name: 'proofread', arguments: { workspace } } })}\n`,
+    `${JSON.stringify({ jsonrpc: '2.0', id: 16, method: 'tools/call', params: { name: 'transform', arguments: { workspace, preset: 'polish' } } })}\n`,
+    `${JSON.stringify({ jsonrpc: '2.0', id: 17, method: 'tools/call', params: { name: 'history', arguments: { workspace } } })}\n`,
+    `${JSON.stringify({ jsonrpc: '2.0', id: 18, method: 'tools/call', params: { name: 'profile_export', arguments: { workspace } } })}\n`,
+    `${JSON.stringify({ jsonrpc: '2.0', id: 19, method: 'tools/call', params: { name: 'citations', arguments: { workspace, action: 'extract' } } })}\n`,
   ]);
   const mcpOut6 = [];
   const output6 = new Writable({
@@ -1088,6 +1184,24 @@ try {
   check(
     'MCP proofread 返回校对报告',
     byId6[15]?.result?.content?.[0]?.text?.includes('校对'),
+  );
+  check(
+    'MCP transform 按预设改写',
+    byId6[16]?.result?.content?.[0]?.text?.includes('已改写'),
+  );
+  check(
+    'MCP history 返回快照列表',
+    byId6[17]?.result?.content?.[0]?.text?.includes('版本快照') ||
+      byId6[17]?.result?.content?.[0]?.text?.includes('还没有版本快照'),
+  );
+  check(
+    'MCP profile_export 导出档案',
+    byId6[18]?.result?.content?.[0]?.text?.includes('风格档案已导出'),
+  );
+  check(
+    'MCP citations 返回引文结果',
+    byId6[19]?.result?.content?.[0]?.text?.includes('引文') ||
+      byId6[19]?.result?.content?.[0]?.text?.includes('《'),
   );
 
   // 12. 生态位探测：主动触发判断

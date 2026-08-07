@@ -38,6 +38,10 @@ node $SCULPTOR init && node $SCULPTOR agent         # 导演模式：主导全�
 语音口述：`node $SCULPTOR dictate <音频> [--to-draft]`（whisper 转录，`SCULPTOR_WHISPER_CMD`
 可指定命令）。校对：`node $SCULPTOR proofread`（错别字/标点确定性 + LLM 语病）。
 导出多格式：`--html` / `--pdf` / `--srt`（视频脚本转字幕）。
+一键改写：`node $SCULPTOR transform polish|expand|condense|imitate|tone:formal`；
+版本快照 `node $SCULPTOR history` / `rollback [N]`（每次写作前自动存）；
+全局风格档案 `node $SCULPTOR profile export/import`（跨工作区携带你的风格）；
+引文管理 `node $SCULPTOR citations [--append refs.json]`。
 风格脉搏：不再做交付前的一次性大考——澄清每轮、大纲生成、每节写作后都即时采集/评估风格
 （`node $SCULPTOR style --pulses` 查看），每节脉搏建议自动带入下一节；你说的每句修改
 （"太文艺了/太啰嗦/结尾收一点"）都会被吸收进风格档案并自动重写。深度全稿评估保留为
