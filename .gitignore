@@ -4,6 +4,13 @@ node_modules/
 .codex/
 *.bak.*
 .env.local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+.netrc
 draft.docx
 draft.pdf
 draft.srt

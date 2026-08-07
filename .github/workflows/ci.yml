@@ -15,6 +15,8 @@ jobs:
           node-version: 20
       - name: Agent e2e（离线 mock）
         run: cd agent && npm test
+      - name: 密钥泄露扫描（含全部历史）
+        run: bash scripts/scan-secrets.sh --all-refs
       - name: Skill engine 与 agent 一致（防漂移）
         run: bash scripts/sync-skill-engine.sh --check
       - name: Skill 启动器可独立运行（内嵌引擎冒烟）

@@ -9,6 +9,11 @@
 未配置 `SCULPTOR_LLM_API_KEY` 时自动读取宿主已配置的 API（Codex / Claude Code / OpenCode /
 常见 `*_API_KEY`），只显示来源与末 4 位、绝不打印密钥；`sculptor credentials --ask` 可交互选择。
 
+> 🔐 **安全**：密钥只放在本地 `.env.local`（已被 `.gitignore` 忽略，权限 0600），
+> **绝不要把 token 写进 git 远程 URL 或任何会提交的文件**。提交前跑
+> `bash scripts/scan-secrets.sh --all-refs`（CI 已内置该检查）；一旦 token 疑似泄露，
+> 立即到 GitHub Settings → Tokens 吊销并重建，再把远程改回干净地址。
+
 > Agent 还是 Skill？——**Skill 优先，Agent 级协议**。分发靠 skill 包（目录即产品），深度靠协议（state.json / requests.jsonl / 风格金库）。
 
 ## 快速开始（一键安装）
