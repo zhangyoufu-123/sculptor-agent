@@ -146,28 +146,34 @@ export async function reviewOutline(cfg, wsDir, { outline = null } = {}) {
     outline: current,
   };
   let report;
-  try {
-    const content = await chatWithRetry(
-      cfg,
-      [
-        { role: 'system', content: '你是大纲评审师，输出严格 JSON。' },
-        { role: 'user', content: reviewPromptArgs(ctx) },
-      ],
-      { json: true, temperature: 0.3, maxTokens: 3500 },
-    );
-    const r = parseJsonContent(content, '大纲评审');
-    const score = Number(r.score);
-    report = {
-      score: Number.isFinite(score) ? Math.max(0, Math.min(1, score)) : 0,
-      strengths: Array.isArray(r.strengths) ? r.strengths.slice(0, 3) : [],
-      issues: Array.isArray(r.issues) ? r.issues.slice(0, 6) : [],
-      revisedOutline:
-        r.revisedOutline && Array.isArray(r.revisedOutline.sections) && r.revisedOutline.sections.length
-          ? r.revisedOutline
-          : null,
-      mode: 'llm',
-    };
-  } catch {
+  if (cfg.apiKey) {
+    try {
+      const content = await chatWithRetry(
+        cfg,
+        [
+          { role: 'system', content: '你是大纲评审师，输出严格 JSON。' },
+          { role: 'user', content: reviewPromptArgs(ctx) },
+        ],
+        { json: true, temperature: 0.3, maxTokens: 3500 },
+      );
+      const r = parseJsonContent(content, '大纲评审');
+      const score = Number(r.score);
+      report = {
+        score: Number.isFinite(score) ? Math.max(0, Math.min(1, score)) : 0,
+        strengths: Array.isArray(r.strengths) ? r.strengths.slice(0, 3) : [],
+        issues: Array.isArray(r.issues) ? r.issues.slice(0, 6) : [],
+        revisedOutline:
+          r.revisedOutline &&
+          Array.isArray(r.revisedOutline.sections) &&
+          r.revisedOutline.sections.length
+            ? r.revisedOutline
+            : null,
+        mode: 'llm',
+      };
+    } catch {
+      report = deterministicReview(current, ctx);
+    }
+  } else {
     report = deterministicReview(current, ctx);
   }
   const revised = Boolean(report.revisedOutline && report.score < REVIEW_SCORE_OK);

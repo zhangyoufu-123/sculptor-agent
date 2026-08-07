@@ -172,51 +172,42 @@ export async function distillCategory(workspace, category, cfg) {
     .join('\n\n---\n\n');
   const out = path.join(d.skills, `${category}.md`);
   let body = '';
-  try {
-    const content = await chatWithRetry(
-      cfg,
-      [
-        { role: 'system', content: '你是写作方法分析师，输出严格 JSON。' },
-        { role: 'user', content: DISTILL_PROMPT(category, texts) },
-      ],
-      { json: true, temperature: 0.3, maxTokens: 1200 },
-    );
-    const r = JSON.parse(
-      content
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```$/, '')
-        .trim(),
-    );
-    body = [
-      `# 个人写作 skill · ${category}`,
-      `> 蒸馏自 ${files.length} 篇作品（${ws.nowIso()}）`,
-      '',
-      `## 结构\n${r.structure || ''}`,
-      '',
-      `## 语气\n${r.voice || ''}`,
-      '',
-      `## 惯用手法\n${r.devices || ''}`,
-      '',
-      `## 要避开的坑\n${r.pitfalls || ''}`,
-      '',
-      `## 代表句\n> ${r.example || ''}`,
-      '',
-    ].join('\n');
-  } catch {
-    const all = texts.replace(/^#.*$/gm, '').trim();
-    body = [
-      `# 个人写作 skill · ${category}`,
-      `> 蒸馏自 ${files.length} 篇作品（确定性兜底，${ws.nowIso()}）`,
-      '',
-      `## 结构\n按 ${category} 文体的常规骨架展开，具体见正文。`,
-      '',
-      `## 语气\n句长 ${all.length > 0 ? '见样本统计' : '未知'}；用词倾向见样本原文。`,
-      '',
-      `## 惯用手法\n见样本原文（vault/library/${category}/）。`,
-      '',
-      `## 要避开的坑\n避免 AI 套话与空泛堆砌（见 anti-ai 清单）。`,
-      '',
-    ].join('\n');
+  if (cfg.apiKey) {
+    try {
+      const content = await chatWithRetry(
+        cfg,
+        [
+          { role: 'system', content: '你是写作方法分析师，输出严格 JSON。' },
+          { role: 'user', content: DISTILL_PROMPT(category, texts) },
+        ],
+        { json: true, temperature: 0.3, maxTokens: 1200 },
+      );
+      const r = JSON.parse(
+        content
+          .replace(/^```(?:json)?\s*/i, '')
+          .replace(/\s*```$/, '')
+          .trim(),
+      );
+      body = [
+        `# 个人写作 skill · ${category}`,
+        `> 蒸馏自 ${files.length} 篇作品（${ws.nowIso()}）`,
+        '',
+        `## 结构\n${r.structure || ''}`,
+        '',
+        `## 语气\n${r.voice || ''}`,
+        '',
+        `## 惯用手法\n${r.devices || ''}`,
+        '',
+        `## 要避开的坑\n${r.pitfalls || ''}`,
+        '',
+        `## 代表句\n> ${r.example || ''}`,
+        '',
+      ].join('\n');
+    } catch {
+      body = fallbackDistill(category, files.length, texts);
+    }
+  } else {
+    body = fallbackDistill(category, files.length, texts);
   }
   fs.writeFileSync(out, body + '\n');
   const index = readIndex(workspace);
@@ -227,6 +218,23 @@ export async function distillCategory(workspace, category, cfg) {
   };
   ws.writeJson(d.index, index);
   return { category, distilled: true, pieces: files.length };
+}
+
+function fallbackDistill(category, count, texts) {
+  const all = texts.replace(/^#.*$/gm, '').trim();
+  return [
+    `# 个人写作 skill · ${category}`,
+    `> 蒸馏自 ${count} 篇作品（确定性兜底，${ws.nowIso()}）`,
+    '',
+    `## 结构\n按 ${category} 文体的常规骨架展开，具体见正文。`,
+    '',
+    `## 语气\n句长 ${all.length > 0 ? '见样本统计' : '未知'}；用词倾向见样本原文。`,
+    '',
+    `## 惯用手法\n见样本原文（vault/library/${category}/）。`,
+    '',
+    `## 要避开的坑\n避免 AI 套话与空泛堆砌（见 anti-ai 清单）。`,
+    '',
+  ].join('\n');
 }
 
 /** 蒸馏所有有作品的类别。 */

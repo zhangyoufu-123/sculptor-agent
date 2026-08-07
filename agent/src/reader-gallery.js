@@ -165,6 +165,7 @@ ${text}
 {"impression":"","moments":[{"at":"原文片段","thought":"当时心里想"}],"advice":""}`;
 
 async function personaReaction(cfg, persona, text, sections) {
+  if (!cfg.apiKey) return fallbackPersona(persona, text, sections);
   try {
     const content = await chatWithRetry(
       cfg,
