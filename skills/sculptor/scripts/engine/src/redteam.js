@@ -80,6 +80,7 @@ export function audit(text, opts = {}) {
     repeatedMetaphors: [],
     repeatedPatterns: [],
     metrics: {},
+    structuralSignals: [],
     passed: true,
     suggestions: [],
     smoothness: null,
@@ -101,7 +102,11 @@ export function audit(text, opts = {}) {
   const vehicles = {};
   for (const s of sentences(all)) {
     for (const m of s.matchAll(/(?:像|如同|仿佛)([^，。；、！？]{2,14})/g)) {
-      let v = m[1].trim().replace(/(一样|般|似的).*$/, '');
+      let v = m[1]
+        .trim()
+        .replace(/(一样|般|似的).*$/, '')
+        // 归一化同喻体：像赶火车 / 像在赶火车 / 像正赶火车 → 赶火车
+        .replace(/^(在|着|是|地|得|不|也|又|正|就|还|都)/, '');
       if (v.length > 4) v = v.slice(0, 4); // 归一化"X一样…"与"X踏过…"为同一喻体
       if (!v) continue;
       vehicles[v] = vehicles[v] || { count: 0, sentences: [] };
@@ -166,6 +171,116 @@ export function audit(text, opts = {}) {
     report.suggestions.push(`句首去重率 ${report.metrics.sentenceStartDedup}% < 75%，句首太重复`);
   if (report.metrics.bigramTtr < 0.7) report.suggestions.push('词汇二元 TTR < 0.7，用词重复偏高');
 
+  // ── 结构性 AI 痕迹（长文级，从《差生》等长稿审计提炼）────────────
+  // 这些是"单句检查抓不到、整篇一看全是模板"的痕迹：
+  // 章节开头单句定场、章节结尾金句收束、三连排比、同语反复（A是A）、
+  // 重复动作模板（数…数到…）、内心话"不出口"收束、单字句意象重复、对话口头禅。
+  const structural = [];
+
+  // 章节开头/结尾模式化（只统计有 ## 标题的章节块）
+  const chapterBlocks = all.split(/\n(?=#{1,6}\s)/).filter((b) => /^#{1,6}\s/.test(b.trim()));
+  if (chapterBlocks.length >= 3) {
+    let shortOpen = 0;
+    let shortEnd = 0;
+    for (const block of chapterBlocks) {
+      const body = block.replace(/^#{1,6}\s+[^\n]*\n?/, '').trim();
+      const firstSent = sentences(body)[0] || '';
+      if (firstSent && [...firstSent].length <= 8) shortOpen += 1;
+      const paras = body.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+      const lastPara = paras.at(-1) || '';
+      const lastSents = sentences(lastPara);
+      if (lastSents.length === 1 && [...lastPara].length <= 14) shortEnd += 1;
+    }
+    if (shortOpen / chapterBlocks.length >= 0.6) {
+      structural.push(
+        `章节开头模式化：${shortOpen}/${chapterBlocks.length} 章以 ≤8 字单句定场（"期中考试。"式），长文结构像模板`,
+      );
+    }
+    if (shortEnd / chapterBlocks.length >= 0.6) {
+      structural.push(
+        `章节结尾模式化：${shortEnd}/${chapterBlocks.length} 章以 ≤14 字单句金句收束，每章都在"点题"`,
+      );
+    }
+  }
+
+  // 三连排比：连续 6 句内同一句首出现 ≥3 次（"我想说…我想说…我想说…"）
+  {
+    const ss = sentences(all);
+    const pref = new Map();
+    for (let i = 0; i < ss.length; i++) {
+      const p = ss[i].slice(0, 2);
+      if (!/[\u4e00-\u9fff]/.test(p[0] || '')) continue;
+      let n = 1;
+      for (let j = i + 1; j < ss.length && j <= i + 5; j++) {
+        if (ss[j].slice(0, 2) === p) n += 1;
+      }
+      if (n >= 3 && !pref.has(p)) pref.set(p, { count: n, example: ss[i].slice(0, 24) });
+    }
+    for (const [p, info] of pref) {
+      structural.push(`三连排比：连续 6 句内"${p}"开头 ${info.count} 次（如"${info.example}…"）`);
+    }
+  }
+
+  // 同语反复："迟到是迟到，白卷是白卷，打架是打架"（A是A）
+  {
+    const hits = all.match(/([\u4e00-\u9fff]{2,6})是\1[，。]/g) || [];
+    if (hits.length >= 3) {
+      structural.push(`同语反复句式（"A是A，B是B"）${hits.length} 处：${hits.slice(0, 3).join('；')}`);
+    }
+  }
+
+  // 重复动作模板："数…，数到…"（注意力漂移技巧被用滥）
+  {
+    const n = (all.match(/数[^。！？]{0,10}，数到/g) || []).length;
+    if (n >= 3) structural.push(`重复动作模板："数…，数到…" ${n} 次（同一种细节手法反复用）`);
+  }
+
+  // 内心话"不出口"收束："这句话我没有说出口" / "我没有告诉任何人"
+  {
+    const n =
+      (all.match(/这句话[^。！？]{0,12}(没有说|说不出口)/g) || []).length +
+      (all.match(/没有说出口/g) || []).length +
+      (all.match(/我(没有|没)[^。！？]{0,8}(告诉|解释)/g) || []).length;
+    if (n >= 3) structural.push(`内心话"不出口"收束 ${n} 次（"这句话我没有说出口"式结尾用滥）`);
+  }
+
+  // 单字句意象重复："白的。"独立成句或作句尾 ≥3 次
+  {
+    const frag = {};
+    const EXCLUDE = new Set(['好', '了', '吗', '吧', '啊', '呀', '嘛', '呢', '是', '的', '有', '没', '不']);
+    // 保留标点的原始分句（sentences() 会剥掉句号，导致"X的。"匹配不上）
+    const rawSents = all
+      .split(/(?<=[。！？.!?])\s*/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const s of rawSents) {
+      if ([...s].length > 16) continue;
+      const m = s.match(/([\u4e00-\u9fff]{1,3})的。$/);
+      if (!m) continue;
+      const k = m[1].slice(-1);
+      if (EXCLUDE.has(k)) continue;
+      frag[k] = (frag[k] || 0) + 1;
+    }
+    for (const [k, n] of Object.entries(frag)) {
+      if (n >= 3) structural.push(`单字句意象重复："${k}的。"作句尾/独立句 ${n} 次（意象单点反复出现）`);
+    }
+  }
+
+  // 对话口头禅：同一句对话出现 ≥5 次（如为刻意人设可忽略，否则是 AI 复读）
+  {
+    const tic = {};
+    for (const m of all.matchAll(/[“"]([^”"]{1,16})[”"]/g)) {
+      const k = m[1].trim();
+      if (k) tic[k] = (tic[k] || 0) + 1;
+    }
+    for (const [k, n] of Object.entries(tic)) {
+      if (n >= 5) structural.push(`对话口头禅重复："${k}" 出现 ${n} 次（若为刻意人设请忽略，否则是 AI 复读）`);
+    }
+  }
+
+  report.structuralSignals = structural;
+  for (const s of structural.slice(0, 5)) report.suggestions.push(s);
+
   // 困惑度签名对照：作者基线均值 vs 本文 surprisal（软提示，不计入硬失败）
   const sig = perplexityProxy(all);
   const baseline = opts.vectorSignature;
@@ -199,6 +314,7 @@ function collectIssues(report) {
   for (const m of report.repeatedMetaphors)
     issues.push(`重复比喻「像${m.vehicle}」（${m.count}次）`);
   for (const p of report.repeatedPatterns) issues.push(`重复句式「${p.pattern}」（${p.count}次）`);
+  for (const s of report.structuralSignals || []) issues.push(`结构痕迹：${s}`);
   return issues.join('；');
 }
 
@@ -252,7 +368,7 @@ export async function redteam(cfg, wsDir, { fix = false } = {}) {
   ws.logContext(
     workspace,
     'redteam',
-    `审计: 黑名单 ${report.blacklistHits.length}、重复比喻 ${report.repeatedMetaphors.length}、句式 ${report.repeatedPatterns.length}、通过=${report.passed}${report.smoothness?.hint ? '、' + report.smoothness.hint : ''}`,
+    `审计: 黑名单 ${report.blacklistHits.length}、重复比喻 ${report.repeatedMetaphors.length}、句式 ${report.repeatedPatterns.length}、结构痕迹 ${report.structuralSignals?.length || 0}、通过=${report.passed}${report.smoothness?.hint ? '、' + report.smoothness.hint : ''}`,
   );
   return { report, draftFile };
 }

@@ -787,6 +787,43 @@ try {
     }),
   );
 
+  // 5.5 结构性 AI 痕迹（长文级，从《差生》审计提炼）
+  const structuralSample = [
+    '我想说，我没有作弊。我想说，我写完了。我想说，那是我自己的答案。',
+    '我数教室的窗户，数到第八扇，乱了。我数天花板的灯，数到第三盏，停了。',
+    '我又数墙上的裂缝，数到第五条，忘了。',
+    '走廊的灯亮着，白的。月光落在地上，白的。清晨的光也是白的。',
+    '迟到是迟到，白卷是白卷，打架是打架。',
+    '这句话我没有说出口。这句话我没有告诉任何人。',
+    '他问：“挺好。”我又说：“挺好。”他点头：“挺好。”她问：“挺好。”我答：“挺好。”',
+  ].join('\n');
+  const srep = audit(structuralSample);
+  check(
+    '结构性 AI 痕迹：排比/重复动机/单字句意象/同语反复/内心收束/口头禅全抓到',
+    srep.structuralSignals.some((s) => s.includes('三连排比')) &&
+      srep.structuralSignals.some((s) => s.includes('数…，数到')) &&
+      srep.structuralSignals.some((s) => s.includes('白的')) &&
+      srep.structuralSignals.some((s) => s.includes('同语反复')) &&
+      srep.structuralSignals.some((s) => s.includes('内心话')) &&
+      srep.structuralSignals.some((s) => s.includes('口头禅')),
+    JSON.stringify(srep.structuralSignals),
+  );
+  const chapterSample = '## 一\n期中考试。\n考场很安静。\n\n## 二\n家长会。\n教室里坐满了人。\n\n## 三\n放学后。\n我走得很慢。';
+  const crep = audit(chapterSample);
+  check(
+    '结构性 AI 痕迹：章节开头单句定场 / 结尾金句',
+    crep.structuralSignals.some((s) => s.includes('章节开头模式化')) &&
+      crep.structuralSignals.some((s) => s.includes('章节结尾模式化')),
+    JSON.stringify(crep.structuralSignals),
+  );
+  const metaSample = '他说话快，像赶火车。律师说得急，像在赶火车。';
+  const mrep = audit(metaSample);
+  check(
+    '比喻归一化：像赶火车 / 像在赶火车 同喻体被抓',
+    mrep.repeatedMetaphors.some((m) => m.vehicle.includes('赶火车')),
+    JSON.stringify(mrep.repeatedMetaphors),
+  );
+
   // 6.5 读者群像（交付前强制环节）
   r = await run(['audience']);
   check(
