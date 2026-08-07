@@ -4,6 +4,9 @@
 
 > 📄 产品文档（功能 / 工作流 / 设计思路 / 设计亮点 / 路线图）：[docs/PRODUCT.md](docs/PRODUCT.md)
 
+> 🌐 **Web 应用已拆分**：面向非技术用户的独立网页应用在 `../sculptor-app`（自己的仓库、打包引擎快照、
+> 可 Docker 部署），与本仓库（引擎 / CLI / skill）完全分离，互不污染。
+
 ## 开箱即用（无需重复填 key）
 
 未配置 `SCULPTOR_LLM_API_KEY` 时自动读取宿主已配置的 API（Codex / Claude Code / OpenCode /

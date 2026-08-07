@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-07（仓库结构）
+
+- **Web 前端从本仓库移除**：拆分为独立应用仓库 `sculptor-app`（`../sculptor-app`，面向非技术用户，
+  自带引擎快照、零依赖、可 Docker 部署）。本仓库只保留引擎 / CLI / skill / MCP，不再含任何 Web 代码。
+  引擎同步：`bash ../sculptor-app/scripts/sync-engine.sh`（单一事实源仍是本仓库 `agent/`）。
+
 ## 0.17.0 (2026-08-07)
 
 ### Added（四层复合风格向量：把"风格 = 不规范表达与完美表达的差异"从理论落成实时向量）
