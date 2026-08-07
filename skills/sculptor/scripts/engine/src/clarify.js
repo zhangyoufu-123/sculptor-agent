@@ -12,7 +12,7 @@ import {
   extractStyleFromSamples,
 } from './style.js';
 import { pulseAfterClarify, pushPulseToState } from './style-pulse.js';
-import { detectGenre } from './genre.js';
+import { detectGenre, genreBlueprint } from './genre.js';
 import { extractInput } from './io.js';
 
 const LOW_WILL = /没(有|什么)?更多|你决定|你自己决定|就这样|先这样|可以了|够了|你看着办/;
@@ -27,6 +27,10 @@ const NEED_LABELS = {
   ending: '结尾姿态',
   styleSample: '风格底稿',
   blueprintConfirm: '整篇文章蓝图确认',
+  items: '事项要点',
+  recipient: '主送/对象',
+  basis: '依据/缘由',
+  plot: '情节架构',
 };
 
 const FALLBACK_QUESTIONS = [
@@ -76,6 +80,26 @@ const FALLBACK_QUESTIONS = [
     recommendation: '300 字以上的旧稿最理想；实在没有，说一句"没有"也行，我边写边从你的修改里学',
     options: ['没有，先写吧'],
   },
+  {
+    need: 'items',
+    ask: '需要具体写哪些事项或要点？',
+    recommendation: '一条一条给，我帮你组织成条理（如"一、二、三"分条）',
+  },
+  {
+    need: 'recipient',
+    ask: '这份文书的主送对象是谁？',
+    recommendation: '例如"全体教职工""××公司"或"各有关单位"',
+  },
+  {
+    need: 'basis',
+    ask: '发文/写作的依据或缘由是什么？',
+    recommendation: '例如"根据上级文件要求"或"为加强安全生产管理"',
+  },
+  {
+    need: 'plot',
+    ask: '故事的情节架构想怎么走？有没有想要的伏笔或反转？',
+    recommendation: '比如"欧亨利式：结尾反转，但前文有伏笔可回收"',
+  },
 ];
 
 export function contextOf(state) {
@@ -121,9 +145,12 @@ function classifyAnswer(question, _answer) {
   if (/情绪|情感|曲线|氛围/.test(q)) return { field: 'emotion' };
   if (/结尾|收尾|收束|姿态/.test(q)) return { field: 'ending' };
   if (/立场|目的|想让人|希望读者|相信什么/.test(q)) return { field: 'stance' };
+  if (/依据|缘由|出台背景|必要性/.test(q)) return { field: 'basis' };
+  if (/主送|对象|收件人|当事人|甲方|乙方/.test(q)) return { field: 'recipient' };
   if (/读者|给谁|听众/.test(q)) return { field: 'audience' };
   if (/主题|写什么|什么事|想写/.test(q)) return { field: 'topic' };
   if (/风格|写过|类似|文体|文风|旧稿|底稿/.test(q)) return { field: 'style' };
+  if (/事项|要点|条款|具体安排|内容要求/.test(q)) return { field: 'items' };
   if (/素材|经历|案例|数据|画面|照片|手稿|细节/.test(q)) return { field: 'material' };
   return { field: 'material' };
 }
@@ -163,6 +190,12 @@ function applyAnswer(state, field, answer) {
     if (!state.confirmed.arguments.includes(a)) state.confirmed.arguments.push(a);
   } else if (field === 'emotion') state.confirmed.emotionalCurve = a;
   else if (field === 'ending') state.confirmed.endingTaste = a;
+  else if (field === 'items') {
+    state.confirmed.items = state.confirmed.items || [];
+    if (!state.confirmed.items.includes(a)) state.confirmed.items.push(a);
+  } else if (field === 'recipient') state.confirmed.recipient = a;
+  else if (field === 'basis') state.confirmed.basis = a;
+  else if (field === 'plot') state.confirmed.plot = a;
   else {
     state.materials = state.materials || [];
     if (!state.materials.includes(a)) state.materials.push(a);
@@ -171,30 +204,47 @@ function applyAnswer(state, field, answer) {
   return state;
 }
 
-function materialGate(state) {
+// ── 文体驱动的动态蓝图 ────────────────────────────────
+// 每类文体有自己的澄清维度（genreBlueprint），散文不再要求"论点×2"，
+// 公文问"事项/主送/依据"，小说问"伏笔/反转"，论文才要论点×N。
+
+/** 当前文体对应的澄清蓝图（默认散文型）。 */
+export function activeBlueprint(state) {
+  return genreBlueprint(state?.confirmed?.genre || '');
+}
+
+function fieldDone(state, f) {
   const c = state.confirmed || {};
-  return Boolean(
-    c.topic &&
-    c.stance &&
-    (state.materials || []).length >= 2 &&
-    c.theme &&
-    (c.arguments || []).length >= 2,
-  );
+  if (f.list === 'materials') return (state.materials || []).length >= (f.count || 1);
+  if (f.list === 'arguments') return (c.arguments || []).length >= (f.count || 1);
+  if (f.list === 'items') return (c.items || []).length >= (f.count || 1);
+  if (f.key === 'styleSample') return Boolean(c.styleSample);
+  // 蓝图 key 与状态存储的别名映射（emotion→emotionalCurve, ending→endingTaste）
+  const valueKey =
+    f.key === 'emotion' ? 'emotionalCurve' : f.key === 'ending' ? 'endingTaste' : f.key;
+  return Boolean(c[valueKey]);
+}
+
+/** 第一个未满足的蓝图字段（含收尾的蓝图确认）。 */
+function blueprintNeed(state) {
+  for (const f of activeBlueprint(state)) {
+    if (!fieldDone(state, f)) return f.key;
+  }
+  if (!state.confirmed?.blueprintConfirmed) return 'blueprintConfirm';
+  return '';
+}
+
+/** 核心（必填、非风格底稿）维度是否齐了——齐了就能进大纲。 */
+function materialGate(state) {
+  for (const f of activeBlueprint(state)) {
+    if (!f.required || f.key === 'styleSample') continue;
+    if (!fieldDone(state, f)) return false;
+  }
+  return true;
 }
 
 function missingNeed(state) {
-  const c = state.confirmed || {};
-  if (!c.topic) return 'topic';
-  if (!c.stance) return 'stance';
-  if (!c.audience) return 'audience';
-  if ((state.materials || []).length < 2) return 'materials';
-  if (!c.theme) return 'theme';
-  if ((c.arguments || []).length < 2) return 'argument';
-  if (!c.emotionalCurve) return 'emotion';
-  if (!c.endingTaste) return 'ending';
-  if (!c.styleSample) return 'styleSample';
-  if (!c.blueprintConfirmed) return 'blueprintConfirm';
-  return '';
+  return blueprintNeed(state);
 }
 
 async function askOnce(state, cfg, workspace) {
@@ -218,7 +268,11 @@ async function askOnce(state, cfg, workspace) {
     context: contextOf(state),
     lastInput: state.lastInput || '（刚开始）',
     stage: '澄清',
-    stageNeed: NEED_LABELS[need] || '素材细节',
+    stageNeed:
+      activeBlueprint(state).find((f) => f.key === need)?.label ||
+      NEED_LABELS[need] ||
+      '素材细节',
+    blueprintFields: activeBlueprint(state).map((f) => f.label).join(' → '),
     coreReady,
     styleNote: state.confirmed.styleNote || '',
     blueprintText: state.blueprint && renderBlueprint(state),

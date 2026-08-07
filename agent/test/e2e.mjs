@@ -11,7 +11,7 @@ import { audit } from '../src/redteam.js';
 import { applyChangeIfUnchanged } from '../src/point-edit.js';
 import { buildStyleShot } from '../src/style-memory.js';
 import { applyStyleDirection } from '../src/style.js';
-import { detectGenre } from '../src/genre.js';
+import { detectGenre, genreBlueprint } from '../src/genre.js';
 import { loadPersonalSkill } from '../src/library.js';
 import { loadStyleAdapter } from '../src/style-adapter.js';
 import { factScan } from '../src/fact-check.js';
@@ -177,7 +177,7 @@ try {
   const i0 = JSON.parse(r.out);
   check(
     'interview 首轮返回问题+清单',
-    Boolean(i0.question) && Array.isArray(i0.checklist) && i0.checklist.length === 9,
+    Boolean(i0.question) && Array.isArray(i0.checklist) && i0.checklist.length >= 5,
     JSON.stringify({ q: i0.question?.slice(0, 20), n: i0.checklist?.length }),
   );
   for (const a of answers) {
@@ -394,6 +394,59 @@ try {
       detectGenre('写一段短视频口播稿') === '视频脚本' &&
       detectGenre('帮我写个脚本') === null,
   );
+  check(
+    '文体识别：小说（欧亨利式）',
+    detectGenre('写一个欧亨利式反转的短篇小说') === '小说' &&
+      detectGenre('写一篇欧亨利式的故事') === '小说',
+  );
+  r = await run(['genre', '小说']);
+  check(
+    '文体库·小说含反转/伏笔骨架',
+    r.code === 0 && r.out.includes('反转') && r.out.includes('伏笔'),
+    r.out.slice(0, 120),
+  );
+  const bpOfficial = genreBlueprint('公文');
+  const bpAcademic = genreBlueprint('学术论文');
+  const bpProse = genreBlueprint('散文');
+  check(
+    '动态蓝图：公文问事项/主送/依据，不问论点与情感',
+    bpOfficial.some((f) => f.key === 'items') &&
+      bpOfficial.some((f) => f.key === 'recipient') &&
+      bpOfficial.some((f) => f.key === 'basis') &&
+      !bpOfficial.some((f) => f.key === 'argument') &&
+      !bpOfficial.some((f) => f.key === 'emotion'),
+    JSON.stringify(bpOfficial.map((f) => f.key)),
+  );
+  check(
+    '动态蓝图：论文要论点×2，散文不要论点',
+    bpAcademic.some((f) => f.key === 'argument' && f.required && f.count === 2) &&
+      !bpProse.some((f) => f.key === 'argument') &&
+      bpProse.some((f) => f.key === 'theme'),
+  );
+  const ws9 = path.join(root, 'ws9');
+  process.env.SCULPTOR_WORKSPACE = ws9;
+  r = await run(['interview', '--once'], { input: '写一份关于安全生产的通知\n' });
+  const iOfficial = JSON.parse(r.out);
+  check(
+    '访谈清单随文体动态切换（通知 → 事项/主送，无论点）',
+    iOfficial.checklist?.some((x) => x.label.includes('事项')) &&
+      iOfficial.checklist?.some((x) => x.label.includes('主送')) &&
+      !iOfficial.checklist?.some((x) => x.label.includes('论点')),
+    JSON.stringify(iOfficial.checklist?.map((x) => x.label)),
+  );
+  process.env.SCULPTOR_WORKSPACE = workspace;
+  const ws10 = path.join(root, 'ws10');
+  const { ensureWorkspace: ensureWs, writeState: writeWs } = await import('../src/workspace.js');
+  const { gate } = await import('../src/outline.js');
+  ensureWs(ws10, { create: true });
+  writeWs(ws10, {
+    phase: 'clarify',
+    confirmed: { genre: '散文', topic: 't', stance: 's', theme: 'm' },
+    materials: ['a', 'b'],
+  });
+  check('大纲门槛动态：散文不强制论点', gate(ws10).ok === true);
+  writeWs(ws10, { phase: 'clarify', confirmed: { genre: '公文', topic: 't' }, materials: [] });
+  check('大纲门槛动态：公文缺事项/依据被拦截', gate(ws10).ok === false);
 
   // 2.10 个人写作库：分类 + 蒸馏 + 查看 + 限量注入
   const ws4 = path.join(root, 'ws4');

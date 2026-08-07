@@ -2,36 +2,35 @@
 // 每一轮：一个问题 + 建议 + 选项 + 确认清单表格 + 进度 + 剩余项。
 // 复用 clarifyStep 作为唯一状态机，不另起一套逻辑（避免两套架构打架）。
 import readline from 'node:readline';
-import { clarifyStep } from './clarify.js';
-import { renderBlueprint } from './clarify.js';
+import { clarifyStep, renderBlueprint, activeBlueprint } from './clarify.js';
 import * as ws from './workspace.js';
 import { styleProgress } from './style.js';
-
-export const NEED_ROWS = [
-  { key: 'topic', label: '主题', required: true },
-  { key: 'stance', label: '立场/目的', required: true },
-  { key: 'audience', label: '读者与场合', required: true },
-  { key: 'materials', label: '具体素材（≥2 条）', required: true, count: 2 },
-  { key: 'theme', label: '核心立意', required: true },
-  { key: 'arguments', label: '支撑论点（≥2 个）', required: true, count: 2 },
-  { key: 'emotion', label: '情感曲线', required: false },
-  { key: 'ending', label: '结尾姿态', required: false },
-  { key: 'styleSample', label: '风格底稿（同文体旧稿）', required: false },
-];
 
 function checklistOf(state) {
   const c = state.confirmed || {};
   const mats = state.materials || [];
-  const args = c.arguments || [];
-  return NEED_ROWS.map((row) => {
+  const rows = activeBlueprint(state).map((f) => ({
+    key: f.key,
+    label: f.label,
+    required: f.required,
+    count: f.count || 1,
+    list: f.list || '',
+  }));
+  rows.push({ key: 'blueprintConfirm', label: '整篇文章蓝图确认', required: true, count: 1, list: '' });
+  return rows.map((row) => {
     let done = false;
     let note = '';
-    if (row.key === 'materials') {
+    if (row.list === 'materials') {
       done = mats.length >= (row.count || 1);
       note = `${mats.length}/${row.count}`;
-    } else if (row.key === 'arguments') {
+    } else if (row.list === 'arguments') {
+      const args = c.arguments || [];
       done = args.length >= (row.count || 1);
       note = `${args.length}/${row.count}`;
+    } else if (row.list === 'items') {
+      const items = c.items || [];
+      done = items.length >= (row.count || 1);
+      note = `${items.length}/${row.count}`;
     } else if (row.key === 'styleSample') {
       done = Boolean(c.styleSample);
       note = c.styleNote ? '已记录' : '';
@@ -41,6 +40,9 @@ function checklistOf(state) {
     } else if (row.key === 'ending') {
       done = Boolean(c.endingTaste);
       note = c.endingTaste ? '已确认' : '';
+    } else if (row.key === 'blueprintConfirm') {
+      done = Boolean(c.blueprintConfirmed);
+      note = c.blueprintConfirmed ? '已确认' : '';
     } else {
       done = Boolean(c[row.key]);
       note = c[row.key] ? '已确认' : '';

@@ -78,6 +78,13 @@ Codex `~/.codex/config.toml`（model_providers 的 `base_url` + `experimental_be
 学术论文可 `sculptor export --academic` 导出（宋体小四/黑体标题/1.5 倍行距）；
 参考文献用 `sculptor cite "<条目>" --style gbt7714|apa` 生成（GB/T 7714 / APA 7）。
 
+### 动态澄清蓝图（文体驱动，不套同一套框）
+
+澄清的"必问维度"由文体动态决定（`genreBlueprint`）：公文问"事由/主送/依据/事项要点"、
+合同问"当事人/标的/条款"、小说（欧亨利式）问"情节架构/伏笔/反转落点"、
+论文才要"支撑论点×N"、散文/演讲稿不要论点。访谈清单、提问提示词、大纲门槛
+全部随文体切换——写什么文体，就问什么维度。
+
 ### 多格式导出
 
 `sculptor export` 支持：`--docx`（普通/`--official` 公文/`--academic` 学术）、

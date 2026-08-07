@@ -1,6 +1,6 @@
 {
   "name": "sculptor",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "深度协作写作 Agent：澄清→大纲评审→逐节写作→静默质量门→读者群像→交付；风格脉搏贯穿每轮，支持语音口述、多格式导出、联网 RAG、一键改写矩阵与持续微调。可装入 Codex / Claude Code / OpenCode。",
   "author": {
     "name": "Sculptor Team"

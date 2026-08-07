@@ -793,7 +793,7 @@ export async function runMcpServer({ input = process.stdin, output = process.std
         result: {
           protocolVersion: '2025-03-26',
           capabilities: { tools: {} },
-          serverInfo: { name: 'sculptor', version: '0.15.0' },
+          serverInfo: { name: 'sculptor', version: '0.16.0' },
         },
       });
     } else if (

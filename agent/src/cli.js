@@ -82,7 +82,7 @@ import {
 } from './credentials.js';
 import { runReview, renderReview } from './review.js';
 
-const HELP = `Sculptor Agent v0.15 — 完整写作 Agent（导演模式 · 对话级双风格提炼 · 深度审阅 · 多模态）
+const HELP = `Sculptor Agent v0.16 — 完整写作 Agent（导演模式 · 对话级双风格提炼 · 深度审阅 · 多模态）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）

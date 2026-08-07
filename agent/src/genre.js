@@ -314,6 +314,22 @@ export const GENRES = {
     ],
     forbidden: ['无平台感的空话', '超过时长的注水台词', '画面与台词脱节'],
   },
+  小说: {
+    aliases: ['小说', '故事', '短篇小说', '欧亨利', '欧亨利式'],
+    skeleton: [
+      '开场（人物/场景/一个不寻常的细节）',
+      '冲突建立（愿望+阻碍，埋伏笔）',
+      '发展（误会/巧合/必然，细节回收）',
+      '高潮/反转（意外但合理的转折，欧亨利式收束）',
+      '结局（余味/回扣，不解释太满）',
+    ],
+    rules: [
+      '反转必须"意外却合理"：伏笔在前文可见，收束时读者恍然大悟',
+      '人物动机驱动情节，不用巧合硬圆',
+      '细节即伏笔：前文埋的点，后文要回收',
+    ],
+    forbidden: ['为反转而反转（无伏笔）', '机械降神', '结局说教'],
+  },
 };
 
 /** GB/T 9704-2012《党政机关公文格式》排版规范（导出 docx 时按此排版）。 */
@@ -438,4 +454,108 @@ export function genreBrief(name) {
 
 export function genreNames() {
   return Object.keys(GENRES);
+}
+
+/**
+ * 文体驱动的动态澄清蓝图：每类文体有自己的"必问/可选维度"，
+ * 不再用同一套 9 项框死所有写作（欧亨利式故事要伏笔/反转，公文要事项/主送，
+ * 论文要论点×N，散文不要论点）。
+ * 字段 key 与 clarify 状态机对齐：list 字段（materials/arguments/items）计数收集。
+ */
+export function genreBlueprint(name) {
+  const F = (fields) => fields;
+  switch (name) {
+    case '议论文':
+    case '学术论文':
+    case '报告':
+      return F([
+        { key: 'topic', label: '主题/研究问题', required: true },
+        { key: 'stance', label: '立场/研究结论', required: true },
+        { key: 'audience', label: '读者与场合', required: true },
+        { key: 'materials', label: '论据/文献/数据（≥2 条）', required: true, count: 2, list: 'materials' },
+        { key: 'theme', label: '核心论点/贡献', required: true },
+        { key: 'argument', label: '支撑论点（≥2 个）', required: true, count: 2, list: 'arguments' },
+        { key: 'ending', label: '结论姿态', required: false },
+        { key: 'styleSample', label: '风格底稿（同文体旧稿）', required: false },
+      ]);
+    case '公文':
+    case '通知':
+    case '会议纪要':
+    case '请示':
+    case '批复':
+    case '函':
+    case '通报':
+    case '公告':
+    case '通告':
+    case '意见':
+    case '决定':
+    case '决议':
+    case '命令':
+    case '公报':
+    case '议案':
+      return F([
+        { key: 'topic', label: '事由/文种事项', required: true },
+        { key: 'recipient', label: '主送/对象', required: true },
+        { key: 'basis', label: '依据/缘由', required: true },
+        { key: 'items', label: '事项要点（≥1 条）', required: true, count: 1, list: 'items' },
+        { key: 'styleSample', label: '范本/惯例（可选）', required: false },
+      ]);
+    case '合同':
+      return F([
+        { key: 'topic', label: '合同类型', required: true },
+        { key: 'recipient', label: '当事人（甲乙双方）', required: true },
+        { key: 'items', label: '标的/价款/履行/违约/争议解决条款要点', required: true, count: 2, list: 'items' },
+        { key: 'styleSample', label: '范本/惯例（可选）', required: false },
+      ]);
+    case '新闻稿':
+      return F([
+        { key: 'topic', label: '事件/主题', required: true },
+        { key: 'recipient', label: '发布对象/媒体', required: true },
+        { key: 'materials', label: '事实素材 5W1H（≥3 条）', required: true, count: 3, list: 'materials' },
+        { key: 'stance', label: '报道角度/目的', required: true },
+        { key: 'ending', label: '结尾落点（回扣/展望）', required: false },
+        { key: 'styleSample', label: '风格底稿（同文体）', required: false },
+      ]);
+    case '邮件':
+      return F([
+        { key: 'topic', label: '邮件主题', required: true },
+        { key: 'recipient', label: '收件人与关系', required: true },
+        { key: 'stance', label: '写这封邮件的目的', required: true },
+        { key: 'materials', label: '背景/要点（≥1 条）', required: true, count: 1, list: 'materials' },
+        { key: 'styleSample', label: '风格底稿（可选）', required: false },
+      ]);
+    case '视频脚本':
+      return F([
+        { key: 'topic', label: '选题/主题', required: true },
+        { key: 'recipient', label: '平台与观众', required: true },
+        { key: 'stance', label: '目的/CTA', required: true },
+        { key: 'materials', label: '素材/画面点（≥2 条）', required: true, count: 2, list: 'materials' },
+        { key: 'emotion', label: '节奏/情绪曲线', required: false },
+        { key: 'ending', label: '结尾 CTA/钩子', required: false },
+        { key: 'styleSample', label: '风格底稿（可选）', required: false },
+      ]);
+    case '小说':
+      return F([
+        { key: 'topic', label: '故事主题', required: true },
+        { key: 'stance', label: '想表达的核心倾向', required: true },
+        { key: 'recipient', label: '读者与题材定位', required: true },
+        { key: 'materials', label: '人物/场景/素材（≥2 条）', required: true, count: 2, list: 'materials' },
+        { key: 'plot', label: '情节架构（伏笔/冲突/反转设计）', required: true },
+        { key: 'emotion', label: '情感曲线', required: false },
+        { key: 'ending', label: '结局/反转落点', required: false },
+        { key: 'styleSample', label: '风格底稿（可选）', required: false },
+      ]);
+    default:
+      // 散文/记叙文/演讲稿/通用：不要"论点"这种议论文专属维度。
+      return F([
+        { key: 'topic', label: '主题', required: true },
+        { key: 'stance', label: '立场/目的', required: true },
+        { key: 'audience', label: '读者与场合', required: true },
+        { key: 'materials', label: '具体素材（≥2 条）', required: true, count: 2, list: 'materials' },
+        { key: 'theme', label: '核心立意', required: true },
+        { key: 'emotion', label: '情感曲线', required: false },
+        { key: 'ending', label: '结尾姿态', required: false },
+        { key: 'styleSample', label: '风格底稿（同文体旧稿）', required: false },
+      ]);
+  }
 }
