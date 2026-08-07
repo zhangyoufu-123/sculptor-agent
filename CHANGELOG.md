@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.10.0 (2026-08-07)
+
+### Changed（去臃肿：评估拆进每一轮，不做交付前大考）
+
+- **新增风格脉搏（Style Pulse）**：`style-pulse.js` —— 澄清每轮、大纲生成后、每节写作后
+  的轻量风格采集与即时反馈（确定性、零 LLM、几十毫秒）；每节写作的脉搏建议自动注入
+  **下一节**提示词，问题不带进下一节。记录落 `vault/style-pulses.jsonl` + `state.stylePulses`；
+  `sculptor style --pulses` 可查看。
+- **用户修改建议 = 评估反馈**：`applyCorrectionFeedback` —— "这句太文艺了/太啰嗦/更口语/
+  结尾收一点"直接收紧/修正档案维度（含负置信微调）并记 correction 脉搏；导演收到这类建议后
+  自动按它重写全文（不再只回"要改哪一处？"）。大纲修改意见同样吸收。
+- **导演交付链去重**：移除交付前全稿 style-eval 自动环节（每节写作已即时评估）；交付消息
+  不再罗列评估过程；风格适配卡改为"素材有变化才重蒸馏"；`SCULPTOR_QUICK=1` 快速模式
+  （读者 3 人、跳过交锋与适配卡重蒸馏）。
+- 深度全稿评估保留为手动命令 `sculptor style-eval`（不自动跑）。
+
+### Changed
+
+- 版本 0.9.0 → 0.10.0（CLI HELP / MCP serverInfo / package.json 同步）；e2e 141 项全绿。
+
 ## 0.9.0 (2026-08-07)
 
 ### Added

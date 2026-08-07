@@ -11,6 +11,7 @@ import {
   styleProgress,
   extractStyleFromSamples,
 } from './style.js';
+import { pulseAfterClarify, pushPulseToState } from './style-pulse.js';
 import { detectGenre } from './genre.js';
 import { extractInput } from './io.js';
 
@@ -301,6 +302,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     skeleton: [],
     corrections: [],
   };
+  let clarifyPulse = null;
   if (lastInput) {
     state.lastInput = lastInput;
     // 文体识别：用户说"写一份关于××的通知/合同/请示…" → 记录文体，后续按范式写作。
@@ -337,6 +339,11 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
         'style',
         `被动采集到风格信号 ${style.writeUpdated} 维（write）+ ${style.readUpdated} 维（read）`,
       );
+    }
+    clarifyPulse = pulseAfterClarify(workspace, lastInput);
+    pushPulseToState(state, clarifyPulse);
+    if (clarifyPulse.suggestion) {
+      ws.logContext(workspace, 'style-pulse', clarifyPulse.suggestion);
     }
     // 风格方向：用户说"整篇更豪迈/更克制…"→ 落档案；已有草稿则标记需要全文重写。
     const dir = applyStyleDirection(workspace, lastInput);
@@ -386,6 +393,9 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     materials: state.materials,
     blueprint: state.blueprint,
     style: styleProgress(workspace),
+    stylePulse: lastInput
+      ? { summary: clarifyPulse?.summary || '', suggestion: clarifyPulse?.suggestion || '' }
+      : null,
   };
 }
 

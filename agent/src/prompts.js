@@ -94,6 +94,7 @@ ${ctx.styleDirection ? `【最新风格方向】${ctx.styleDirection}——按�
 ${ctx.genreBrief ? `【文体范式（公式化内容按此产出）】\n${ctx.genreBrief}` : ''}
 ${ctx.personalSkill ? `【这类文体你个人的写法（蒸馏自你的旧作）】\n${ctx.personalSkill}` : ''}
 ${ctx.styleAdapter ? `【风格适配卡（压缩自你的全部样本，最高优先级）】\n${ctx.styleAdapter}` : ''}
+${ctx.recentPulse ? `【上一节风格脉搏】${ctx.recentPulse}——写本节时修正它，别把问题带到下一节。` : ''}
 
 硬性要求：
 1. 黑名单禁用：在当今社会/随着/近年来/众所周知/毋庸置疑/不可否认/值得注意的是/不难发现/事实上/总而言之/底层逻辑/赋能 等 AI 套话一律不用。

@@ -11,6 +11,7 @@ import { latestStyleDirection } from './style.js';
 import { genreBrief, genreToCategory } from './genre.js';
 import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
+import { pulseAfterWrite, pushPulseToState } from './style-pulse.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -36,6 +37,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
   }
   const parts = existing ? existing.split(/\n(?=## )/) : [];
   const report = [];
+  let prevPulse = null;
 
   state.phase = 'write';
   for (let i = start; i <= end; i++) {
@@ -61,6 +63,9 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
         category: state.confirmed?.libraryCategory || genreToCategory(state.confirmed?.genre || ''),
       }),
       styleAdapter: loadStyleAdapter(workspace, 600),
+      recentPulse: prevPulse
+        ? `上一节「${prevPulse.section}」的风格脉搏建议：${prevPulse.suggestion || '（无）'}`
+        : '',
     };
     const body = await chatWithRetry(
       cfg,
@@ -97,12 +102,17 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       expanded = true;
     }
     parts[i] = `## ${section.heading}\n\n${text}\n`;
+    const pulse = pulseAfterWrite(workspace, text, { section, index: i + 1, previous: prevPulse });
+    prevPulse = pulse;
+    pushPulseToState(state, pulse);
     report.push({
       index: i + 1,
       heading: section.heading,
       target: words,
       actual,
       expanded,
+      pulse: pulse.score,
+      pulseNote: pulse.suggestion || '',
     });
     state.summary = `正在写第 ${i + 1}/${sections.length} 节：${section.heading}`;
     state.nextStep = i < end ? `继续写第 ${i + 2} 节` : '写完后运行 sculptor redteam';

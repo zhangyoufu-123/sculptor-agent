@@ -301,3 +301,15 @@ export function adapterStatus(workspace) {
     hasDataset: fs.existsSync(path.join(workspace, 'vault', 'style-adapter-dataset.jsonl')),
   };
 }
+
+/** 素材量是否比上次蒸馏有变化（没变化就不用重蒸馏，省一次 LLM 调用）。 */
+export function adapterStale(workspace) {
+  const st = adapterStatus(workspace);
+  try {
+    const card = ws.readJson(path.join(workspace, 'vault', 'style-adapter.json'));
+    const src = card.sources || {};
+    return !(st.samples === src.samples && st.pieces === src.pieces && st.edits === src.edits);
+  } catch {
+    return st.samples + st.pieces + st.edits > 0;
+  }
+}

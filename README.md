@@ -33,8 +33,11 @@ node $SCULPTOR init && node $SCULPTOR agent         # 导演模式：主导全�
 `node $SCULPTOR genre 合同` 可查看每种文体的结构规范；党政机关公文 15 文种
 （请示/批复/函/通报/公告/通告/意见/决定/决议/命令/公报/议案…）按 GB/T 9704-2012 排版导出：
 `node $SCULPTOR export --official [--redhead]` → A4 公文 docx（红头可选）。
-风格保真评估：交付前自动对照你的旧稿与亲手修改记录给成稿打"像不像你"的分数，低分自动针对性修订；
-`node $SCULPTOR style-eval` 手动运行。大纲评审：生成后自动按六条标准评审并自动微调（仍由你确认）。
+风格脉搏：不再做交付前的一次性大考——澄清每轮、大纲生成、每节写作后都即时采集/评估风格
+（`node $SCULPTOR style --pulses` 查看），每节脉搏建议自动带入下一节；你说的每句修改
+（"太文艺了/太啰嗦/结尾收一点"）都会被吸收进风格档案并自动重写。深度全稿评估保留为
+手动 `node $SCULPTOR style-eval`。大纲评审：生成后自动按六条标准评审并自动微调（仍由你确认）。
+快速模式：`SCULPTOR_QUICK=1`（读者 3 人、跳过交锋与适配卡重蒸馏，交付更快）。
 读者交锋：8 位"第一读者"反馈后，分歧最大的 3 位互看意见、收敛出共识/争议/优先级
 （`node $SCULPTOR debate`）。事实核查：把数字/年代/引文/人名/机构分级为
 material/common/verify，交付前必看（`node $SCULPTOR fact-check`）。

@@ -15,6 +15,7 @@ import { detectGenre } from '../src/genre.js';
 import { loadPersonalSkill } from '../src/library.js';
 import { loadStyleAdapter } from '../src/style-adapter.js';
 import { factScan } from '../src/fact-check.js';
+import { applyCorrectionFeedback } from '../src/style-pulse.js';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-e2e-'));
 const work = path.join(root, 'work');
@@ -132,6 +133,13 @@ try {
       temperature: writeStyle.dimensions?.temperature?.value,
       associations: writeStyle.vector?.personalDataset?.topAssociations,
     }),
+  );
+  const pulseLog = path.join(workspace, 'vault', 'style-pulses.jsonl');
+  const pulseText = fs.existsSync(pulseLog) ? fs.readFileSync(pulseLog, 'utf8') : '';
+  check(
+    '澄清每轮也记录风格脉搏',
+    pulseText.includes('"phase":"clarify"'),
+    pulseText.slice(0, 120),
   );
 
   // 2.4 旧稿种子：模拟作者写过同题旧稿，验证写作时能按论题检索注入
@@ -419,6 +427,26 @@ try {
   const draftText = fs.readFileSync(path.join(workspace, 'draft.md'), 'utf8');
   const cjkCount = (draftText.match(/[\u4e00-\u9fff]/g) || []).length;
   check(`字数达标（${cjkCount} ≥ 540）`, cjkCount >= 540, `总字数 ${cjkCount}`);
+  const pulseLines = fs.existsSync(pulseLog)
+    ? fs
+        .readFileSync(pulseLog, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+    : [];
+  check(
+    '每节写作记录风格脉搏（jsonl）',
+    pulseLines.filter((l) => l.includes('"phase":"write"')).length >= 3,
+    `write pulses=${pulseLines.filter((l) => l.includes('"phase":"write"')).length}`,
+  );
+  const pulseState = JSON.parse(
+    fs.readFileSync(path.join(workspace, 'protocol', 'state.json'), 'utf8'),
+  );
+  check(
+    '风格脉搏进 state（供下一节注入）',
+    (pulseState.stylePulses || []).filter((p) => p.phase === 'write').length >= 3,
+    JSON.stringify((pulseState.stylePulses || []).slice(-2)),
+  );
 
   // 4.5 退让协议：draft.md 被外部修改 → 不覆盖；--force 才重写
   fs.writeFileSync(path.join(workspace, 'draft.md'), '外部 agent 改过这一行\n');
@@ -656,6 +684,28 @@ try {
   check(
     '压缩指纹刷新',
     r.code === 0 && fs.existsSync(path.join(workspace, 'vault', 'style-fingerprint.json')),
+  );
+
+  // 8.4 修改建议 = 评估反馈：落档案 + 记 correction 脉搏
+  const corr = applyCorrectionFeedback(workspace, '结尾太文艺了，收一点');
+  const corrStyle = JSON.parse(
+    fs.readFileSync(path.join(workspace, 'vault', 'write-style.json'), 'utf8'),
+  );
+  check(
+    '修改建议吸收进风格档案（意象收紧 + 证据）',
+    corr.applied === true &&
+      corr.updated >= 1 &&
+      corr.phrase.includes('意象') &&
+      (corrStyle.dimensions?.imageryTendency?.evidence || []).some((e) =>
+        e.includes('用户修改建议'),
+      ),
+    JSON.stringify(corr),
+  );
+  r = await run(['style', '--pulses']);
+  check(
+    'style --pulses 查看风格脉搏',
+    r.code === 0 && r.out.includes('风格脉搏') && r.out.includes('correction'),
+    r.out.slice(0, 140),
   );
 
   // 8.5 风格保真评估闭环：对照作者样本打分 + 历史记录 + 无参照系兜底

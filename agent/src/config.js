@@ -10,6 +10,7 @@ export function loadConfig(env = process.env) {
     maxTokens: Number(env.SCULPTOR_LLM_MAX_TOKENS || 8000),
     timeoutMs: Number(env.SCULPTOR_LLM_TIMEOUT_MS || 300000),
     targetWords: Number(env.SCULPTOR_TARGET_WORDS || 1000),
+    quick: env.SCULPTOR_QUICK === '1' || env.SCULPTOR_QUICK === 'true',
     workspace: env.SCULPTOR_WORKSPACE || '',
   };
 }

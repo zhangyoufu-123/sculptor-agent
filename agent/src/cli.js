@@ -39,8 +39,9 @@ import {
   submitFineTune,
 } from './style-adapter.js';
 import { factCheck, renderFactCheck } from './fact-check.js';
+import { recentPulses, renderPulse } from './style-pulse.js';
 
-const HELP = `Sculptor Agent v0.9 — 完整写作 Agent（导演模式 · 风格保真闭环 · 读者交锋 · 持续微调 · 事实核查 · 多模态）
+const HELP = `Sculptor Agent v0.10 — 完整写作 Agent（导演模式 · 风格脉搏贯穿每轮 · 读者交锋 · 持续微调 · 事实核查 · 多模态）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
@@ -58,7 +59,7 @@ const HELP = `Sculptor Agent v0.9 — 完整写作 Agent（导演模式 · 风�
                                      按新风格方向重写整篇（或指定节）；缺省用档案最近一条方向
   sculptor redteam [--fix] [工作区]   反 AI 审计（可选 LLM 修订）
   sculptor redteam --file x.md        直接审计任意文件
-  sculptor style-eval [--file x.md] [工作区]  风格保真评估：这篇像不像你（对照你的旧稿/修改记录打分）
+  sculptor style-eval [--file x.md] [工作区]  深度全稿风格保真评估（对照旧稿/修改记录打分；默认不自动跑，需要时手动）
   sculptor outline-review [工作区]    大纲评审：评审当前大纲（低分时自动给出修订版，仍需你确认）
   sculptor audience [--file x.md] [--quick] [工作区]  读者群像：8 个"第一读者"的感性反馈
   sculptor debate [--file x.md] [--quick] [工作区]    读者交锋：分歧最大的 3 位读者互看意见后收敛出共识/争议/优先级
@@ -69,6 +70,7 @@ const HELP = `Sculptor Agent v0.9 — 完整写作 Agent（导演模式 · 风�
   sculptor checklist <工作区>         渲染需求访谈确认清单（不消耗 LLM）
   sculptor style [--memory 查询] [--export] [--backfill] [--extract] [工作区]
                                      风格档案进度；--memory 预览按论题检索到的旧稿与修改对；--export 导出人类可读档案（vault/style-profile.md）；--backfill 回填对话日志；--extract 提取风格底稿
+  sculptor style --pulses [工作区]    风格脉搏：查看澄清/大纲/每节写作/修改建议的即时评估记录
   sculptor style-adapter [--distill] [--dataset [out.jsonl]] [--lora] [工作区]
                                      风格持续微调：--distill 蒸馏风格适配卡（最高优先级注入）；--dataset 生成偏好对 JSONL；--lora 提交微调（未配置端点时给出本地 LoRA 指引）
   sculptor genre [名称]               文体库：结构骨架 + 行文规范（公文/合同/通知/纪要/报告/议论文/散文/演讲稿/记叙文）
@@ -94,6 +96,7 @@ const HELP = `Sculptor Agent v0.9 — 完整写作 Agent（导演模式 · 风�
 环境变量（可选，默认指向 DeepSeek）:
   SCULPTOR_LLM_BASE_URL  SCULPTOR_LLM_API_KEY  SCULPTOR_LLM_MODEL
   SCULPTOR_LLM_MAX_TOKENS  SCULPTOR_LLM_TIMEOUT_MS  SCULPTOR_WORKSPACE
+  SCULPTOR_QUICK=1          快速模式：读者 3 人、跳过交锋与适配卡重蒸馏（交付更快）
 `;
 
 function parseArgs(argv) {
@@ -325,6 +328,15 @@ export async function runCli(argv, io = {}) {
         if (flags.backfill) {
           const r = backfillFromContext(w);
           console.log(`已从对话日志回填 ${r.applied} 条风格信号（跳过 ${r.skipped} 条）`);
+        }
+        if (flags.pulses) {
+          const pulses = recentPulses(w);
+          if (!pulses.length) {
+            console.log('（还没有风格脉搏：澄清/大纲/写作/修改时会自动记录）');
+          } else {
+            console.log('风格脉搏（最近记录）:');
+            for (const p of pulses) console.log(`  · ${renderPulse(p)}`);
+          }
         }
         if (flags.export) {
           const dest = path.join(w, 'vault', 'style-profile.md');

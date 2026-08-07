@@ -10,6 +10,7 @@ import { genreBrief, genreToCategory } from './genre.js';
 import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
 import { reviewOutline } from './outline-review.js';
+import { pulseAfterOutline, pushPulseToState } from './style-pulse.js';
 
 export function styleSummary(file) {
   try {
@@ -108,6 +109,9 @@ export async function generateOutline(cfg, wsDir) {
   state.phase = 'plan';
   state.summary = `大纲已生成：${outline.sections.length} 节（立意+论点已挂载），目标 ${targetWords} 字`;
   if (review.revised) state.summary += '（已按内部评审自动微调）';
+  const pulse = pulseAfterOutline(workspace, outline);
+  pushPulseToState(state, pulse);
+  if (pulse.suggestion) state.summary += `（大纲脉搏建议：${pulse.suggestion}）`;
   state.targetWords = targetWords;
   state.nextStep = '确认大纲后运行 sculptor write';
   state.outline = outline;
