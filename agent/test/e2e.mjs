@@ -219,6 +219,17 @@ try {
     ar.kind === 'confirm_outline' && ar.outline?.sections?.length >= 1,
     JSON.stringify(ar).slice(0, 140),
   );
+  const ws3WriteStyle = JSON.parse(
+    fs.readFileSync(path.join(ws3, 'vault', 'write-style.json'), 'utf8'),
+  );
+  check(
+    '对话级双风格提炼已触发（无旧稿也建立高层次档案）',
+    Object.values(ws3WriteStyle.dimensions || {}).some((d) =>
+      (d.evidence || []).some((e) => e.includes('对话整体提炼')),
+    ) &&
+      (ws3WriteStyle.vector?.personalDataset?.topAssociations || []).includes('银杏'),
+    JSON.stringify(ws3WriteStyle.vector?.personalDataset?.topAssociations),
+  );
   r = await run(['agent', '--once'], { input: '可以\n' });
   ar = JSON.parse(r.out);
   check('导演确认后自动开始写作', ar.kind === 'working' || ar.kind === 'deliver', ar.kind);
@@ -1151,6 +1162,25 @@ try {
   );
   process.env.SCULPTOR_WORKSPACE = workspace;
 
+  // 8.12 深度审阅 review（红队 + 校对 + 事实 + 原创 + 风格保真 + 读者交锋，--fix 一键修复）
+  r = await run(['review']);
+  check(
+    'review 深度审阅聚合输出',
+    r.out.includes('深度审阅') && r.out.includes('结论'),
+    r.out.slice(0, 140),
+  );
+  const badFile = path.join(root, 'bad.md');
+  fs.writeFileSync(
+    badFile,
+    '在当今社会，随着时代的发展，我们不难发现，总而言之这是一个最好的时代。',
+  );
+  r = await run(['review', '--file', badFile, '--fix']);
+  check(
+    'review --fix 修复外部文件 P0 并复检通过',
+    r.code === 0 && r.out.includes('已自动修复') && r.out.includes('通过'),
+    r.out.slice(0, 160),
+  );
+
   // 9. panel / status / doctor
   r = await run(['panel', path.join(workspace, 'protocol', 'state.json')]);
   check('玻璃面板渲染', r.out.includes('玻璃面板'));
@@ -1252,7 +1282,7 @@ try {
       .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
   );
   check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'sculptor');
-  check('MCP tools/list 35 个工具', byId[2]?.result?.tools?.length === 35);
+  check('MCP tools/list 36 个工具', byId[2]?.result?.tools?.length === 36);
   check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Sculptor 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
   const mcpInput2 = Readable.from([
@@ -1314,6 +1344,7 @@ try {
     `${JSON.stringify({ jsonrpc: '2.0', id: 19, method: 'tools/call', params: { name: 'citations', arguments: { workspace, action: 'extract' } } })}\n`,
     `${JSON.stringify({ jsonrpc: '2.0', id: 20, method: 'tools/call', params: { name: 'rag_search', arguments: { workspace, text: '1987年《光明日报》北大红楼' } } })}\n`,
     `${JSON.stringify({ jsonrpc: '2.0', id: 21, method: 'tools/call', params: { name: 'originality', arguments: { workspace } } })}\n`,
+    `${JSON.stringify({ jsonrpc: '2.0', id: 22, method: 'tools/call', params: { name: 'review', arguments: { workspace, quick: true } } })}\n`,
   ]);
   const mcpOut6 = [];
   const output6 = new Writable({
@@ -1383,6 +1414,10 @@ try {
   check(
     'MCP originality 返回原创性结果',
     byId6[21]?.result?.content?.[0]?.text?.includes('原创性检查'),
+  );
+  check(
+    'MCP review 返回深度审阅',
+    byId6[22]?.result?.content?.[0]?.text?.includes('深度审阅'),
   );
 
   // 12. 生态位探测：主动触发判断

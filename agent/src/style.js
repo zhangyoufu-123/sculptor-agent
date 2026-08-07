@@ -4,7 +4,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import * as ws from './workspace.js';
-import { STYLE_EXTRACTION_PROMPT } from './prompts.js';
+import { STYLE_EXTRACTION_PROMPT, CONVERSATION_STYLE_PROMPT } from './prompts.js';
 import { chatWithRetry, parseJsonContent } from './llm.js';
 
 // ── 风格方向（用户主动给出的整体改变方向）────────────────────────
@@ -392,4 +392,120 @@ export async function extractStyleFromSamples(workspace, cfg) {
   obj.learnedFrom.samplesExtracted = done;
   ws.writeJson(writeFile, obj);
   return { extracted, skipped };
+}
+
+/** 从 context.jsonl 收集用户发言（对话级风格提炼的语料）。 */
+export function collectUserUtterances(workspace, { max = 30, maxChars = 120 } = {}) {
+  const logFile = path.join(workspace, 'protocol', 'context.jsonl');
+  const out = [];
+  try {
+    const lines = fs.readFileSync(logFile, 'utf8').split('\n').filter(Boolean);
+    for (const line of lines) {
+      try {
+        const rec = JSON.parse(line);
+        const summary = String(rec.summary || '');
+        const m = summary.match(/→\s*(.+)$/);
+        const text = rec.event === 'user' ? summary : m ? m[1] : '';
+        const clean = String(text || '').trim();
+        if (clean.length >= 4 && !/^(对|好|可以|嗯|ok|是的|就这样|继续|你决定)$/i.test(clean)) {
+          out.push(clean.slice(0, maxChars));
+        }
+      } catch {}
+    }
+  } catch {}
+  return out.slice(-max);
+}
+
+/**
+ * 对话级整体风格提炼：澄清收尾时把用户全部发言（素材/感受/修改意见/确认）
+ * 做一次 LLM 综合，提炼"人想写的（write）"与"人想听的（read）"双风格，
+ * 并合并进 write/read 档案（高置信维度 + 联想库 + 技术偏好）。
+ * 失败静默（不阻塞流程）；apiKey 守卫；提炼结果全部带证据。
+ */
+export async function extractStyleFromConversation(cfg, workspace, { texts = null } = {}) {
+  if (!cfg.apiKey) return { extracted: false, reason: 'no-key' };
+  const corpus = texts || collectUserUtterances(workspace);
+  if (!corpus.length) return { extracted: false, reason: 'no-utterances' };
+  let content;
+  try {
+    content = await chatWithRetry(
+      cfg,
+      [
+        { role: 'system', content: '你是风格提炼师，输出严格 JSON。' },
+        { role: 'user', content: CONVERSATION_STYLE_PROMPT(corpus) },
+      ],
+      { json: true, temperature: 0.25, maxTokens: 3000 },
+    );
+  } catch {
+    return { extracted: false, reason: 'llm-failed' };
+  }
+  let r;
+  try {
+    r = parseJsonContent(content, '对话风格提炼');
+  } catch {
+    return { extracted: false, reason: 'parse-failed' };
+  }
+  const writeFile = path.join(workspace, 'vault', 'write-style.json');
+  const readFile = path.join(workspace, 'vault', 'read-style.json');
+  const writeObj = ws.readJson(writeFile);
+  const readObj = ws.readJson(readFile);
+  let updated = 0;
+  for (const [k, d] of Object.entries(r.writeStyle || {})) {
+    const dim = writeObj.dimensions?.[k];
+    if (!dim || !d || typeof d !== 'object') continue;
+    if (d.value) dim.value = String(d.value);
+    const conf = Number(d.confidence) || 0;
+    dim.confidence = Math.max(dim.confidence || 0, Math.min(1, conf));
+    dim.evidence = dim.evidence || [];
+    const ev = `对话整体提炼：${String(d.evidence || d.value || '').slice(0, 80)}`;
+    if (ev && !dim.evidence.includes(ev)) dim.evidence.push(ev);
+    updated += 1;
+  }
+  for (const [k, d] of Object.entries(r.readStyle || {})) {
+    const dim = readObj.structure?.[k];
+    if (!dim || !d || typeof d !== 'object') continue;
+    if (d.value) dim.value = String(d.value);
+    const conf = Number(d.confidence) || 0;
+    dim.confidence = Math.max(dim.confidence || 0, Math.min(1, conf));
+    dim.evidence = dim.evidence || [];
+    const ev = `对话整体提炼：${String(d.evidence || d.value || '').slice(0, 80)}`;
+    if (ev && !dim.evidence.includes(ev)) dim.evidence.push(ev);
+    updated += 1;
+  }
+  writeObj.vector = writeObj.vector || {};
+  writeObj.vector.personalDataset = writeObj.vector.personalDataset || {};
+  const mergeTop = (key, arr) => {
+    const cur = writeObj.vector.personalDataset[key] || [];
+    const merged = [...new Set([...cur, ...(Array.isArray(arr) ? arr : [])])].slice(0, 6);
+    writeObj.vector.personalDataset[key] = merged;
+  };
+  mergeTop('topAssociations', r.associations);
+  mergeTop('topTechniques', r.techniques);
+  if (r.preferences?.length) mergeTop('topVocabulary', []);
+  writeObj.vector.writingDeviation = writeObj.vector.writingDeviation || {};
+  writeObj.vector.writingDeviation.notableDirections = writeObj.vector.writingDeviation.notableDirections || [];
+  if (r.preferences?.length) {
+    for (const p of r.preferences.slice(0, 4)) {
+      if (!writeObj.vector.writingDeviation.notableDirections.includes(p)) {
+        writeObj.vector.writingDeviation.notableDirections.push(p);
+      }
+    }
+  }
+  if (r.writeReadGap) {
+    writeObj.vector.writeReadGap = String(r.writeReadGap);
+  }
+  writeObj.learnedFrom = writeObj.learnedFrom || {};
+  writeObj.learnedFrom.conversations = (writeObj.learnedFrom.conversations || 0) + 1;
+  writeObj.lastUpdated = ws.nowIso();
+  readObj.learnedFrom = readObj.learnedFrom || {};
+  readObj.learnedFrom.conversations = (readObj.learnedFrom.conversations || 0) + 1;
+  readObj.lastUpdated = ws.nowIso();
+  ws.writeJson(writeFile, writeObj);
+  ws.writeJson(readFile, readObj);
+  ws.logContext(
+    workspace,
+    'style',
+    `对话整体提炼：更新 ${updated} 维（write ${Object.keys(r.writeStyle || {}).length} + read ${Object.keys(r.readStyle || {}).length}）`,
+  );
+  return { extracted: true, updated, writeReadGap: r.writeReadGap || '' };
 }

@@ -13,7 +13,7 @@ import { writeSection } from './write.js';
 import { redteam } from './redteam.js';
 import { runAudience, renderAudience, runDebate, renderDebate } from './reader-gallery.js';
 import { restyle } from './restyle.js';
-import { applyStyleDirection } from './style.js';
+import { applyStyleDirection, extractStyleFromConversation } from './style.js';
 import { applyCorrectionFeedback } from './style-pulse.js';
 import { distillStyleAdapter, adapterStale } from './style-adapter.js';
 import { factScan } from './fact-check.js';
@@ -132,6 +132,11 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
         phase: state.phase,
       };
     }
+    // 澄清收尾：把用户全部发言做一次"对话级整体风格提炼"（write/read 双风格），
+    // 让没贴旧稿的用户也能在进入大纲前建立高层次风格档案；失败静默，不阻塞。
+    try {
+      await extractStyleFromConversation(cfg, workspace);
+    } catch {}
     d.stage = 'outline';
     ws.writeState(workspace, state);
     const res = await advanceToOutline(cfg, workspace, state);

@@ -80,8 +80,9 @@ import {
   clearCredentials,
   credentialsFile,
 } from './credentials.js';
+import { runReview, renderReview } from './review.js';
 
-const HELP = `Sculptor Agent v0.14 — 完整写作 Agent（导演模式 · 凭据自动发现 · 联网 RAG · 静默质量门 · 多模态）
+const HELP = `Sculptor Agent v0.15 — 完整写作 Agent（导演模式 · 对话级双风格提炼 · 深度审阅 · 多模态）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
@@ -137,6 +138,7 @@ const HELP = `Sculptor Agent v0.14 — 完整写作 Agent（导演模式 · 凭�
   sculptor citations [--file x.md] [--append refs.json] [工作区]  提取文中《引文》清单；--append 把参考文献附录追加到草稿
   sculptor rag [status|search|ingest] [工作区]  联网检索：search 生成查询并直连/排队宿主代检；ingest <results.json> 回灌缓存与素材
   sculptor originality [--file x.md] [工作区]   原创性检查：文内重复句/与个人库自我复用/模板句（内置质量门，交付前自动执行）
+  sculptor review [--fix] [--quick] [--file x.md] [工作区]  深度审阅：红队+校对+事实+原创+风格保真+读者交锋 → P0/P1/P2；--fix 一键修复 P0
   sculptor absorb <工作区> <edit.json>   吸收定点修改进风格档案
   sculptor fingerprint <工作区>       刷新压缩守卫风格指纹
   sculptor panel [state.json]         渲染玻璃面板
@@ -313,6 +315,17 @@ export async function runCli(argv, io = {}) {
         if (!fs.existsSync(file)) throw new Error(`找不到文稿: ${file}`);
         const r = originalityScan(fs.readFileSync(file, 'utf8'), w);
         console.log(JSON.stringify(r, null, 2));
+        break;
+      }
+      case 'review': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        const r = await runReview(cfg, w, {
+          file: flags.file ? path.resolve(String(flags.file)) : null,
+          fix: Boolean(flags.fix),
+          quick: Boolean(flags.quick),
+        });
+        console.log(renderReview(r.report));
+        process.exitCode = r.report.passed ? 0 : 1;
         break;
       }
       case 'rag': {

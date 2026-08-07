@@ -238,6 +238,23 @@ export function respond(messages) {
       attentionFocus: { 生命: 0.8, 死亡: 0.7, 苦难: 0.6 },
     });
   }
+  if (userMsg.includes('风格提炼师') && userMsg.includes('对话发言')) {
+    return JSON.stringify({
+      writeStyle: {
+        imageryTendency: { value: '物象承载情感（银杏/葡萄藤）', confidence: 0.8, evidence: '反复用自然物象寄托情绪' },
+        endingPattern: { value: '留白收束、意会不点破', confidence: 0.75, evidence: '用户要求结尾留白' },
+        emotionalSpectrum: { value: '克制低气压，偶有反诘', confidence: 0.7, evidence: '平静陈述到心酸' },
+      },
+      readStyle: {
+        emotionalCurve: { value: '平静→心酸→空落→余味', confidence: 0.8, evidence: '用户确认的情感曲线' },
+        endingTaste: { value: '环境回望、余味收束', confidence: 0.75, evidence: '首尾呼应' },
+      },
+      associations: ['银杏', '葡萄藤', '戈多', '等待'],
+      techniques: ['物象承载情感', '暗喻不点破', '叠词与反问'],
+      preferences: ['结尾留白不点破', '过程先于结论', '感觉瞬间替代实物直陈'],
+      writeReadGap: '想写克制低气压的私人告别，读者需要最后一点亮的余味',
+    });
+  }
   if (userMsg.includes('写作方法分析师')) {
     return JSON.stringify({
       structure: '通常从一个具体场景切入，中段铺细节，结尾收束不点破。',

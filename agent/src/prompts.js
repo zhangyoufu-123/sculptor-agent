@@ -206,6 +206,31 @@ ${text}
 
 只输出整理后的草稿。`;
 
+export const CONVERSATION_STYLE_PROMPT = (
+  utterances,
+) => `你是 Sculptor 的风格提炼师。下面是这位作者在一段写作对话里的全部发言（素材、感受、修改意见、确认）。请从这些"活的发言"里提炼他的整体写作风格——不是从成稿，而是从他怎么想、怎么选、怎么改。
+
+【对话发言】
+${utterances.map((u, i) => `${i + 1}. ${u}`).join('\n')}
+
+提炼要求：
+1. writeStyle：这位作者"想写的"语言习惯，覆盖 14 维中的有信号维度：
+   temperature(语气温度) sentencePreference(句式) modifierDensity(修饰) languageRegister(语域)
+   emotionalSpectrum(情感频谱) narrativePerspective(视角) imageryTendency(意象) rhythm(节奏)
+   rhetoricalDevices(修辞) dialogueRatio(对话) timeHandling(时间) endingPattern(结尾模式)
+   criticalStance(批判姿态) vocabularyCharacter(词汇特色)。每维给 value + confidence(0-1) + evidence(引用用户原话片段)。
+   没有信号的维度不要输出。
+2. readStyle：他想让"读者/自己读起来"的接收结构，覆盖 7 维中有信号维度：
+   pacing(节奏) infoDensity(信息密度) emotionalCurve(情感曲线) openingTaste(开篇口味)
+   endingTaste(结尾口味) frictionTolerance(摩擦容忍) formatPreference(格式偏好)。
+3. associations：他从对话里反复出现的物象/意象/主题词（≤6 个）。
+4. techniques：他惯用的手法（≤5 个，如"物象承载情感""暗喻不点破""叠词与反问"）。
+5. preferences：他明确表达或反复体现的写作偏好（≤4 条，如"结尾留白不点破""过程先于结论""感觉瞬间替代实物直陈"）。
+6. writeReadGap：一句话点出"他想写的"与"他要读者感受到的"之间的张力/差异（如"想写克制低气压的私人告别，读者需要最后一点亮的余味"）。
+
+只输出严格 JSON（全部中文，简洁具体）：
+{"writeStyle":{"dimensionName":{"value":"","confidence":0,"evidence":""}},"readStyle":{},"associations":[""],"techniques":[""],"preferences":[""],"writeReadGap":""}`;
+
 /** 风格少样本块：作者本人的旧稿 + 亲手修改对 + 联想库 + 反例（StyleMC 对比式注入）。 */
 export const STYLE_SHOT = (shot) => `【风格少样本 · 全部来自作者本人】
 以下内容全部来自这位作者自己的文字或亲手修改——写的时候模仿这些，而不是模仿范文或通用模板：

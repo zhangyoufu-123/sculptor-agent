@@ -41,6 +41,7 @@ import {
   ragStatus,
 } from './rag.js';
 import { originalityScan } from './originality.js';
+import { runReview, renderReview } from './review.js';
 
 const TOOLS = [
   {
@@ -237,6 +238,20 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: { workspace: { type: 'string' }, file: { type: 'string' } },
+    },
+  },
+  {
+    name: 'review',
+    description:
+      '深度审阅（核心功能）：聚合红队审计 + 校对 + 事实核查 + 原创性 + 风格保真 + 读者群像/交锋，输出 P0 硬伤 / P1 建议 / P2 争议 / 亮点；fix=true 自动修复 P0 并复检。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        file: { type: 'string' },
+        fix: { type: 'boolean' },
+        quick: { type: 'boolean' },
+      },
     },
   },
   {
@@ -591,6 +606,16 @@ async function callTool(name, args, cfg) {
         text: `原创性检查：风险 ${r.risk}；文内重复 ${r.selfDuplicates.length}、自我复用 ${r.libraryOverlaps.length}、模板句 ${r.templateHits.length}`,
       };
     }
+    case 'review': {
+      const w = wsDir(args, cfg);
+      ws.ensureWorkspace(w);
+      const r = await runReview(cfg, w, {
+        file: args.file ? path.resolve(args.file) : null,
+        fix: Boolean(args.fix),
+        quick: Boolean(args.quick),
+      });
+      return { text: renderReview(r.report) };
+    }
     case 'style_adapter': {
       const w = wsDir(args, cfg);
       ws.ensureWorkspace(w);
@@ -768,7 +793,7 @@ export async function runMcpServer({ input = process.stdin, output = process.std
         result: {
           protocolVersion: '2025-03-26',
           capabilities: { tools: {} },
-          serverInfo: { name: 'sculptor', version: '0.14.0' },
+          serverInfo: { name: 'sculptor', version: '0.15.0' },
         },
       });
     } else if (
