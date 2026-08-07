@@ -22,6 +22,10 @@ git clone https://github.com/zhangyoufu-123/sculptor-agent
 cd sculptor-agent && ./install.sh --project ~/我的写作项目
 ```
 
+安装完成后**自动注册当前项目**（Codex MCP + skill + 凭据，零手动、零全局副作用）：
+新开一个 Codex 对话，直接描述写作任务即可，Sculptor 自动启动。
+`--no-setup` 跳过自动注册；`--setup-all` 同时注册 Claude Code / OpenCode。
+
 skill 内嵌**完整 agent 引擎**，装完即用，无需单独安装 CLI。在你的写作项目里：
 
 ```bash

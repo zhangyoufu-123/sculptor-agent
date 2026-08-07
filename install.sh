@@ -11,6 +11,8 @@
 #   --global          install into ~/.codex/skills/sculptor (affects all Codex sessions)
 #   --cli             also symlink the standalone CLI to ~/.local/bin/sculptor (optional)
 #   --mcp-codex       print Codex MCP config snippet (never modifies host config on its own)
+#   --no-setup        skip auto-register after install (default: auto-register project Codex)
+#   --setup-all       also register Claude Code / OpenCode after install (auto-detected)
 #   --dry-run         only show what would be done
 set -euo pipefail
 
@@ -19,6 +21,8 @@ PROJECT_DIR=""
 GLOBAL=0
 WITH_CLI=0
 MCP_CODEX=0
+AUTO_SETUP=1
+SETUP_ALL=0
 REPO_URL="${SCULPTOR_REPO_URL:-https://github.com/zhangyoufu-123/sculptor-agent}"
 
 usage() {
@@ -32,6 +36,8 @@ while [ $# -gt 0 ]; do
     --global) GLOBAL=1; shift ;;
     --cli) WITH_CLI=1; shift ;;
     --mcp-codex) MCP_CODEX=1; shift ;;
+    --no-setup) AUTO_SETUP=0; shift ;;
+    --setup-all) SETUP_ALL=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h|--help) usage ;;
     *) echo "Unknown option: $1" >&2; usage ;;
@@ -124,15 +130,26 @@ if [ "$WITH_CLI" -eq 1 ]; then
   fi
 fi
 
+if [ "$DRY_RUN" -eq 0 ] && [ "$AUTO_SETUP" -eq 1 ]; then
+  step "auto-register (project-scoped, zero manual)"
+  if command -v node >/dev/null 2>&1; then
+    HOSTS="codex"
+    [ "$SETUP_ALL" -eq 1 ] && HOSTS="codex,claude,opencode"
+    if ! node "$DEST/scripts/sculptor.mjs" setup --dir "$PROJECT_DIR" --hosts "$HOSTS"; then
+      echo "（自动接入未完全成功；稍后可手动运行: node $DEST/scripts/sculptor.mjs setup --dir $PROJECT_DIR）"
+    fi
+  else
+    echo "（未检测到 Node，跳过自动接入；安装 Node >= 18 后运行: node $DEST/scripts/sculptor.mjs setup --dir $PROJECT_DIR）"
+  fi
+fi
+
 cat <<EOF
 
 DONE.
 - Skill (with full engine): $DEST
-- Zero manual steps (recommended): run once
-    node $DEST/scripts/sculptor.mjs setup
-  -> auto-registers this project's MCP + skill + credentials for
-     Codex/Claude Code/OpenCode; open a NEW chat and just describe your
-     writing task - Sculptor starts on its own.
+- This project is auto-registered (Codex MCP + skill + credentials).
+  Open a NEW chat in this project and just describe your writing task -
+  Sculptor starts on its own.
 - Or start the director manually: node $DEST/scripts/sculptor.mjs agent
 - Or let the host agent call it per $DEST/SKILL.md
 - Rollback: move $DEST.bak.* back to $DEST if needed
