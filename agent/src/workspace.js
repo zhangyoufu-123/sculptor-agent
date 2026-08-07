@@ -24,7 +24,8 @@ export function resolveWorkspace(cfg, flagWorkspace) {
 }
 
 export function ensureWorkspace(ws, { create = false } = {}) {
-  if (!fs.existsSync(ws)) {
+  const stateFile = path.join(ws, 'protocol', 'state.json');
+  if (!fs.existsSync(stateFile)) {
     if (!create) throw new Error(`工作区不存在: ${ws}（先运行 sculptor init）`);
     fs.mkdirSync(path.join(ws, 'protocol'), { recursive: true });
     fs.mkdirSync(path.join(ws, 'vault', 'project-memory'), { recursive: true });
