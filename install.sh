@@ -42,7 +42,7 @@ step() { printf '\n=== %s ===\n' "$1"; }
 
 # 1/5 locate the repository (local checkout or clone)
 # 按脚本自身位置判断（bash /path/to/install.sh 从任意目录调用都成立）
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 if [ -f "$SCRIPT_DIR/agent/package.json" ] && [ -d "$SCRIPT_DIR/skills/sculptor" ]; then
   REPO_DIR="$SCRIPT_DIR"
   step "1/5 use local repo: $REPO_DIR"
