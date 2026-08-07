@@ -980,6 +980,8 @@ export async function runCli(argv, io = {}) {
         break;
       }
       default:
+        console.error(`[sculptor] 未知命令: ${cmd}`);
+        console.error('[sculptor] 提示：如果是新命令（如 web），先 git push 并运行更新器 bash ~/.codex/skills/sculptor/scripts/update.sh，再重试。');
         console.log(HELP);
         process.exitCode = 1;
     }
