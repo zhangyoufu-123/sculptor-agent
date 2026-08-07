@@ -16,6 +16,8 @@ import { styleProgress } from './style.js';
 import { buildStyleShot } from './style-memory.js';
 import { restyle } from './restyle.js';
 import { agentStep } from './director.js';
+import { evaluateStyleFidelity, applyEvalFeedback, renderStyleEval } from './style-eval.js';
+import { reviewOutline, renderOutlineReview } from './outline-review.js';
 
 const TOOLS = [
   {
@@ -159,6 +161,24 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: { workspace: { type: 'string' }, fix: { type: 'boolean' } },
+    },
+  },
+  {
+    name: 'style_eval',
+    description:
+      '风格保真评估：对照作者本人的旧稿样本/亲手修改对打分，输出"像不像作者本人"的分数、最像/最不像的句子与可执行修订建议；LLM 失败时确定性统计兜底。',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' }, file: { type: 'string' } },
+    },
+  },
+  {
+    name: 'outline_review',
+    description:
+      '大纲评审-修订回路：按立意贯穿/论点-功能匹配/逻辑递进/素材利用/篇幅分配/文体规范评审当前大纲，低分时自动给出修订版（是否采用由宿主/用户决定）。',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' } },
     },
   },
   {
@@ -340,6 +360,26 @@ async function callTool(name, args, cfg) {
           JSON.stringify(rep, null, 2),
       };
     }
+    case 'style_eval': {
+      const w = wsDir(args, cfg);
+      const r = await evaluateStyleFidelity(cfg, w, { file: args.file || null });
+      const fb = applyEvalFeedback(w, r);
+      return {
+        text:
+          renderStyleEval(r) +
+          (fb.applied ? `\n已把 ${fb.applied} 条漂移证据写回风格档案。` : ''),
+      };
+    }
+    case 'outline_review': {
+      const w = wsDir(args, cfg);
+      const state = ws.readState(w);
+      const r = await reviewOutline(cfg, w, { outline: state.outline || null });
+      if (r.revised) {
+        state.outline = r.outline;
+        ws.writeState(w, state);
+      }
+      return { text: renderOutlineReview(r.report, { revised: r.revised }) };
+    }
     case 'dissect': {
       const w = wsDir(args, cfg);
       const r = await dissect(cfg, w, { file: args.file || null });
@@ -392,7 +432,7 @@ export async function runMcpServer({ input = process.stdin, output = process.std
         result: {
           protocolVersion: '2025-03-26',
           capabilities: { tools: {} },
-          serverInfo: { name: 'sculptor', version: '0.7.0' },
+          serverInfo: { name: 'sculptor', version: '0.8.0' },
         },
       });
     } else if (

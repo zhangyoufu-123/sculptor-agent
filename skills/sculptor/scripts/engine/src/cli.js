@@ -27,10 +27,12 @@ import { runHook } from './hook.js';
 import { renderChecklist } from './interview.js';
 import { agentStep, agentInteractive } from './director.js';
 import { listLibrary, viewCategory, addPiece, distillAll } from './library.js';
-import { extractInput, exportDocx, docxAvailable } from './io.js';
+import { extractInput, exportDocx, exportOfficialDocx, docxAvailable } from './io.js';
 import { GENRES, genreBrief, genreNames } from './genre.js';
+import { evaluateStyleFidelity, applyEvalFeedback, renderStyleEval } from './style-eval.js';
+import { reviewOutline, renderOutlineReview } from './outline-review.js';
 
-const HELP = `Sculptor Agent v0.7 — 完整写作 Agent（导演模式 · 文体库 · 个人写作库 · 多模态）
+const HELP = `Sculptor Agent v0.8 — 完整写作 Agent（导演模式 · 风格保真闭环 · 文体库 · 个人写作库 · 多模态）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
@@ -48,6 +50,8 @@ const HELP = `Sculptor Agent v0.7 — 完整写作 Agent（导演模式 · 文�
                                      按新风格方向重写整篇（或指定节）；缺省用档案最近一条方向
   sculptor redteam [--fix] [工作区]   反 AI 审计（可选 LLM 修订）
   sculptor redteam --file x.md        直接审计任意文件
+  sculptor style-eval [--file x.md] [工作区]  风格保真评估：这篇像不像你（对照你的旧稿/修改记录打分）
+  sculptor outline-review [工作区]    大纲评审：评审当前大纲（低分时自动给出修订版，仍需你确认）
   sculptor audience [--file x.md] [--quick] [工作区]  读者群像：8 个"第一读者"的感性反馈
   sculptor dissect [--file x.md] [工作区]  感性解剖 5 维度
   sculptor quote "<原句>"             生成可粘贴的「Sculptor 引用」块
@@ -62,6 +66,7 @@ const HELP = `Sculptor Agent v0.7 — 完整写作 Agent（导演模式 · 文�
   sculptor library add <file> [--category 类别] [--session 标识] [工作区]  归档一篇作品（自动分类）
   sculptor ingest <file...> [工作区]  多模态输入：docx/xlsx/图片/md → 提取成素材
   sculptor export [--docx out.docx] [--md out.md] [工作区]  把 draft.md 导出为 docx/md
+  sculptor export --official [--redhead] [--docx out.docx] [工作区]  按 GB/T 9704-2012 公文排版导出 docx
   sculptor absorb <工作区> <edit.json>   吸收定点修改进风格档案
   sculptor fingerprint <工作区>       刷新压缩守卫风格指纹
   sculptor panel [state.json]         渲染玻璃面板
@@ -286,6 +291,26 @@ export async function runCli(argv, io = {}) {
         );
         break;
       }
+      case 'outline-review': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        const state = ws.readState(w);
+        const r = await reviewOutline(cfg, w, { outline: state.outline || null });
+        if (r.revised) {
+          state.outline = r.outline;
+          ws.writeState(w, state);
+          console.log(`已按评审自动修订大纲（${r.report.score} 分）。`);
+        }
+        console.log(renderOutlineReview(r.report, { revised: r.revised }));
+        break;
+      }
+      case 'style-eval': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        const r = await evaluateStyleFidelity(cfg, w, { file: flags.file || null });
+        const fb = applyEvalFeedback(w, r);
+        console.log(renderStyleEval(r));
+        if (fb.applied) console.log(`已把 ${fb.applied} 条漂移证据写回风格档案。`);
+        break;
+      }
       case 'write': {
         const w = ws.resolveWorkspace(cfg, workspace);
         const index = flags.section !== undefined ? Number(flags.section) : null;
@@ -391,6 +416,18 @@ export async function runCli(argv, io = {}) {
         if (!fs.existsSync(draft)) throw new Error('没有 draft.md，先 sculptor write');
         const text = fs.readFileSync(draft, 'utf8');
         let out = '';
+        if (flags.official) {
+          if (!docxAvailable()) throw new Error('本机没有 python-docx，无法导出公文 docx');
+          const dest = flags.docx ? path.resolve(String(flags.docx)) : path.join(w, 'draft-公文.docx');
+          const state = ws.readState(w);
+          const title = state.outline?.title || state.confirmed?.topic || '';
+          out = exportOfficialDocx(text, dest, {
+            redhead: Boolean(flags.redhead),
+            title,
+          });
+          console.log(`已按 GB/T 9704-2012 排版导出公文 docx → ${out}${flags.redhead ? '（红头）' : ''}`);
+          break;
+        }
         if (flags.docx) {
           out = exportDocx(text, path.resolve(String(flags.docx)));
           console.log(`已导出 docx → ${out}`);

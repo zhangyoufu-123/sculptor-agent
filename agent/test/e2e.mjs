@@ -240,18 +240,49 @@ try {
     r.code === 0 && fs.existsSync(path.join(ws3, 'draft-export.docx')),
     r.out.slice(0, 100),
   );
+  const pyDocxCheck = spawnSync('python3', ['-c', 'import docx; print(1)'], { encoding: 'utf8' });
+  if (pyDocxCheck.status === 0) {
+    r = await run(['export', '--official', '--docx', path.join(ws3, 'draft-official.docx')]);
+    check(
+      'export --official 按 GB/T 9704 排版导出公文 docx',
+      r.code === 0 && fs.existsSync(path.join(ws3, 'draft-official.docx')),
+      r.out.slice(0, 120),
+    );
+  } else {
+    check('export --official 公文 docx', true, '跳过：本机无 python-docx');
+  }
   process.env.SCULPTOR_WORKSPACE = workspace;
 
   // 2.9 文体库：公式化内容的结构范式
   r = await run(['genre', '合同']);
   check('文体库·合同结构范式', r.code === 0 && r.out.includes('违约责任'), r.out.slice(0, 80));
+  r = await run(['genre', '请示']);
+  check('文体库·请示结构范式', r.code === 0 && r.out.includes('妥否，请批示'), r.out.slice(0, 80));
+  r = await run(['genre', '批复']);
+  check('文体库·批复含此复固定语', r.code === 0 && r.out.includes('此复'), r.out.slice(0, 80));
   r = await run(['genre', 'list']);
-  check('文体库清单', r.code === 0 && r.out.includes('公文') && r.out.includes('合同'));
+  check(
+    '文体库清单（含 15 文种关键项）',
+    r.code === 0 &&
+      r.out.includes('公文') &&
+      r.out.includes('合同') &&
+      r.out.includes('请示') &&
+      r.out.includes('批复') &&
+      r.out.includes('函') &&
+      r.out.includes('通报'),
+    r.out.slice(0, 120),
+  );
   check(
     '文体识别：通知/合同/议论文',
     detectGenre('写一份关于安全生产的通知') === '通知' &&
       detectGenre('拟一份房屋租赁合同') === '合同' &&
       detectGenre('这是一篇议论文的立意') === '议论文',
+  );
+  check(
+    '文体识别：请示/批复/函',
+    detectGenre('关于追加经费的请示') === '请示' &&
+      detectGenre('关于同意追加经费的批复') === '批复' &&
+      detectGenre('关于商洽合作事项的函') === '函',
   );
 
   // 2.10 个人写作库：分类 + 蒸馏 + 查看 + 限量注入
@@ -359,6 +390,21 @@ try {
   // 3. outline
   r = await run(['outline']);
   check('大纲 3 节', r.code === 0 && r.out.includes('3 节'), r.out.slice(0, 120));
+  r = await run(['outline-review']);
+  check(
+    'outline-review 大纲评审-修订回路',
+    r.code === 0 && r.out.includes('大纲评审') && r.out.includes('评分'),
+    r.out.slice(0, 160),
+  );
+  const stateAfterOutline = JSON.parse(
+    fs.readFileSync(path.join(workspace, 'protocol', 'state.json'), 'utf8'),
+  );
+  check(
+    '评审记录已入 state.outlineReviews',
+    (stateAfterOutline.outlineReviews || []).length >= 1 &&
+      typeof stateAfterOutline.outlineReviews[0].score === 'number',
+    JSON.stringify(stateAfterOutline.outlineReviews?.slice(0, 1)),
+  );
 
   // 4. write（mock 正文偏短 → 触发扩写；扩写版干净）
   r = await run(['write']);
@@ -599,6 +645,37 @@ try {
     r.code === 0 && fs.existsSync(path.join(workspace, 'vault', 'style-fingerprint.json')),
   );
 
+  // 8.5 风格保真评估闭环：对照作者样本打分 + 历史记录 + 无参照系兜底
+  r = await run(['style-eval']);
+  check(
+    'style-eval 风格保真评估（LLM 对照作者旧稿/修改记录）',
+    r.code === 0 &&
+      r.out.includes('风格保真评估') &&
+      r.out.includes('保真度') &&
+      r.out.includes('78 分'),
+    r.out.slice(0, 160),
+  );
+  const evalLog = path.join(workspace, 'vault', 'style-eval.jsonl');
+  check(
+    '风格评估历史已记录',
+    fs.existsSync(evalLog) && fs.readFileSync(evalLog, 'utf8').trim().length > 0,
+  );
+  const wsNoRef = path.join(root, 'ws-noref');
+  process.env.SCULPTOR_WORKSPACE = wsNoRef;
+  r = await run(['init'], {});
+  check('无参照系工作区 init', r.code === 0);
+  fs.writeFileSync(
+    path.join(wsNoRef, 'draft.md'),
+    '这是一段足够长的测试文字，用来验证在没有作者旧稿和修改记录时，风格保真评估依然能给出确定性兜底结果，不会因为缺少参照系而中断整个流程。\n',
+  );
+  r = await run(['style-eval']);
+  check(
+    'style-eval 无参照系时确定性兜底',
+    r.code === 0 && r.out.includes('参照'),
+    r.out.slice(0, 120),
+  );
+  process.env.SCULPTOR_WORKSPACE = workspace;
+
   // 9. panel / status / doctor
   r = await run(['panel', path.join(workspace, 'protocol', 'state.json')]);
   check('玻璃面板渲染', r.out.includes('玻璃面板'));
@@ -700,7 +777,7 @@ try {
       .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
   );
   check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'sculptor');
-  check('MCP tools/list 20 个工具', byId[2]?.result?.tools?.length === 20);
+  check('MCP tools/list 22 个工具', byId[2]?.result?.tools?.length === 22);
   check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Sculptor 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
   const mcpInput2 = Readable.from([
@@ -748,6 +825,35 @@ try {
   check(
     'MCP style_memory 检索到作者旧稿',
     byId3[7]?.result?.content?.[0]?.text?.includes('破晓的号角'),
+  );
+  const mcpInput6 = Readable.from([
+    `${JSON.stringify({ jsonrpc: '2.0', id: 10, method: 'tools/call', params: { name: 'style_eval', arguments: { workspace } } })}\n`,
+    `${JSON.stringify({ jsonrpc: '2.0', id: 11, method: 'tools/call', params: { name: 'outline_review', arguments: { workspace } } })}\n`,
+  ]);
+  const mcpOut6 = [];
+  const output6 = new Writable({
+    write(c, _e, cb) {
+      mcpOut6.push(c.toString());
+      cb();
+    },
+  });
+  await runMcpServer({ input: mcpInput6, output: output6 });
+  const byId6 = Object.fromEntries(
+    mcpOut6
+      .join('')
+      .trim()
+      .split('\n')
+      .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
+  );
+  check(
+    'MCP style_eval 返回保真度',
+    byId6[10]?.result?.content?.[0]?.text?.includes('风格保真评估') &&
+      byId6[10]?.result?.content?.[0]?.text?.includes('保真度'),
+  );
+  check(
+    'MCP outline_review 返回评审报告',
+    byId6[11]?.result?.content?.[0]?.text?.includes('大纲评审') &&
+      byId6[11]?.result?.content?.[0]?.text?.includes('评分'),
   );
 
   // 12. 生态位探测：主动触发判断

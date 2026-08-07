@@ -14,6 +14,7 @@ import { redteam } from './redteam.js';
 import { runAudience, renderAudience } from './reader-gallery.js';
 import { restyle } from './restyle.js';
 import { applyStyleDirection } from './style.js';
+import { evaluateStyleFidelity, applyEvalFeedback } from './style-eval.js';
 import { archiveDraft, distillCategory } from './library.js';
 import { exportDocx } from './io.js';
 
@@ -23,10 +24,12 @@ const OUTLINE_CORRECT_RE =
 
 function initDirector(state) {
   state.director = state.director || {
-    stage: 'clarify', // clarify → outline → write → redteam → audience → restyle → deliver
+    stage: 'clarify', // clarify → outline → write → redteam → style_eval → audience → deliver / restyle
     writeIndex: 0,
     outlineRegens: 0,
     fixAttempts: 0,
+    styleFixAttempts: 0,
+    styleFixDirection: '',
   };
   return state.director;
 }
@@ -219,8 +222,49 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       state.summary = '红队审计仍有残留问题，交付带警告';
       ws.writeState(workspace, state);
     }
+    d.stage = 'style_eval';
+    d.styleFixAttempts = 0;
+    d.styleFixDirection = '';
+    ws.writeState(workspace, state);
+  }
+
+  // ── 风格保真评估：红队通过后，对照作者本人旧稿/修改记录打分 ──
+  // 低分（LLM 评估 < 0.62）且还有修订次数 → 针对性重写一轮；否则写入证据并进读者群像。
+  if (d.stage === 'style_eval') {
+    const ev = await evaluateStyleFidelity(cfg, workspace);
+    ({ state, d } = load());
+    state.styleEval = { score: ev.score, ts: ev.ts, mode: ev.mode };
+    if (ev.needsFix && d.styleFixAttempts < 2) {
+      d.styleFixAttempts += 1;
+      d.styleFixDirection = ev.advice.join('；');
+      d.stage = 'style_fix';
+      ws.writeState(workspace, state);
+      return {
+        kind: 'working',
+        message: `风格保真评估 ${(ev.score * 100).toFixed(0)} 分，发现 ${ev.drifted.length} 处不像你的表达，正在按评估意见针对性修订（第 ${d.styleFixAttempts} 次）…`,
+        phase: 'style-eval',
+      };
+    }
+    const fb = applyEvalFeedback(workspace, ev);
+    if (fb.applied)
+      state.summary = `风格保真评估 ${ev.score === null ? '（无参照系）' : (ev.score * 100).toFixed(0) + ' 分'}，${fb.applied} 条漂移证据已写回档案`;
     d.stage = 'audience';
     ws.writeState(workspace, state);
+  }
+
+  // ── 风格针对性修订：按评估意见重写不像你的句子 → 回红队复查 ──
+  if (d.stage === 'style_fix') {
+    const dirText = d.styleFixDirection || '按风格保真评估修订，更像作者本人';
+    await restyle(cfg, workspace, { direction: dirText });
+    ({ state, d } = load());
+    d.stage = 'redteam';
+    d.fixAttempts = 0;
+    ws.writeState(workspace, state);
+    return {
+      kind: 'working',
+      message: '已按评估意见修订不像你的句子，重新反 AI 审计…',
+      phase: 'redteam',
+    };
   }
 
   // ── 读者群像：交付前强制 ─────────────────────────────
@@ -246,6 +290,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
         path.join(path.dirname(ar.file), 'draft.docx'),
       );
     } catch {}
+    const styleScore = state.styleEval?.score;
     d.stage = 'deliver';
     state.phase = 'deliver';
     ws.writeState(workspace, state);
@@ -256,7 +301,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       archived: archived ? `已归档到个人写作库（${archived.category}）` : '',
       distilled: distilled || '',
       audience: rendered,
-      message: `整篇文章已完成：逐节写作 → 反 AI 审计 → 8 位第一读者反馈。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}，同类文体下次会写得更快更像你。${docx ? `已导出 ${docx}。` : ''}交付前请核对事实细节；要改某一句用 point-edit，要整体换风格直接说方向（如"更克制一点"），我会重写。`,
+      message: `整篇文章已完成：逐节写作 → 反 AI 审计 → 风格保真评估${styleScore === null || styleScore === undefined ? '（暂缺参照系）' : ` ${(styleScore * 100).toFixed(0)} 分`} → 8 位第一读者反馈。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}，同类文体下次会写得更快更像你。${docx ? `已导出 ${docx}。` : ''}交付前请核对事实细节；要改某一句用 point-edit，要整体换风格直接说方向（如"更克制一点"），我会重写。`,
       next: 'sculptor redteam / sculptor audience / sculptor restyle / sculptor point-edit',
     };
   }

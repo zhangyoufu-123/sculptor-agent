@@ -160,3 +160,20 @@ export function exportDocx(mdText, outFile) {
   }
   return path.resolve(outFile);
 }
+
+/** 按 GB/T 9704-2012 公文排版导出 docx（红头文件可选；缺省自动补标题）。 */
+export function exportOfficialDocx(mdText, outFile, { redhead = false, title = '' } = {}) {
+  if (!docxAvailable()) throw new Error('本机没有 python-docx，无法导出公文 docx。可先导出 md。');
+  const tmpMd = path.join(path.dirname(outFile), `.sculptor-official-${Date.now()}.md`);
+  const hasTitle = /^#\s+.+$/m.test(mdText);
+  const withTitle = !hasTitle && String(title || '').trim() ? `# ${title.trim()}\n\n${mdText}` : mdText;
+  fs.writeFileSync(tmpMd, withTitle);
+  try {
+    const args = [path.join(IO_SCRIPTS, 'write_docx.py'), tmpMd, path.resolve(outFile), '--official'];
+    if (redhead) args.push('--redhead');
+    runPy(args);
+  } finally {
+    fs.rmSync(tmpMd, { force: true });
+  }
+  return path.resolve(outFile);
+}

@@ -197,6 +197,26 @@ export function respond(messages) {
     });
   }
   if (userMsg.includes('提纲设计师')) return JSON.stringify(OUTLINE);
+  if (userMsg.includes('大纲评审师')) {
+    return JSON.stringify({
+      score: 0.82,
+      strengths: ['论点挂载齐', '素材有分配', '节与节有推进'],
+      issues: [],
+      revisedOutline: null,
+    });
+  }
+  if (userMsg.includes('风格保真评估师')) {
+    return JSON.stringify({
+      score: 0.78,
+      dims: {
+        sentencePreference: { score: 0.6, note: '句长与作者样本接近' },
+        imageryTendency: { score: 0.85, note: '意象贴合作者旧稿' },
+      },
+      matched: [{ at: '历史从不等候', note: '收束方式像作者本人' }],
+      drifted: [],
+      advice: ['保留现有物象，少用抽象判断'],
+    });
+  }
   if (userMsg.includes('⟦待修改⟧') && userMsg.includes('修改指令')) {
     return '那扇窗没有开口，却什么都知道。';
   }

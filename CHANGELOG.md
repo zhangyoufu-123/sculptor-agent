@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.8.0 (2026-08-07)
+
+### Added
+
+- **风格保真评估闭环（Style Fidelity Eval）**：交付前自动对照作者本人的旧稿样本 +
+  亲手修改对给草稿打"像不像你"的分数（参考 EMNLP 2025《Catch Me If You Can? Not Yet》
+  与 WritingPreferenceBench 的偏好对比思路）。LLM 逐句对照打分（14 维），失败时确定性
+  统计兜底（词汇重叠/句长分布/反 AI 黑名单），评估历史落 `vault/style-eval.jsonl`；
+  低分时把漂移证据写回风格档案（只加 evidence、不覆盖维度值）。导演交付链自动执行，
+  低分自动针对性重写一轮。CLI `sculptor style-eval`，MCP 工具 `style_eval`。
+- **大纲评审-修订回路（CogWriter / WriteHERE 式规划→评审→重规划）**：大纲生成后按
+  立意贯穿/论点-功能匹配/逻辑递进/素材利用/篇幅分配/文体规范评审，低分且有 LLM 修订版
+  时自动替换（用户仍需最终确认）；评审记录入 `state.outlineReviews`。
+  CLI `sculptor outline-review`，MCP 工具 `outline_review`。
+- **公文国标升级**：文体库补全党政机关公文 15 文种（请示/批复/函/通报/公告/通告/意见/
+  决定/决议/命令/公报/议案 + 原通知/纪要/报告/公文）；`sculptor genre` 展示
+  GB/T 9704-2012 排版规范；`sculptor export --official [--redhead]` 按国标导出
+  A4 公文 docx（37/35/28/26 页边距、2号小标宋标题、3号仿宋正文、黑体/楷体层级标题、
+  右空四字落款、一字线页码、红头可选）。
+
+### Changed
+
+- 版本 0.7.0 → 0.8.0（CLI HELP / MCP serverInfo / package.json 同步）；
+  MCP 工具 20 → 22；导演交付链：红队通过 → 风格保真评估 → 读者群像 → 交付。
+
 ## 0.7.0 (2026-08-07)
 
 ### Added

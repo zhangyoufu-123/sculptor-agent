@@ -8,6 +8,7 @@ import { buildStyleShot } from './style-memory.js';
 import { latestStyleDirection } from './style.js';
 import { genreBrief, genreToCategory } from './genre.js';
 import { loadPersonalSkill } from './library.js';
+import { reviewOutline } from './outline-review.js';
 
 export function styleSummary(file) {
   try {
@@ -84,8 +85,27 @@ export async function generateOutline(cfg, wsDir) {
     }
   }
 
+  // 大纲评审-修订回路：低分且有 LLM 修订版时自动替换（用户仍需最终确认）。
+  // 确定性兜底时 revised=false，大纲保持原样，流程永不因评审而中断。
+  const review = await reviewOutline(cfg, workspace, { outline });
+  if (review.revised) {
+    outline.sections = review.outline.sections;
+    outline.title = review.outline.title || outline.title;
+    outline.reviewed = true;
+  }
+  state.outlineReviews = state.outlineReviews || [];
+  state.outlineReviews.push({
+    ts: ws.nowIso(),
+    score: review.report.score,
+    mode: review.report.mode,
+    issues: (review.report.issues || []).map((i) => i.issue).slice(0, 4),
+    revised: review.revised,
+  });
+  if (state.outlineReviews.length > 5) state.outlineReviews = state.outlineReviews.slice(-5);
+
   state.phase = 'plan';
   state.summary = `大纲已生成：${outline.sections.length} 节（立意+论点已挂载），目标 ${targetWords} 字`;
+  if (review.revised) state.summary += '（已按内部评审自动微调）';
   state.targetWords = targetWords;
   state.nextStep = '确认大纲后运行 sculptor write';
   state.outline = outline;

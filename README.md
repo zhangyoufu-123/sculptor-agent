@@ -30,7 +30,11 @@ node $SCULPTOR init && node $SCULPTOR agent         # 导演模式：主导全�
 深度定点修改：选中一句话 → `node $SCULPTOR point-edit "原句" "指令" --dir 项目`（macOS 可装右键服务，见 extras/）。
 宿主 agent（Codex / Claude Code / OpenCode）安装后可直接按 `SKILL.md` 自动调用全部流程。
 公式化内容（公文/合同/通知/纪要/报告）：对话里说"写一份关于××的通知/合同"即自动按文体范式产出；
-`node $SCULPTOR genre 合同` 可查看每种文体的结构规范。
+`node $SCULPTOR genre 合同` 可查看每种文体的结构规范；党政机关公文 15 文种
+（请示/批复/函/通报/公告/通告/意见/决定/决议/命令/公报/议案…）按 GB/T 9704-2012 排版导出：
+`node $SCULPTOR export --official [--redhead]` → A4 公文 docx（红头可选）。
+风格保真评估：交付前自动对照你的旧稿与亲手修改记录给成稿打"像不像你"的分数，低分自动针对性修订；
+`node $SCULPTOR style-eval` 手动运行。大纲评审：生成后自动按六条标准评审并自动微调（仍由你确认）。
 个人写作库：交付后作品自动分类归档并蒸馏出"这类文体你的写法"，同类文章越写越像你；
 `node $SCULPTOR library` 查看分类，`node $SCULPTOR library view 议论文` 查看蒸馏 skill。
 多模态：对话里直接给 docx/xlsx/图片 文件路径即可自动提取素材；`node $SCULPTOR export` 把成稿导出为 docx。
