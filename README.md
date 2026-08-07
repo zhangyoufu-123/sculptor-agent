@@ -2,6 +2,8 @@
 
 深度协作写作 Agent：可装入 **Codex / Claude Code / OpenCode / Cursor** 的跨平台 skill 包，承上启下——观察主对话、动态澄清、建立大纲、按你的双风格写作、红队审计，产出交给下游 Agent（剪辑、发布、PPT）。
 
+> 📄 产品文档（功能 / 工作流 / 设计思路 / 设计亮点 / 路线图）：[docs/PRODUCT.md](docs/PRODUCT.md)
+
 > Agent 还是 Skill？——**Skill 优先，Agent 级协议**。分发靠 skill 包（目录即产品），深度靠协议（state.json / requests.jsonl / 风格金库）。
 
 ## 快速开始（一键安装）

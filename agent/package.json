@@ -10,6 +10,7 @@
     "bin",
     "src",
     "templates",
+    "scripts/io",
     "README.md"
   ],
   "repository": {

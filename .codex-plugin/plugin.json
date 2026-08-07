@@ -1,7 +1,7 @@
 {
   "name": "sculptor",
-  "version": "0.4.0",
-  "description": "深度协作写作 Agent：需求访谈、大纲、双风格写作、红队审计、读者群像与感性解剖。可装入 Codex / Claude Code / OpenCode，作为承上启下的写作 Agent。",
+  "version": "0.13.0",
+  "description": "深度协作写作 Agent：澄清→大纲评审→逐节写作→静默质量门→读者群像→交付；风格脉搏贯穿每轮，支持语音口述、多格式导出、联网 RAG、一键改写矩阵与持续微调。可装入 Codex / Claude Code / OpenCode。",
   "author": {
     "name": "Sculptor Team"
   },
@@ -10,8 +10,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Sculptor 写作助手",
-    "shortDescription": "深度协作写作 Agent：需求访谈、双风格、读者群像、反 AI 痕迹",
-    "longDescription": "Sculptor 是一个承上启下的写作 Agent。它用可见的多轮访谈确认需求（一次一问 + 实时清单），建立带论点的大纲，按你的双风格（人想写的 / 人想听的）逐节写作、红队审计，并在交付前模拟 8 个第一读者给出群像化反馈。它的风格向量引擎从你的每一句话与每一次修改中在线学习，压缩也不会遗忘；它的感性解剖引擎能照亮文本隐藏的立场、局限与困惑。",
+    "shortDescription": "深度协作写作 Agent：多轮澄清、双风格、读者群像、反 AI 痕迹、联网 RAG",
+    "longDescription": "Sculptor 是一个承上启下的写作 Agent：多轮澄清（一次一问）确认需求 → 大纲评审修订 → 按你的双风格（人想写的 / 人想听的）逐节写作 → 红队审计 → 静默质量门（风格保真/原创性/校对/事实核查 + 联网 RAG）→ 8 位第一读者群像 + 交锋 → 交付。风格脉搏从你的每一句话与每一次修改中在线学习，压缩也不遗忘；支持语音口述、25 种文体、多格式导出（docx/html/pdf/srt）、一键改写矩阵、版本快照回滚与 LoRA 持续微调。",
     "developerName": "Sculptor Team",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],

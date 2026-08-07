@@ -3,3 +3,10 @@ node_modules/
 .sculptor/
 *.bak.*
 .env.local
+draft.docx
+draft.pdf
+draft.srt
+draft.html
+draft-*.docx
+sculptor-profile.json
+*.log
