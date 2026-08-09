@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.18.0 (2026-08-09)
+
+### Added（个人知识库 PKB：把"读过什么 + 经历"沉淀成用户的独有资产）
+
+- **归纳式采集**：澄清时用户提到《书名》→ 只问一次"如果《X》是你读过/喜欢的作品，告诉我一声"；
+  答"读过/喜欢"自动收录，答"没读过"记已问过不再追问（`asked.jsonl` 去重）。
+- **地点与构想**："去过/参观过 ×" 收录为 `place`；主题明确且库中无相关时，每会话最多一次
+  泛问"这个话题你读过什么书、或去过相关的地方吗？"。
+- **人可读存储**：`vault/knowledge/<id>.md`（JSON 头 + Markdown 笔记，0600），
+  可阅读、可编辑、可带走；CLI 管理 `sculptor knowledge list|search|view|add|remove`。
+- **轮换注入**：大纲与每节写作按主题 BM25 检索注入 `【作者知识库·辅助参考】`，
+  未用条目 +0.2 / 用过的按次数递减（封顶 -0.45），绝不反复引用同一本。
+- **测试**：`agent/test/knowledge.test.mjs`（25 项：收录/去重/匹配/轮换/提问去重/归纳一问）；
+  `npm test` = knowledge + e2e 全链路。
+- 设计参考：MemGPT 分层记忆 / Alexandria 来源可引 / memories-off 代码化管理 / read-aware 引导访谈
+  → `skills/sculptor/references/knowledge.md`
+
 ## 2026-08-09（产品方向收敛）
 
 - **放弃应用路线**：删除独立 Web 应用（sculptor-app）与桌面 IDE（agent-studio）及全部应用产物/文档；

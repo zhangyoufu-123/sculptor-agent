@@ -222,6 +222,21 @@ common（低风险）/ verify（交付前必须核对）。`sculptor fact-check`
 `sculptor library scan`（手动重新蒸馏）、`sculptor library add <file>`（手动归档）。
 Web 端将按 session 为单元组织这些作品。
 
+### 个人知识库（PKB：读过的书 · 去过的地方 · 自己的构想）
+
+人的联想、理论与作品都来自"读过什么 + 个人经历"。AI 智库再大也只是通用底座；
+真正独特的是用户自己的知识库。澄清时**归纳式采集**（不硬塞）：
+
+- 用户提到《书名》且库里没有 → 只问一次"如果《X》是你读过/喜欢的作品，告诉我一声，
+  我会记进你的个人知识库"；用户答"读过/喜欢"→ 收录；答"没读过"→ 记已问过、不再追问。
+- 用户说"去过/参观过 ×" → 收录为地点（place）；只问一次的泛问用于引导："这个话题你读过什么书、或去过相关的地方吗？"
+- 存储为 `vault/knowledge/<id>.md`（JSON 头 + Markdown 笔记，人类可直接阅读/编辑）。
+- **调用纪律**：大纲与写作时按主题 BM25 检索注入（`【作者知识库·辅助参考】`），
+  只作联想引子、不强求；按使用次数轮换，绝不反复引用同一本、不让用户起疑。
+- 管理：`sculptor knowledge`（list / search / view / add / remove）。
+- 设计细节与竞品参考（MemGPT 分层记忆 / Alexandria 来源可引 / memories-off 代码化管理 / read-aware 引导访谈）
+  → [references/knowledge.md](references/knowledge.md)
+
 ### 多模态输入输出（docx / xlsx / 图片 / md）
 
 - 输入：对话里直接给出文件路径（docx/xlsx/md/txt/图片）→ 自动提取成素材；
@@ -354,3 +369,4 @@ node scripts/sculptor.mjs panel / status / checklist / absorb / fingerprint / qu
 - 进入写作前必读：style-vectors.md + anti-ai.md
 - 用户要求深度审视时读：sensibility.md
 - 用户选中某句要求修改时读：point-edit.md
+- 涉及"读过什么/去过哪里/自己的理论"时读：knowledge.md

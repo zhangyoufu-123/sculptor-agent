@@ -16,6 +16,12 @@ import { refreshStyleVector } from './style-vector.js';
 import { detectGenre, genreBlueprint } from './genre.js';
 import { parseTargetWords, guessTargetWords } from './budget.js';
 import { extractInput } from './io.js';
+import {
+  knowledgeSuggestion,
+  captureKbMentions,
+  normTitle,
+  markAsked,
+} from './knowledge.js';
 
 const LOW_WILL = /没(有|什么)?更多|你决定|你自己决定|就这样|先这样|可以了|够了|你看着办/;
 const NEED_LABELS = {
@@ -438,9 +444,35 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
         ws.logContext(workspace, 'style', `风格底稿提取完成：${ex.extracted} 份样本 → 14 维档案`);
       }
     }
+    // 个人知识库（PKB）：用户确认读过/喜欢的《书名》、去过的地方 → 归纳收录。
+    // 同意才记、标题去重、不硬塞；上一条建议悬而未决的书在"读过/喜欢"时补录。
+    const kbCaptured = captureKbMentions(workspace, lastInput, {
+      pendingBook: state.pendingKbBook || '',
+    });
+    if (kbCaptured.length) {
+      ws.logContext(workspace, 'knowledge', `从对话归纳收录 ${kbCaptured.length} 条个人知识`);
+    }
+    // pending 书已得到明确回应（确认已入库/否认/答了别的）→ 只问一次，清掉防误记
+    if (state.pendingKbBook && lastInput.trim()) state.pendingKbBook = null;
     ws.logContext(workspace, 'clarify', `${state.lastQuestion || '（首轮）'} → ${lastInput}`);
   }
   const next = await askOnce(state, cfg, workspace);
+  // 归纳式知识一问（非阻塞）：《书名》未问过才问；主题泛问每会话最多一次。
+  const kbSuggest = knowledgeSuggestion(state, workspace, {
+    sessionAsked: Boolean(state.kbGenericAsked),
+  });
+  if (kbSuggest) {
+    state.knowledgeSuggestion = kbSuggest;
+    const bookMatch = kbSuggest.match(/《([^》]{1,30})》/);
+    if (bookMatch) {
+      state.pendingKbBook = bookMatch[1];
+      markAsked(workspace, `book:${normTitle(bookMatch[1])}`);
+    } else {
+      state.kbGenericAsked = true;
+    }
+  } else {
+    state.knowledgeSuggestion = '';
+  }
   // 合并 LLM 读出的蓝图增量，让"整篇文章"在澄清中持续生长。
   if (next.blueprintUpdate) {
     const u = next.blueprintUpdate;
@@ -466,6 +498,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     confirmed: state.confirmed,
     materials: state.materials,
     blueprint: state.blueprint,
+    knowledgeSuggestion: state.knowledgeSuggestion || '',
     style: styleProgress(workspace),
     stylePulse: lastInput
       ? { summary: clarifyPulse?.summary || '', suggestion: clarifyPulse?.suggestion || '' }
@@ -511,6 +544,7 @@ export async function clarifyInteractive(cfg, wsDir) {
       if (next.recommendation) prompt += `\n我的建议: ${next.recommendation}`;
       if (next.options?.length)
         prompt += `\n选项: ${next.options.map((o, i) => `${'ABC'[i]}. ${o}`).join('  ')}`;
+      if (next.knowledgeSuggestion) prompt += `\n${next.knowledgeSuggestion}`;
       const answer = await ask(prompt + '\n> ');
       if (LOW_WILL.test(answer)) lowWill += 1;
       else lowWill = 0;

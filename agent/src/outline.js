@@ -10,6 +10,7 @@ import { genreBrief, genreToCategory, isOfficialGenre } from './genre.js';
 import { contentBudget } from './budget.js';
 import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
+import { knowledgeBrief } from './knowledge.js';
 import { reviewOutline } from './outline-review.js';
 import { pulseAfterOutline, pushPulseToState } from './style-pulse.js';
 import { refreshStyleVector } from './style-vector.js';
@@ -91,6 +92,17 @@ export async function generateOutline(cfg, wsDir) {
       category: state.confirmed?.libraryCategory || genreToCategory(state.confirmed?.genre || ''),
     }),
     styleAdapter: loadStyleAdapter(workspace, 600),
+    knowledgeBrief: knowledgeBrief(
+      workspace,
+      [
+        state.confirmed.topic,
+        state.confirmed.genre || '',
+        state.confirmed.theme,
+        (state.confirmed.arguments || []).join(' '),
+      ]
+        .filter(Boolean)
+        .join(' '),
+    ),
   };
   const content = await chatWithRetry(
     cfg,

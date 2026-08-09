@@ -64,6 +64,7 @@ ${ctx.styleDirection ? `【最新风格方向】${ctx.styleDirection}` : ''}
 ${ctx.genreBrief ? `【文体范式（公式化内容按此产出）】\n${ctx.genreBrief}` : ''}
 ${ctx.personalSkill ? `【这类文体你个人的写法（蒸馏自你的旧作）】\n${ctx.personalSkill}` : ''}
 ${ctx.styleAdapter ? `【风格适配卡（压缩自你的全部样本，最高优先级）】\n${ctx.styleAdapter}` : ''}
+${ctx.knowledgeBrief ? `【作者知识库·辅助参考】（只作联想与素材引子，不强求使用；轮换使用，绝不反复引用同一本）\n${ctx.knowledgeBrief}` : ''}
 
 要求：
 1. 每节一句话功能（铺垫/转折/细节/收束/升华），连续段落不要做同一件事。
@@ -103,6 +104,7 @@ ${ctx.styleDirection ? `【最新风格方向】${ctx.styleDirection}——按�
 ${ctx.genreBrief ? `【文体范式（公式化内容按此产出）】\n${ctx.genreBrief}` : ''}
 ${ctx.personalSkill ? `【这类文体你个人的写法（蒸馏自你的旧作）】\n${ctx.personalSkill}` : ''}
 ${ctx.styleAdapter ? `【风格适配卡（压缩自你的全部样本，最高优先级）】\n${ctx.styleAdapter}` : ''}
+${ctx.knowledgeBrief ? `【作者知识库·辅助参考】（只作联想与素材引子，不强求使用；轮换使用，绝不反复引用同一本）\n${ctx.knowledgeBrief}` : ''}
 ${ctx.recentPulse ? `【上一节风格脉搏】${ctx.recentPulse}——写本节时修正它，别把问题带到下一节。` : ''}
 
 硬性要求：

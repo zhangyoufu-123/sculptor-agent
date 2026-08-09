@@ -29,6 +29,13 @@ import { renderChecklist } from './interview.js';
 import { agentStep, agentInteractive } from './director.js';
 import { listLibrary, viewCategory, addPiece, distillAll } from './library.js';
 import {
+  listEntries,
+  addEntry,
+  removeEntry,
+  matchKb,
+  normTitle,
+} from './knowledge.js';
+import {
   extractInput,
   exportDocx,
   exportOfficialDocx,
@@ -130,6 +137,10 @@ const HELP = `Sculptor Agent v0.17 — 完整写作 Agent（导演模式 · 四�
   sculptor library scan [工作区]      蒸馏每类作品的"个人写作 skill"（vault/skills/personal/）
   sculptor library view <类别> [工作区]  查看某类的蒸馏 skill 与作品清单
   sculptor library add <file> [--category 类别] [--session 标识] [工作区]  归档一篇作品（自动分类）
+  sculptor knowledge [工作区]           个人知识库：查看读过的书/去过的地方/自己的构想
+  sculptor knowledge list|search <关键词>|view <标题或id>|add <标题>|remove <标题或id> [工作区]
+                                     列表/检索/查看/收录/移除个人知识（澄清中《书名》与"去过×"
+                                     会自动归纳收录，只问一次、可随时在此管理）
   sculptor ingest <file...> [工作区]  多模态输入：docx/xlsx/图片/md → 提取成素材
   sculptor dictate <音频...> [--to-draft] [工作区]  语音口述：whisper 转录 → 素材；--to-draft 生成口述草稿
   sculptor export [--docx out.docx] [--md out.md] [工作区]  把 draft.md 导出为 docx/md
@@ -682,6 +693,77 @@ export async function runCli(argv, io = {}) {
           console.log(`已归档 → ${r.file}（分类: ${r.category}）`);
         } else {
           throw new Error(`未知子命令「${sub}」。可用: list / scan / view / add`);
+        }
+        break;
+      }
+      case 'knowledge': {
+        const w = ws.resolveWorkspace(cfg, flags.workspace || '');
+        ws.ensureWorkspace(w);
+        const sub = positional[0] || 'list';
+        const find = (q) => {
+          const es = listEntries(w);
+          return es.find((e) => e.id === q || normTitle(e.title) === normTitle(q));
+        };
+        if (sub === 'list') {
+          const es = listEntries(w);
+          if (!es.length) {
+            console.log(
+              '个人知识库为空。澄清时你提到读过的书/去过的地方会自动归纳收录；也可用 sculptor knowledge add 手动加入。',
+            );
+            break;
+          }
+          for (const e of es) {
+            console.log(
+              `• ${e.title}${e.author ? `（${e.author}）` : ''} [${e.type}] 使用 ${e.usageCount || 0} 次 · ${
+                (e.createdAt || '').slice(0, 10) || ''
+              }`,
+            );
+          }
+        } else if (sub === 'add') {
+          if (positional.length < 2)
+            throw new Error(
+              '用法: sculptor knowledge add <标题> [--author 作者] [--type book|place|theory|work] [--note 备注]',
+            );
+          const r = addEntry(w, {
+            title: positional[1],
+            author: flags.author || '',
+            type: flags.type || 'book',
+            note: flags.note || '',
+          });
+          console.log(r.created ? `已收录 → ${r.entry.id}` : `已存在（${r.entry.id}），未重复收录`);
+        } else if (sub === 'remove') {
+          if (positional.length < 2)
+            throw new Error('用法: sculptor knowledge remove <标题或id>');
+          const hit = find(positional[1]);
+          if (!hit) throw new Error(`未找到「${positional[1]}」`);
+          removeEntry(w, hit.id);
+          console.log(`已移除「${hit.title}」`);
+        } else if (sub === 'search') {
+          if (positional.length < 2)
+            throw new Error('用法: sculptor knowledge search <关键词>');
+          const hits = matchKb(w, positional.slice(1).join(' '), { limit: 10 });
+          if (!hits.length) {
+            console.log('无匹配');
+            break;
+          }
+          for (const h of hits) {
+            console.log(
+              `• 《${h.title.replace(/^《|》$/g, '')}》${h.author ? `（${h.author}）` : ''} [${h.type}] score=${h.score}${
+                h.note ? ` — ${h.note.slice(0, 60)}` : ''
+              }`,
+            );
+          }
+        } else if (sub === 'view') {
+          if (positional.length < 2) throw new Error('用法: sculptor knowledge view <标题或id>');
+          const hit = find(positional[1]);
+          if (!hit) throw new Error(`未找到「${positional[1]}」`);
+          console.log(`# ${hit.title}（${hit.type}）`);
+          console.log(
+            `作者: ${hit.author || '—'}  来源: ${hit.source}  使用: ${hit.usageCount || 0} 次`,
+          );
+          if (hit.note) console.log(`\n${hit.note}\n`);
+        } else {
+          throw new Error(`未知子命令「${sub}」。可用: list / add / remove / search / view`);
         }
         break;
       }

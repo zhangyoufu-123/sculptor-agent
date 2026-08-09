@@ -119,6 +119,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
         question: r.question,
         recommendation: r.recommendation,
         options: r.options,
+        knowledgeSuggestion: r.knowledgeSuggestion || '',
         phase: state.phase,
         blueprint: state.blueprint,
         stylePulse: r.stylePulse || null,
@@ -460,6 +461,7 @@ export async function agentInteractive(cfg, wsDir) {
       if (r.kind === 'ask') {
         let p = `\n${r.question}`;
         if (r.recommendation) p += `\n我的建议: ${r.recommendation}`;
+        if (r.knowledgeSuggestion) p += `\n${r.knowledgeSuggestion}`;
         if (r.stylePulse?.suggestion) p += `\n风格脉搏: ${r.stylePulse.suggestion}`;
         if (r.options?.length)
           p += `\n选项: ${r.options.map((o, j) => `${'ABC'[j]}. ${o}`).join('  ')}`;

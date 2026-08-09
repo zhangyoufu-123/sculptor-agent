@@ -11,6 +11,7 @@ import { latestStyleDirection } from './style.js';
 import { genreBrief, genreToCategory } from './genre.js';
 import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
+import { knowledgeBrief } from './knowledge.js';
 import { pulseAfterWrite, pushPulseToState } from './style-pulse.js';
 import { refreshStyleVector } from './style-vector.js';
 import { snapshot } from './history.js';
@@ -66,6 +67,10 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
         category: state.confirmed?.libraryCategory || genreToCategory(state.confirmed?.genre || ''),
       }),
       styleAdapter: loadStyleAdapter(workspace, 600),
+      knowledgeBrief: knowledgeBrief(
+        workspace,
+        `${outline.title || ''} ${section.heading || ''} ${section.thesis || ''} ${section.function || ''}`,
+      ),
       recentPulse: prevPulse
         ? `上一节「${prevPulse.section}」的风格脉搏建议：${prevPulse.suggestion || '（无）'}`
         : '',
