@@ -1412,7 +1412,7 @@ try {
       .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
   );
   check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'sculptor');
-  check('MCP tools/list 36 个工具', byId[2]?.result?.tools?.length === 36);
+  check('MCP tools/list 37 个工具', byId[2]?.result?.tools?.length === 37);
   check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Sculptor 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
   const mcpInput2 = Readable.from([
@@ -1651,7 +1651,7 @@ try {
   const p1 = JSON.parse(r.out);
   check(
     '长文写作触发',
-    p1.triggered === true && p1.entry === 'clarify',
+    p1.triggered === true && p1.entry === 'creative',
     JSON.stringify({ c: p1.confidence, e: p1.entry }),
   );
   r = await run(['probe', '把这句话改得更口语一点']);
@@ -1667,6 +1667,53 @@ try {
   r = await run(['probe', '帮我总结这段文章']);
   const p4 = JSON.parse(r.out);
   check('总结任务不触发', p4.triggered === false);
+
+  // 13. 实时取数闭环：学术场景自动排队 → rag needs 可查 → 回灌进素材并标记完成
+  {
+    const dataWs = path.join(root, 'data-ws');
+    const prevWs = process.env.SCULPTOR_WORKSPACE;
+    fs.mkdirSync(dataWs, { recursive: true });
+    process.env.SCULPTOR_WORKSPACE = dataWs;
+    r = await run(['init']);
+    check('数据工作区初始化', r.code === 0);
+    r = await run(['clarify', '--once'], { input: '我想写一篇关于AI教育公平的学术论文' });
+    const reqFile = path.join(dataWs, 'protocol', 'requests.jsonl');
+    const reqLog = fs.existsSync(reqFile) ? fs.readFileSync(reqFile, 'utf8') : '';
+    check('学术澄清自动排队资料检索', reqLog.includes('clarify-data'), reqLog ? '有请求' : '无请求');
+    r = await run(['rag', 'needs']);
+    check(
+      'CLI rag needs 显示待办',
+      r.out.includes('待办资料检索') || r.out.includes('clarify-data'),
+      r.out.slice(0, 60),
+    );
+    const resultsFile = path.join(root, 'data-results.json');
+    fs.writeFileSync(
+      resultsFile,
+      JSON.stringify([
+        {
+          query: 'AI教育公平 文献',
+          results: [
+            { title: 'AI 教育的公平性研究', source: '教育学报', url: 'https://example.com/ai', snippet: '2025 年抽样调查…' },
+          ],
+        },
+      ]),
+    );
+    r = await run(['rag', 'ingest', resultsFile]);
+    check('CLI rag ingest 回灌成功', r.out.includes('已回灌'), r.out.slice(0, 60));
+    const dataState = JSON.parse(
+      fs.readFileSync(path.join(dataWs, 'protocol', 'state.json'), 'utf8'),
+    );
+    check(
+      '回灌结果进入素材',
+      (dataState.materials || []).some((m) => m.includes('AI 教育的公平性研究')),
+    );
+    const stillPending = fs
+      .readFileSync(reqFile, 'utf8')
+      .split('\n')
+      .some((l) => l.includes('"status": "pending"'));
+    check('回灌后待办标记完成', stillPending === false);
+    process.env.SCULPTOR_WORKSPACE = prevWs;
+  }
 } finally {
   delete globalThis.fetch;
   delete globalThis.fetchBodies;

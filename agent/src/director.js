@@ -76,10 +76,15 @@ async function advanceToOutline(cfg, workspace, state) {
     state.summary = `大纲已生成：${r.outline.sections.length} 节，等待用户确认`;
     state.nextStep = '确认大纲（可提出修改）';
     ws.writeState(workspace, state);
+    const dataNote =
+      r.dataRequests?.queued > 0
+        ? `另有 ${r.dataRequests.queued} 条资料检索已排队（宿主/协作 agent 检索后回灌，我会自动补进对应节）。`
+        : '';
     return {
       kind: 'confirm_outline',
       outline: outlineView(r.outline),
-      message: '需求已齐，这是我设计的整篇大纲——请确认，或直接告诉我要改哪里。',
+      message: `需求已齐，这是我设计的整篇大纲——请确认，或直接告诉我要改哪里。${dataNote}`,
+      dataRequests: r.dataRequests || { queued: 0 },
     };
   } catch (err) {
     state.summary = '素材不足，暂不能生成大纲';
@@ -120,6 +125,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
         recommendation: r.recommendation,
         options: r.options,
         knowledgeSuggestion: r.knowledgeSuggestion || '',
+        dataSuggestion: r.dataSuggestion || '',
         phase: state.phase,
         blueprint: state.blueprint,
         stylePulse: r.stylePulse || null,
@@ -213,11 +219,15 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       ws.writeState(workspace, state);
       const sec = r.report[0];
       const remain = sections.length - d.writeIndex;
+      const dataNote =
+        sec.dataRequested?.length > 0
+          ? ` 本节缺 ${sec.dataRequested.length} 项资料，已排队检索「${sec.dataRequested.join('、').slice(0, 80)}」`
+          : '';
       return {
         kind: 'working',
         message: `已写第 ${idx + 1}/${sections.length} 节「${sec.heading}」（${sec.actual} 字，风格脉搏 ${(sec.pulse * 100).toFixed(0)} 分${
           sec.pulseNote ? `，${sec.pulseNote}` : ''
-        }）${
+        }）${dataNote}${
           remain > 0 ? `，继续写下一节…` : '，开始反 AI 审计…'
         }`,
         progress: { done: d.writeIndex, total: sections.length },
@@ -360,6 +370,17 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     const prCount = typeof q.proofread === 'number' ? q.proofread : 0;
     state.factCheck = { total: fcVerify, verify: fcVerify, ts: ws.nowIso() };
     state.proofread = { total: prCount, ts: ws.nowIso() };
+    // 学术论文交付：提示引文整理（确定性检测《书名》，格式由 sculptor citations 生成）
+    let citeNote = '';
+    try {
+      if (/学术论文/.test(state.confirmed?.genre || '')) {
+        const draftText = fs.readFileSync(ar.file, 'utf8');
+        const cited = (draftText.match(/《([^》]{2,40})》/g) || []).slice(0, 8);
+        if (cited.length) {
+          citeNote = `检测到 ${cited.length} 处引文（${cited.join('、').slice(0, 80)}…）。运行 \`sculptor citations --append refs.json\` 可生成 GB/T 7714 参考文献并追加到文末。`;
+        }
+      }
+    } catch {}
     d.stage = 'deliver';
     state.phase = 'deliver';
     ws.writeState(workspace, state);
@@ -371,7 +392,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       distilled: distilled || '',
       audience: rendered,
       debate: debateRendered,
-      message: `整篇文章已完成：逐节写作（每节风格脉搏已即时反馈）→ 反 AI 审计 → 读者群像 → 交锋。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}${adapterNote}。${docx ? `已导出 ${docx}。` : ''}${prCount ? `⚠ 校对：${prCount} 处提示（错别字/标点，运行 sculptor proofread 看明细）。` : ''}${fcVerify ? `⚠ 事实核查：${fcVerify} 处数字/年代/引文需核对（运行 sculptor fact-check 看明细）。` : ''}要改某一句用 point-edit，要整体换风格或表达直接说（如"更克制一点"），我会吸收进风格档案并重写。`,
+      message: `整篇文章已完成：逐节写作（每节风格脉搏已即时反馈）→ 反 AI 审计 → 读者群像 → 交锋。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}${adapterNote}。${docx ? `已导出 ${docx}。` : ''}${prCount ? `⚠ 校对：${prCount} 处提示（错别字/标点，运行 sculptor proofread 看明细）。` : ''}${fcVerify ? `⚠ 事实核查：${fcVerify} 处数字/年代/引文需核对（运行 sculptor fact-check 看明细）。` : ''}${citeNote ? `\n${citeNote}` : ''}要改某一句用 point-edit，要整体换风格或表达直接说（如"更克制一点"），我会吸收进风格档案并重写。`,
       next: 'sculptor redteam / sculptor audience / sculptor debate / sculptor fact-check / sculptor point-edit',
     };
   }
@@ -462,6 +483,7 @@ export async function agentInteractive(cfg, wsDir) {
         let p = `\n${r.question}`;
         if (r.recommendation) p += `\n我的建议: ${r.recommendation}`;
         if (r.knowledgeSuggestion) p += `\n${r.knowledgeSuggestion}`;
+        if (r.dataSuggestion) p += `\n${r.dataSuggestion}`;
         if (r.stylePulse?.suggestion) p += `\n风格脉搏: ${r.stylePulse.suggestion}`;
         if (r.options?.length)
           p += `\n选项: ${r.options.map((o, j) => `${'ABC'[j]}. ${o}`).join('  ')}`;

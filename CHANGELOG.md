@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.19.0 (2026-08-09)
+
+### Added（主导式协作 + 实时取数 + 场景全打通）
+
+- **主导式协作协议**：写作生态位内 Sculptor 自主决策（agent_step 状态机），宿主与
+  学术/数据分析 agent 作为执行与数据供给方；生态位外完全让位。`probe` 输出细分入口
+  （academic/official/creative/style/outline/point-edit）与启动建议（agent/point-edit/none）。
+- **实时取数三通道**：澄清（clarify-data）、大纲缺素材节（outline-gap）、写作"素材不足"
+  标注（write-gap）自动排队检索；`sculptor rag needs` / MCP `data_needs` 查看待办，
+  `rag ingest` 回灌进素材并标记完成；请求去重、不阻塞流程。
+- **学术论文闭环**：素材缺口检测（论文/报告/新闻稿必须有可查证的文献/数据）、
+  交付时自动检测《引文》并提示生成 GB/T 7714 参考文献；导出走 `export --academic`。
+- **MCP 新增 data_needs**（37 个工具）；导演 working 消息携带已排队检索提示。
+- **测试**：`agent/test/rag.test.mjs`（16 项实时取数单测）；e2e 增加学术澄清自动排队
+  → rag needs → ingest 回灌 → 待办完成全闭环（共 231 项断言）。
+
 ## 0.18.0 (2026-08-09)
 
 ### Added（个人知识库 PKB：把"读过什么 + 经历"沉淀成用户的独有资产）

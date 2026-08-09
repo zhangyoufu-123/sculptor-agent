@@ -15,6 +15,7 @@ import { knowledgeBrief } from './knowledge.js';
 import { pulseAfterWrite, pushPulseToState } from './style-pulse.js';
 import { refreshStyleVector } from './style-vector.js';
 import { snapshot } from './history.js';
+import { buildSearchQueries, requestHostSearch, parseDataNeed } from './rag.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -110,6 +111,23 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       actual = (text.match(/[\u4e00-\u9fff]/g) || []).length;
       expanded = true;
     }
+    // 实时取数：本节写后仍标注"素材不足" → 解析缺口、排队检索（每节最多一次）。
+    let dataRequested = [];
+    if (expanded) {
+      const gaps = parseDataNeed(text);
+      state.dataRequested = state.dataRequested || {};
+      if (gaps.length && !state.dataRequested[i]) {
+        const queries = buildSearchQueries(
+          `${outline.title || ''} ${section.heading || ''} ${gaps.join(' ')}`,
+          { topic: state.confirmed?.topic || '', limit: 4 },
+        );
+        if (queries.length) {
+          const req = requestHostSearch(workspace, queries, { purpose: 'write-gap' });
+          state.dataRequested[i] = { queries, queued: req.queued };
+          dataRequested = queries;
+        }
+      }
+    }
     parts[i] = `## ${section.heading}\n\n${text}\n`;
     const pulse = pulseAfterWrite(workspace, text, { section, index: i + 1, previous: prevPulse });
     await refreshStyleVector(cfg, workspace, { text, kind: 'write', evidence: `第 ${i + 1} 节` });
@@ -121,6 +139,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       target: words,
       actual,
       expanded,
+      dataRequested,
       pulse: pulse.score,
       pulseNote: pulse.suggestion || '',
     });
@@ -140,6 +159,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
     sections: end - start + 1,
     report,
     total,
+    dataRequested: report.flatMap((r) => r.dataRequested || []),
     hint: state.needsRestyle
       ? '检测到新的风格方向：可运行 sculptor restyle 让整篇按新方向重写'
       : '',

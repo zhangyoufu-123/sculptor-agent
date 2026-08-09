@@ -14,6 +14,7 @@ import { knowledgeBrief } from './knowledge.js';
 import { reviewOutline } from './outline-review.js';
 import { pulseAfterOutline, pushPulseToState } from './style-pulse.js';
 import { refreshStyleVector } from './style-vector.js';
+import { buildSearchQueries, requestHostSearch, pendingDataNeeds } from './rag.js';
 
 export function styleSummary(file) {
   try {
@@ -161,11 +162,36 @@ export async function generateOutline(cfg, wsDir) {
   state.outline = outline;
   // 修正已吸收进大纲，清空避免后续重写重复应用
   if (state.blueprint) state.blueprint.corrections = [];
+
+  // 实时取数：大纲里没有挂素材/标注"需补充素材"的节 → 自动排队检索（宿主代检，非阻塞）。
+  const queries = [];
+  for (const s of outline.sections) {
+    const mats = s.materials || [];
+    const gap = !mats.length || mats.some((m) => /需补充素材|补充素材/.test(String(m)));
+    if (!gap) continue;
+    for (const q of buildSearchQueries(
+      `${outline.title || ''} ${s.heading || ''} ${s.thesis || ''}`,
+      { topic: state.confirmed?.topic || '', limit: 3 },
+    )) {
+      if (queries.length < 6 && !queries.includes(q)) queries.push(q);
+    }
+  }
+  const dataRequests = { queued: 0 };
+  if (queries.length) {
+    const existing = pendingDataNeeds(workspace);
+    const fresh = queries.filter((q) => !existing.some((p) => p.queries?.includes(q)));
+    if (fresh.length) {
+      const req = requestHostSearch(workspace, fresh, { purpose: 'outline-gap' });
+      dataRequests.queued = req.queued;
+      dataRequests.queries = fresh;
+      state.summary += `（有 ${req.queued} 条资料请求待宿主检索，回灌后我会补进对应节）`;
+    }
+  }
   ws.writeState(workspace, state);
   const memoryFile = path.join(workspace, 'vault', 'project-memory', `outline-${Date.now()}.json`);
   fs.writeFileSync(
     memoryFile,
     JSON.stringify({ ...outline, generatedAt: ws.nowIso() }, null, 2) + '\n',
   );
-  return { outline, state, memoryFile };
+  return { outline, state, memoryFile, dataRequests };
 }

@@ -51,6 +51,72 @@ export function requestHostSearch(workspace, queries, { purpose = 'fact-check' }
   return { queued: queries.length, requestId };
 }
 
+/** 待办检索请求（status=pending，尚未回灌）。 */
+export function pendingDataNeeds(workspace) {
+  try {
+    return fs
+      .readFileSync(path.join(workspace, 'protocol', 'requests.jsonl'), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => {
+        try {
+          return JSON.parse(l);
+        } catch {
+          return null;
+        }
+      })
+      .filter((r) => r && r.type === 'web-search' && r.status === 'pending')
+      .map((r) => ({
+        requestId: r.requestId,
+        purpose: r.purpose,
+        queries: r.queries,
+        ts: r.ts,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 素材缺口（按文体）：论文/报告/新闻稿必须有可查证的文献、数据或来源。
+ * 缺口存在 → 返回需要补什么；已有可查证素材 → 不需要。
+ */
+export function dataGap(state) {
+  const g = String(state?.confirmed?.genre || '');
+  const needsData = /学术论文|报告|新闻稿/.test(g);
+  if (!needsData) return { needed: false, missing: [] };
+  const materials = state?.materials || [];
+  const verifiable = materials.some((m) =>
+    /[0-9０-９]|《|来源|数据|研究|文献|调查|报告|发表|统计|https?:/.test(String(m)),
+  );
+  if (verifiable) return { needed: false, missing: [] };
+  return { needed: true, missing: ['可查证的文献/数据/来源（数字、引文、报告、链接）'] };
+}
+
+/**
+ * 澄清中的"实时取数"提议：题材需要数据且素材不足 → 自动排队一次检索请求
+ * （宿主代检，非阻塞、可拒绝；已有 pending 同款请求则不重复排队）。
+ */
+export function dataSuggestion(state, workspace, { sessionAsked = false } = {}) {
+  if (sessionAsked) return '';
+  const gap = dataGap(state);
+  if (!gap.needed) return '';
+  const topic = String(state.confirmed?.topic || '').trim();
+  const queries = topic
+    ? [`${topic} 文献 数据 研究现状`, topic]
+    : ['研究文献 数据'];
+  const existing = pendingDataNeeds(workspace);
+  const dup = existing.some(
+    (p) => p.purpose === 'clarify-data' && p.queries?.some((q) => q.includes(topic.slice(0, 8))),
+  );
+  if (!dup) requestHostSearch(workspace, queries, { purpose: 'clarify-data' });
+  const g = state.confirmed?.genre || '论文';
+  return (
+    `（这篇${g}需要可查证的资料支撑。我已自动排队检索「${queries[0]}」的文献与数据——` +
+    '宿主/协作 agent 检索后回灌，我会把结果补进素材再继续；你直接给我文献、数据或链接也行。）'
+  );
+}
+
 /** 通路 2：直连检索端点（可选）。约定 POST {endpoint}/search {queries} → {results:[{query,results:[...]}]}。 */
 export async function searchOnline(cfg, queries) {
   if (!cfg.ragEndpoint || !cfg.ragApiKey) {
@@ -112,6 +178,22 @@ export function ingestSearchResults(workspace, results) {
   }
   writeCache(workspace, entries);
   ws.writeState(workspace, state);
+  // 回灌完成 → 待办检索标记 done（重写 requests.jsonl，保留历史）
+  try {
+    const reqFile = path.join(workspace, 'protocol', 'requests.jsonl');
+    const lines = fs.readFileSync(reqFile, 'utf8').split('\n').filter(Boolean);
+    const next = lines.map((l) => {
+      try {
+        const r = JSON.parse(l);
+        return r.type === 'web-search' && r.status === 'pending'
+          ? JSON.stringify({ ...r, status: 'done', doneAt: ws.nowIso() })
+          : l;
+      } catch {
+        return l;
+      }
+    });
+    fs.writeFileSync(reqFile, next.join('\n') + '\n');
+  } catch {}
   ws.logContext(workspace, 'rag', `回灌 ${added} 条检索结果 → rag-cache.json + 素材`);
   return { ingested: added, cached: entries.length };
 }
@@ -127,4 +209,16 @@ export function ragStatus(workspace, cfg = {}) {
     endpoint: cfg.ragEndpoint || '',
     cacheFile: path.join(workspace, 'vault', CACHE_FILE),
   };
+}
+
+/** 从写作文本解析"素材不足"标注（EXPAND_PROMPT 约定：【素材不足：还需要××】）。 */
+export function parseDataNeed(text) {
+  const out = [];
+  const re = /【素材不足[:：]?\s*([^】]{2,60})】/g;
+  let m;
+  while ((m = re.exec(String(text || '')))) {
+    const v = m[1].trim();
+    if (v && !out.includes(v)) out.push(v);
+  }
+  return out;
 }

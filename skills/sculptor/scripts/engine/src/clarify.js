@@ -22,6 +22,7 @@ import {
   normTitle,
   markAsked,
 } from './knowledge.js';
+import { dataSuggestion } from './rag.js';
 
 const LOW_WILL = /没(有|什么)?更多|你决定|你自己决定|就这样|先这样|可以了|够了|你看着办/;
 const NEED_LABELS = {
@@ -473,6 +474,12 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
   } else {
     state.knowledgeSuggestion = '';
   }
+  // 实时取数提议（非阻塞）：论文/报告/新闻稿素材不足 → 自动排队检索一次。
+  const dataSuggest = dataSuggestion(state, workspace, {
+    sessionAsked: Boolean(state.dataGenericAsked),
+  });
+  if (dataSuggest) state.dataGenericAsked = true;
+  state.dataSuggestion = dataSuggest || '';
   // 合并 LLM 读出的蓝图增量，让"整篇文章"在澄清中持续生长。
   if (next.blueprintUpdate) {
     const u = next.blueprintUpdate;
@@ -499,6 +506,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     materials: state.materials,
     blueprint: state.blueprint,
     knowledgeSuggestion: state.knowledgeSuggestion || '',
+    dataSuggestion: state.dataSuggestion || '',
     style: styleProgress(workspace),
     stylePulse: lastInput
       ? { summary: clarifyPulse?.summary || '', suggestion: clarifyPulse?.suggestion || '' }
@@ -545,6 +553,7 @@ export async function clarifyInteractive(cfg, wsDir) {
       if (next.options?.length)
         prompt += `\n选项: ${next.options.map((o, i) => `${'ABC'[i]}. ${o}`).join('  ')}`;
       if (next.knowledgeSuggestion) prompt += `\n${next.knowledgeSuggestion}`;
+      if (next.dataSuggestion) prompt += `\n${next.dataSuggestion}`;
       const answer = await ask(prompt + '\n> ');
       if (LOW_WILL.test(answer)) lowWill += 1;
       else lowWill = 0;

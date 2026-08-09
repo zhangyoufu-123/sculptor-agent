@@ -38,6 +38,7 @@ import {
   searchOnline,
   ingestSearchResults,
   requestHostSearch,
+  pendingDataNeeds,
   ragStatus,
 } from './rag.js';
 import { originalityScan } from './originality.js';
@@ -229,6 +230,15 @@ const TOOLS = [
         results: { type: 'array', items: { type: 'object' } },
         file: { type: 'string' },
       },
+    },
+  },
+  {
+    name: 'data_needs',
+    description:
+      '查看当前工作区待办的资料检索请求与素材缺口（Sculptor 主导写作、请求数据；宿主/学术/数据分析 agent 据此供给并回灌）。返回 [{requestId,purpose,queries}]。',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace: { type: 'string' } },
     },
   },
   {
@@ -595,6 +605,20 @@ async function callTool(name, args, cfg) {
       }
       const r = ingestSearchResults(w, results || []);
       return { text: `已回灌 ${r.ingested} 条检索结果（缓存 ${r.cached} 条）` };
+    }
+    case 'data_needs': {
+      const w = wsDir(args, cfg);
+      ws.ensureWorkspace(w);
+      const needs = pendingDataNeeds(w);
+      return {
+        text: needs.length
+          ? `待办资料检索 ${needs.length} 组：\n` +
+            needs
+              .map((n, i) => `${i + 1}. [${n.purpose}] ${(n.queries || []).join(' / ')}`)
+              .join('\n')
+          : '（当前没有待办检索——需要数据时会自动写入 requests.jsonl 并提示）',
+        needs,
+      };
     }
     case 'originality': {
       const w = wsDir(args, cfg);

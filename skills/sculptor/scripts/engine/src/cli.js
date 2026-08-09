@@ -77,6 +77,7 @@ import {
   searchOnline,
   ingestSearchResults,
   requestHostSearch,
+  pendingDataNeeds,
   ragStatus,
 } from './rag.js';
 import { originalityScan } from './originality.js';
@@ -149,7 +150,7 @@ const HELP = `Sculptor Agent v0.17 — 完整写作 Agent（导演模式 · 四�
   sculptor export --html out.html / --srt out.srt / --pdf out.pdf [工作区]  导出 HTML / 字幕 SRT / PDF
   sculptor cite "<json条目或数组>" [--style gbt7714|apa] [--file refs.json]  生成参考文献（期刊/图书/网页/报纸/论文/报告）
   sculptor citations [--file x.md] [--append refs.json] [工作区]  提取文中《引文》清单；--append 把参考文献附录追加到草稿
-  sculptor rag [status|search|ingest] [工作区]  联网检索：search 生成查询并直连/排队宿主代检；ingest <results.json> 回灌缓存与素材
+  sculptor rag [status|search|ingest|needs] [工作区]  联网检索：search 生成查询并直连/排队宿主代检；ingest <results.json> 回灌缓存与素材；needs 查看待办资料请求
   sculptor originality [--file x.md] [工作区]   原创性检查：文内重复句/与个人库自我复用/模板句（内置质量门，交付前自动执行）
   sculptor review [--fix] [--quick] [--file x.md] [工作区]  深度审阅：红队+校对+事实+原创+风格保真+读者交锋 → P0/P1/P2；--fix 一键修复 P0
   sculptor absorb <工作区> <edit.json>   吸收定点修改进风格档案
@@ -375,6 +376,17 @@ export async function runCli(argv, io = {}) {
             console.log(`已排队 ${r.queued} 条宿主检索请求（${r.requestId}）→ requests.jsonl`);
             console.log('宿主检索后用: sculptor rag ingest <results.json> 回灌');
           }
+        } else if (sub === 'needs') {
+          const needs = pendingDataNeeds(w);
+          if (!needs.length) {
+            console.log('（当前没有待办检索——需要数据时 Sculptor 会自动排队并提示）');
+            break;
+          }
+          console.log(`待办资料检索 ${needs.length} 组（供宿主/学术/数据分析 agent 供给）：`);
+          for (const n of needs) {
+            console.log(`  [${n.purpose}] ${(n.queries || []).join(' / ')}`);
+          }
+          console.log('检索后运行: sculptor rag ingest <results.json> 回灌');
         } else {
           const st = ragStatus(w, cfg);
           console.log(

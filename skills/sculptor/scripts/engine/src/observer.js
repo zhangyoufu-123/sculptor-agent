@@ -9,12 +9,18 @@ const POSITIVE = [
     label: '长文写作',
   },
   {
+    re: /文献|引用|参考文献|查资料|数据支撑|资料查证|GB\/T ?7714|APA|学术规范|论证严密/,
+    weight: 2.5,
+    label: '学术/数据',
+  },
+  {
     re: /润色|改写|重写|文笔|风格|像.*写的|要有我的风格|AI味|假大空|读起来|通顺/,
     weight: 2.5,
     label: '风格/质量',
   },
   { re: /大纲|立意|论点|结构|分几段|怎么展开|升华|素材/, weight: 2, label: '写作结构' },
   { re: /改一下|这句|这段|哪一句|哪一段|这里/, weight: 2, label: '定点修改' },
+  { re: /公文|通知|请示|批复|函|纪要|报告|方案|合同|协议|致辞/, weight: 2, label: '公文/文书' },
 ];
 
 const NEGATIVE = [
@@ -57,15 +63,36 @@ export function probeTask(text) {
     ? 'none'
     : isPointEdit
       ? 'point-edit'
-      : reasons.includes('长文写作')
-        ? 'clarify'
-        : reasons.includes('风格/质量')
-          ? 'style'
-          : reasons.includes('写作结构')
-            ? 'outline'
-            : 'clarify';
-  const offer = triggered
-    ? `这是${reasons.join('、')}任务，Sculptor 可以承接（从 ${entry} 起步：${entry === 'clarify' ? '先澄清立意与论点再成稿' : entry === 'outline' ? '先搭立意-论点-节结构' : entry === 'point-edit' ? '只改你选中的那一处' : '先提取你的风格'}）。要我接手吗？一句话即可，不接也没关系。`
+      : reasons.includes('学术/数据')
+        ? 'academic'
+        : reasons.includes('公文/文书')
+          ? 'official'
+          : reasons.includes('长文写作')
+            ? 'creative'
+            : reasons.includes('风格/质量')
+              ? 'style'
+              : reasons.includes('写作结构')
+                ? 'outline'
+                : 'clarify';
+  const suggest = triggered
+    ? isPointEdit
+      ? 'point-edit'
+      : 'agent'
     : '';
-  return { triggered, confidence, reasons, negatives, entry, offer };
+  const offer = triggered
+    ? `这是${reasons.join('、')}任务，Sculptor 可以承接（从 ${entry} 起步：${
+        entry === 'academic'
+          ? '按学术规范澄清研究问题/论点/文献数据，写带引用与参考文献的论文'
+          : entry === 'official'
+            ? '按公文/文书范式澄清事由/对象/依据/事项，产出规范文稿'
+            : entry === 'creative'
+              ? '先澄清立意与论点再成稿'
+              : entry === 'outline'
+                ? '先搭立意-论点-节结构'
+                : entry === 'point-edit'
+                  ? '只改你选中的那一处'
+                  : '先提取你的风格'
+      }）。要我接手吗？一句话即可，不接也没关系。`
+    : '';
+  return { triggered, confidence, reasons, negatives, entry, suggest, offer };
 }
