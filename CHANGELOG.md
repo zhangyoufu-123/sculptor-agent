@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-09（产品方向收敛）
+
+- **放弃应用路线**：删除独立 Web 应用（sculptor-app）与桌面 IDE（agent-studio）及全部应用产物/文档；
+  本仓库（引擎 / CLI / skill / MCP）即产品，专注把 agent 做深做透并开源分发。
+
 ## 2026-08-07（仓库结构）
 
 - **Web 前端从本仓库移除**：拆分为独立应用仓库 `sculptor-app`（`../sculptor-app`，面向非技术用户，
