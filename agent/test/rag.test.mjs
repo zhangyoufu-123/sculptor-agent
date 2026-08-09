@@ -12,6 +12,7 @@ import {
   ingestSearchResults,
   parseDataNeed,
   ragStatus,
+  autoReferences,
 } from '../src/rag.js';
 
 let failures = 0;
@@ -86,6 +87,24 @@ const req = requestHostSearch(wsDir, ['芬兰教育改革 数据', '可汗学院
 check('写作缺口排队', req.queued === 2);
 needs = pendingDataNeeds(wsDir);
 check('待办含 write-gap', needs.some((n) => n.purpose === 'write-gap'));
+
+// ── 自动参考文献草稿 ────────────────────────────────────
+const ref = autoReferences(wsDir, { style: 'gbt7714' });
+check(
+  '从检索回灌来源生成参考文献草稿',
+  ref.file.includes('references.md') && ref.refs >= 1,
+  ref.file,
+);
+if (ref.file) {
+  const refText = fs.readFileSync(ref.file, 'utf8');
+  check(
+    '参考文献含来源标题与格式',
+    refText.includes('AI 与教育变革') && refText.includes('[EB/OL]'),
+    refText.split('\n').slice(0, 3).join(' '),
+  );
+}
+const stateAfter = ws.readState(wsDir);
+check('回灌写入 ragIngestedAt', Boolean(stateAfter.ragIngestedAt));
 
 console.log(`\n${failures === 0 ? '✓ RAG 实时取数测试全部通过' : `✗ ${failures} 项失败`}`);
 process.exit(failures === 0 ? 0 : 1);

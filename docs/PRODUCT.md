@@ -171,5 +171,5 @@ node .codex/skills/sculptor/scripts/sculptor.mjs agent   # 导演模式，主导
 
 ## 九、路线图
 
-- **已落地（v0.8–v0.19）**：风格保真闭环、大纲评审、公文国标、读者交锋、持续微调管线、事实核查、语音口述、多格式导出、校对、联网 RAG、改写矩阵、版本快照、全局风格档案、引文管理、静默质量门、**个人知识库**（读过的书/去过的地方/自己的构想：归纳式一问 + 只问一次 + 轮换注入，`sculptor knowledge` 可管理）、**主导式协作**（写作生态位内 Sculptor 自主决策，宿主/学术/数据分析 agent 作为数据供给方，`probe` 给出 academic/official/creative/point-edit 细分入口与启动建议）、**实时取数**（澄清/大纲/写作三处自动排队检索：clarify-data / outline-gap / write-gap，`rag needs` + `rag_ingest` 闭环，回灌进素材、去重不阻塞）。
+- **已落地（v0.8–v0.20）**：风格保真闭环、大纲评审、公文国标、读者交锋、持续微调管线、事实核查、语音口述、多格式导出、校对、联网 RAG、改写矩阵、版本快照、全局风格档案、引文管理、静默质量门、**个人知识库**（读过的书/去过的地方/自己的构想：归纳式一问 + 只问一次 + 轮换注入，`sculptor knowledge` 可管理）、**主导式协作**（写作生态位内 Sculptor 自主决策，宿主/学术/数据分析 agent 作为数据供给方，`probe` 给出 academic/official/creative/point-edit 细分入口与启动建议）、**实时取数**（澄清/大纲/写作三处自动排队检索：clarify-data / outline-gap / write-gap，`rag needs` + `rag_ingest` 闭环，回灌进素材、去重不阻塞）、**数据回灌自动续写**（回灌晚于写作 → 交付前自动重写【素材不足】节并重新审计）、**自动参考文献草稿**（学术论文交付自动生成 references.md，`sculptor citations --auto` 可手动触发）。
 - **可选（P2）**：流式输出、TTS 听读、PPT 联动、模板市集、多语言翻译——按真实场景按需补，不碰写作主线。

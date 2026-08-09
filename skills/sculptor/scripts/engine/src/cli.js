@@ -149,7 +149,7 @@ const HELP = `Sculptor Agent v0.17 — 完整写作 Agent（导演模式 · 四�
   sculptor export --academic [--docx out.docx] [工作区]  按学术论文排版导出 docx（宋体小四/黑体标题）
   sculptor export --html out.html / --srt out.srt / --pdf out.pdf [工作区]  导出 HTML / 字幕 SRT / PDF
   sculptor cite "<json条目或数组>" [--style gbt7714|apa] [--file refs.json]  生成参考文献（期刊/图书/网页/报纸/论文/报告）
-  sculptor citations [--file x.md] [--append refs.json] [工作区]  提取文中《引文》清单；--append 把参考文献附录追加到草稿
+  sculptor citations [--file x.md] [--append refs.json] [--auto] [工作区]  提取文中《引文》清单；--append 追加参考文献到草稿；--auto 从检索回灌来源生成参考文献草稿
   sculptor rag [status|search|ingest|needs] [工作区]  联网检索：search 生成查询并直连/排队宿主代检；ingest <results.json> 回灌缓存与素材；needs 查看待办资料请求
   sculptor originality [--file x.md] [工作区]   原创性检查：文内重复句/与个人库自我复用/模板句（内置质量门，交付前自动执行）
   sculptor review [--fix] [--quick] [--file x.md] [工作区]  深度审阅：红队+校对+事实+原创+风格保真+读者交锋 → P0/P1/P2；--fix 一键修复 P0
@@ -906,7 +906,15 @@ export async function runCli(argv, io = {}) {
       case 'citations': {
         const w = ws.resolveWorkspace(cfg, workspace);
         ws.ensureWorkspace(w);
-        if (flags.append) {
+        if (flags.auto) {
+          const { autoReferences } = await import('./rag.js');
+          const r = autoReferences(w, { style: flags.style ? String(flags.style) : 'gbt7714' });
+          console.log(
+            r.file
+              ? `已从检索回灌来源生成参考文献草稿（${r.refs} 条，${flags.style || 'gbt7714'}）→ ${r.file}`
+              : '（没有检索回灌的来源，无法自动生成；可先 sculptor rag ingest）',
+          );
+        } else if (flags.append) {
           const draft = path.join(w, 'draft.md');
           if (!fs.existsSync(draft)) throw new Error('没有 draft.md，先 sculptor write');
           const style = flags.style ? String(flags.style) : 'gbt7714';

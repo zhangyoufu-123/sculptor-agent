@@ -9,7 +9,7 @@ import readline from 'node:readline';
 import * as ws from './workspace.js';
 import { clarifyStep, missingNeed } from './clarify.js';
 import { generateOutline } from './outline.js';
-import { writeSection } from './write.js';
+import { writeSection, detectDraftGaps } from './write.js';
 import { redteam } from './redteam.js';
 import { runAudience, renderAudience, runDebate, renderDebate } from './reader-gallery.js';
 import { restyle } from './restyle.js';
@@ -20,7 +20,7 @@ import { distillStyleAdapter, adapterStale } from './style-adapter.js';
 import { factScan } from './fact-check.js';
 import { proofScan } from './proofread.js';
 import { originalityScan } from './originality.js';
-import { buildSearchQueries, requestHostSearch } from './rag.js';
+import { buildSearchQueries, requestHostSearch, autoReferences } from './rag.js';
 import { evaluateStyleFidelity } from './style-eval.js';
 import { archiveDraft, distillCategory } from './library.js';
 import { exportDocx } from './io.js';
@@ -239,6 +239,33 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     ws.writeState(workspace, state);
   }
 
+  // ── 回灌后自动续写：检索结果晚于最后写作，且稿中仍有【素材不足】节 → 用新素材重写 ──
+  if (d.stage === 'rewrite_gaps') {
+    const gaps = d.rewriteGaps || [];
+    let rewritten = 0;
+    const failed = [];
+    for (const g of gaps) {
+      if (g.index === null) continue;
+      try {
+        await writeSection(cfg, workspace, { index: g.index });
+        rewritten += 1;
+      } catch {
+        failed.push(g.heading);
+      }
+    }
+    ({ state, d } = load());
+    d.stage = 'redteam';
+    d.fixAttempts = 0;
+    ws.writeState(workspace, state);
+    return {
+      kind: 'working',
+      message: `已用回灌资料重写 ${rewritten} 个缺口节${
+        failed.length ? `，${failed.length} 节未能重写（${failed.join('、')}，可能被外部改过）` : ''
+      }，重新反 AI 审计…`,
+      phase: 'redteam',
+    };
+  }
+
   // ── 红队：审计 + 自动修订，最多 3 次 ──────────────────
   if (d.stage === 'redteam') {
     const rr = await redteam(cfg, workspace, { fix: d.fixAttempts < 3 });
@@ -372,6 +399,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     state.proofread = { total: prCount, ts: ws.nowIso() };
     // 学术论文交付：提示引文整理（确定性检测《书名》，格式由 sculptor citations 生成）
     let citeNote = '';
+    let refFile = '';
     try {
       if (/学术论文/.test(state.confirmed?.genre || '')) {
         const draftText = fs.readFileSync(ar.file, 'utf8');
@@ -379,6 +407,8 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
         if (cited.length) {
           citeNote = `检测到 ${cited.length} 处引文（${cited.join('、').slice(0, 80)}…）。运行 \`sculptor citations --append refs.json\` 可生成 GB/T 7714 参考文献并追加到文末。`;
         }
+        const ar = autoReferences(workspace, { style: 'gbt7714' });
+        if (ar.file) refFile = ar.file;
       }
     } catch {}
     d.stage = 'deliver';
@@ -392,13 +422,31 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       distilled: distilled || '',
       audience: rendered,
       debate: debateRendered,
-      message: `整篇文章已完成：逐节写作（每节风格脉搏已即时反馈）→ 反 AI 审计 → 读者群像 → 交锋。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}${adapterNote}。${docx ? `已导出 ${docx}。` : ''}${prCount ? `⚠ 校对：${prCount} 处提示（错别字/标点，运行 sculptor proofread 看明细）。` : ''}${fcVerify ? `⚠ 事实核查：${fcVerify} 处数字/年代/引文需核对（运行 sculptor fact-check 看明细）。` : ''}${citeNote ? `\n${citeNote}` : ''}要改某一句用 point-edit，要整体换风格或表达直接说（如"更克制一点"），我会吸收进风格档案并重写。`,
+      message: `整篇文章已完成：逐节写作（每节风格脉搏已即时反馈）→ 反 AI 审计 → 读者群像 → 交锋。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}${adapterNote}。${docx ? `已导出 ${docx}。` : ''}${refFile ? `已自动生成参考文献草稿 ${refFile}（基于检索回灌来源；运行 \`sculptor citations\` 可校对格式）。` : ''}${prCount ? `⚠ 校对：${prCount} 处提示（错别字/标点，运行 sculptor proofread 看明细）。` : ''}${fcVerify ? `⚠ 事实核查：${fcVerify} 处数字/年代/引文需核对（运行 sculptor fact-check 看明细）。` : ''}${citeNote ? `\n${citeNote}` : ''}要改某一句用 point-edit，要整体换风格或表达直接说（如"更克制一点"），我会吸收进风格档案并重写。`,
       next: 'sculptor redteam / sculptor audience / sculptor debate / sculptor fact-check / sculptor point-edit',
     };
   }
 
   // ── 交付后：用户的方向/修改建议都是评估反馈 → 吸收进档案后重写 ──
   if (d.stage === 'deliver') {
+    // 回灌后自动续写：检索结果晚于最后一次写作，且稿中仍有【素材不足】节 → 先重写再重新审计交付
+    const lastWrite = state.lastWriteAt || '';
+    const lastIngest = state.ragIngestedAt || '';
+    if (lastIngest && lastWrite && lastIngest > lastWrite) {
+      const rewritable = detectDraftGaps(workspace).filter((g) => g.index !== null);
+      if (rewritable.length) {
+        d.stage = 'rewrite_gaps';
+        d.rewriteGaps = rewritable;
+        ws.writeState(workspace, state);
+        return {
+          kind: 'working',
+          message: `检索资料已回灌，检测到 ${rewritable.length} 个缺口节（${rewritable
+            .map((g) => g.heading)
+            .join('、')}），正在用新素材重写…`,
+          phase: 'rewrite',
+        };
+      }
+    }
     const corr = applyCorrectionFeedback(workspace, lastInput);
     const dir = applyStyleDirection(workspace, lastInput);
     if (corr.applied || dir.applied) {

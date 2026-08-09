@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as ws from './workspace.js';
-import { extractCitations } from './citation.js';
+import { extractCitations, formatReferences } from './citation.js';
 
 const CACHE_FILE = 'rag-cache.json';
 const CACHE_MAX = 100;
@@ -177,6 +177,7 @@ export function ingestSearchResults(workspace, results) {
     added += 1;
   }
   writeCache(workspace, entries);
+  state.ragIngestedAt = ws.nowIso(); // 供"回灌后自动重写缺口节"判断时序
   ws.writeState(workspace, state);
   // 回灌完成 → 待办检索标记 done（重写 requests.jsonl，保留历史）
   try {
@@ -221,4 +222,37 @@ export function parseDataNeed(text) {
     if (v && !out.includes(v)) out.push(v);
   }
   return out;
+}
+
+/**
+ * 自动参考文献草稿：从检索缓存（rag-cache.json）的来源生成 web 条目（GB/T 7714 / APA），
+ * 写入工作区 references.md。结构化条目仍需用户核对（sculptor citations 可追加/校对）。
+ */
+export function autoReferences(workspace, { style = 'gbt7714' } = {}) {
+  const entries = readCache(workspace);
+  const refs = [];
+  for (const e of entries) {
+    for (const h of e.results || []) {
+      const title = String(h.title || '').trim();
+      if (!title || refs.some((r) => r.title === title)) continue;
+      refs.push({
+        type: 'web',
+        title,
+        site: String(h.source || '').trim(),
+        url: String(h.url || '').trim(),
+        year: h.year ? Number(h.year) : undefined,
+        accessDate: new Date().toISOString().slice(0, 10),
+      });
+    }
+  }
+  if (!refs.length) return { file: '', refs: [] };
+  const text =
+    '## 参考文献（草稿：来自检索回灌来源，请用 sculptor citations 校对格式）\n\n' +
+    formatReferences(refs, style)
+      .map((l) => `${l}\n`)
+      .join('') +
+    '\n';
+  const file = path.join(workspace, 'references.md');
+  fs.writeFileSync(file, text, { mode: 0o600 });
+  return { file, refs: refs.length };
 }

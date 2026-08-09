@@ -1,5 +1,6 @@
 // 全链路 e2e（进程内）：fetch stub + 模拟 LLM，跑通 init→clarify→outline→write→redteam→fix→dissect + MCP。
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -1712,6 +1713,63 @@ try {
       .split('\n')
       .some((l) => l.includes('"status": "pending"'));
     check('回灌后待办标记完成', stillPending === false);
+    process.env.SCULPTOR_WORKSPACE = prevWs;
+  }
+
+  // 14. 回灌后自动续写：交付态检测到【素材不足】节 + 回灌晚于写作 → 自动重写并重新审计
+  {
+    const rwWs = path.join(root, 'rewrite-ws');
+    const prevWs = process.env.SCULPTOR_WORKSPACE;
+    fs.mkdirSync(rwWs, { recursive: true });
+    process.env.SCULPTOR_WORKSPACE = rwWs;
+    r = await run(['init']);
+    const draftText =
+      '## 三、数据缺口\n\n本节需要真实数据支撑【素材不足：还需要 2025 年 AI 教育统计】\n';
+    fs.writeFileSync(path.join(rwWs, 'draft.md'), draftText);
+    const st = JSON.parse(
+      fs.readFileSync(path.join(rwWs, 'protocol', 'state.json'), 'utf8'),
+    );
+    st.phase = 'deliver';
+    st.director = { stage: 'deliver', writeIndex: 0, outlineRegens: 0, fixAttempts: 0, qualityFixAttempts: 0 };
+    st.outline = {
+      title: 'AI 教育公平研究',
+      sections: [
+        {
+          heading: '三、数据缺口',
+          function: '细节',
+          thesis: '数据支撑论点',
+          words: 300,
+          keyPoints: ['数据'],
+          materials: ['旧素材'],
+        },
+      ],
+    };
+    st.outlineConfirmed = true;
+    st.confirmed = { topic: 'AI 教育公平', genre: '学术论文' };
+    st.materials = ['[检索 AI教育公平 文献] AI 教育的公平性研究（教育学报）'];
+    st.lastDraftHash = createHash('sha1').update(draftText).digest('hex').slice(0, 16);
+    st.lastWriteAt = '2026-01-01T00:00:00.000Z';
+    st.ragIngestedAt = '2026-08-09T00:00:00.000Z';
+    fs.writeFileSync(
+      path.join(rwWs, 'protocol', 'state.json'),
+      JSON.stringify(st, null, 2) + '\n',
+    );
+    r = await run(['agent', '--once']);
+    const step1 = JSON.parse(r.out);
+    check(
+      '回灌后自动进入缺口重写',
+      step1.kind === 'working' && step1.phase === 'rewrite',
+      r.out.slice(0, 90),
+    );
+    r = await run(['agent', '--once']);
+    const step2 = JSON.parse(r.out);
+    const draftAfter = fs.readFileSync(path.join(rwWs, 'draft.md'), 'utf8');
+    check('缺口节已被重写（素材不足标注消失）', !draftAfter.includes('素材不足'));
+    check(
+      '重写后重新进入反 AI 审计',
+      step2.kind === 'working' && step2.phase === 'redteam',
+      r.out.slice(0, 60),
+    );
     process.env.SCULPTOR_WORKSPACE = prevWs;
   }
 } finally {

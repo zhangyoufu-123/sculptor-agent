@@ -21,6 +21,30 @@ function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
 }
 
+/**
+ * 检测成稿中仍带【素材不足】标注的节（回灌后自动重写的依据）。
+ * 返回 [{heading, index}]，index 为 outline.sections 中的位置；定位不到时 index=null。
+ */
+export function detectDraftGaps(workspace) {
+  let text = '';
+  try {
+    text = fs.readFileSync(path.join(workspace, 'draft.md'), 'utf8');
+  } catch {
+    return [];
+  }
+  const state = ws.readState(workspace);
+  const sections = state.outline?.sections || [];
+  const gaps = [];
+  for (const block of text.split(/\n(?=## )/)) {
+    if (!/【素材不足/.test(block)) continue;
+    const heading = (block.match(/^##\s+(.+)$/m) || [])[1]?.trim();
+    if (!heading) continue;
+    const index = sections.findIndex((s) => s.heading === heading);
+    gaps.push({ heading, index: index >= 0 ? index : null });
+  }
+  return gaps;
+}
+
 export async function writeSection(cfg, wsDir, { index = null, force = false } = {}) {
   const workspace = ws.ensureWorkspace(wsDir);
   const state = ws.readState(workspace);
@@ -150,6 +174,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
   fs.writeFileSync(draftFile, parts.join(''));
   const total = report.reduce((s, r) => s + r.actual, 0);
   state.lastDraftHash = fileHash(parts.join(''));
+  state.lastWriteAt = ws.nowIso(); // 供"回灌后自动重写缺口节"判断时序
   state.summary = `全文完成：${sections.length} 节，实际 ${total} 字（目标 ${targetWords} 字）`;
   state.nextStep = '运行 sculptor redteam 做反 AI 审计';
   ws.writeState(workspace, state);

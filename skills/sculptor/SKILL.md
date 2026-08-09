@@ -109,7 +109,10 @@ Codex `~/.codex/config.toml`（model_providers 的 `base_url` + `experimental_be
 4. 宿主/学术/数据分析 agent 用 `sculptor rag needs`（或 MCP `data_needs`）查看待办，
    检索后 `sculptor rag ingest <results.json>`（或 MCP `rag_ingest`）回灌 → 自动进素材；
 5. 请求只发一次（去重）、不阻塞：数据没回来照常推进，交付时提示缺口；回灌后待办标记完成。
-6. 学术论文交付时自动检测《引文》并提示用 `sculptor citations --append` 生成 GB/T 7714 参考文献。
+6. **回灌后自动续写**：若检索结果回灌晚于最后一次写作、且稿中仍有"【素材不足：还需要××】"的节，
+   导演在交付态自动重写这些节（用新素材），再走一遍反 AI 审计后才交付——用户无需手动重跑。
+7. 学术论文交付时自动检测《引文》并提示用 `sculptor citations --append` 生成 GB/T 7714 参考文献；
+   有检索回灌来源时自动生成参考文献草稿 `references.md`（`sculptor citations --auto` 可手动触发）。
 
 ### 多格式导出
 
