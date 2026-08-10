@@ -299,6 +299,17 @@ export function respond(messages) {
       keyPoints: ['石阶被磨亮了一百年', '历史从不缺席，只等一个人走进去', '百年征程波澜壮阔'],
     });
   }
+  if (userMsg.includes('【主题提炼】')) {
+    const m = userMsg.match(/用户开局说了：(.+?)\n/);
+    const startsCommand = /^(开始|写吧|开写|你看着办|随便|帮我写$|写吧$)/.test(String(m ? m[1] : ''));
+    const raw = String(m ? m[1] : '')
+      .replace(
+        /^(好|可以|行)?\s*(我)?(想|要|打算|希望)?\s*(帮我|麻烦|请)?\s*(写一?[篇份个]?|创作|起草|来[一篇份个]?|整[一篇份个]?)?\s*(关于|一篇|一份|一个|的)?\s*/,
+        '',
+      )
+      .replace(/[，。！？、\s]+$/, '');
+    return JSON.stringify({ topic: !startsCommand && raw.length >= 4 ? raw.slice(0, 40) : '' });
+  }
   if (userMsg.includes('【中译英】')) {
     return 'The stone steps have been polished for a hundred years. History never disappears; it only waits for someone to walk in.';
   }

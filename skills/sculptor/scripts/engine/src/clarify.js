@@ -453,6 +453,8 @@ function fieldDone(state, f) {
 
 /** 第一个未满足的蓝图字段（含收尾的蓝图确认）。 */
 function blueprintNeed(state) {
+  // 用户已明确放弃继续追问 → 不再问任何字段，直接进大纲（缺的写作时补）。
+  if (state.deferred) return '';
   for (const f of activeBlueprint(state)) {
     if (!fieldDone(state, f)) return f.key;
   }
@@ -569,24 +571,13 @@ function materialGate(state) {
   return true;
 }
 
-/** 用户明确想结束时，把未满足的必填项用占位补齐（写作时再补），绝不困住用户。 */
-function waiveMissingRequired(state) {
+/** 用户明确想结束时：标记"用户放弃"，后续大纲按现有信息生成（缺的写作时标注），绝不困住用户。 */
+function markDeferred(state) {
+  state.deferred = true;
   const c = state.confirmed || (state.confirmed = {});
   for (const f of activeBlueprint(state)) {
     if (!f.required || f.key === 'styleSample' || fieldDone(state, f)) continue;
-    const need = f.count || 1;
-    if (f.list === 'materials') {
-      const arr = state.materials || (state.materials = []);
-      for (let i = arr.length; i < need; i++) arr.push('（素材不足，写作时再补）');
-    } else if (f.list === 'arguments') {
-      const arr = c.arguments || (c.arguments = []);
-      for (let i = arr.length; i < need; i++) arr.push('（论点不足，写作时按论证链补全）');
-    } else if (f.list === 'items') {
-      const arr = c.items || (c.items = []);
-      for (let i = arr.length; i < need; i++) arr.push('（事项待补）');
-    } else {
-      c[f.key] = c[f.key] || '（用户放弃，写作时补全）';
-    }
+    if (!f.list) c[f.key] = c[f.key] || '（待定，写作时再补）';
   }
 }
 
@@ -644,7 +635,7 @@ async function askOnce(state, cfg, workspace) {
   // 低意愿早退（确定性护栏，不依赖 LLM 判断）：连续两次"没有更多/你决定/可以了"
   // → 直接进大纲。核心字段未齐也放行（缺失项占位，写作时再补），绝不困住用户。
   if ((state.lowWill || 0) >= 2) {
-    if (!coreReady) waiveMissingRequired(state);
+    if (!coreReady) markDeferred(state);
     return { stop: true, ready: true, question: null, lowWill: true };
   }
   // 意图理解刷新：每轮有新输入时提炼"我的理解/核心诉求/风险"，喂给追问设计师对齐后再问。
@@ -657,7 +648,9 @@ async function askOnce(state, cfg, workspace) {
     }
   }
   const style = workspace ? styleProgress(workspace) : null;
-  // v0.30：大纲缺口驱动提问——核心信息已齐、大纲未满时，问题由"最早未就绪的一节"决定。
+  // v0.35：大纲缺口驱动提问——定位缺口但**优先让 LLM 自然发问**（沿用用户原词、灵活生长），
+  // 确定性缺口问题只做 LLM 停摆时的最后兜底。代码定"问哪一节"，模型定"怎么问"。
+  let gapCtx = '';
   if (need === 'outlineGap') {
     const lo = ensureLiveOutline(state);
     // 同一缺口连续问过两次还没补上 → 自动放弃该项换下一缺口，绝不车轱辘。
@@ -675,8 +668,7 @@ async function askOnce(state, cfg, workspace) {
       const gapKey = `${gap.index}:${(gap.missing || []).join(',')}`;
       state.askedOutlineGaps[gapKey] = (state.askedOutlineGaps[gapKey] || 0) + 1;
       state.pendingOutlineGap = { index: gap.index, missing: gap.missing };
-      const q = gapQuestion(lo, gap, state);
-      return { ...q, ready: materialGate(state) };
+      gapCtx = `第 ${gap.index + 1} 节「${gap.heading || '未命名'}」还缺：${gap.missing.join('/')}`;
     }
   }
   // 确认题上用户说"再打磨一下"→ 确定性打磨问题（不依赖 LLM 临场发挥，绝不退回无关模板）。
@@ -730,6 +722,7 @@ async function askOnce(state, cfg, workspace) {
       activeBlueprint(state).find((f) => f.key === need)?.label ||
       NEED_LABELS[need] ||
       '素材细节',
+    ...(gapCtx ? { outlineGap: gapCtx } : {}),
     blueprintFields: activeBlueprint(state).map((f) => f.label).join(' → '),
     coreReady,
     styleNote: state.confirmed.styleNote || '',
@@ -756,8 +749,20 @@ async function askOnce(state, cfg, workspace) {
       { json: true, temperature: 0.7, maxTokens: 1000 },
     );
     const q = parseJsonContent(content, '追问');
-    if (q.stop && missingNeed(state) === '') {
-      return { stop: true, ready: materialGate(state), question: null };
+    if (q.stop) {
+      // 大纲缺口：LLM 说"该问的已问完"→ 用确定性缺口问题兜底；
+      // 全部维度走完 → 正常停止。
+      if (gapCtx) {
+        const lo = ensureLiveOutline(state);
+        const gap = nextOutlineGap(lo.progress);
+        if (gap) {
+          const g = gapQuestion(lo, gap, state);
+          return { ...g, ready: materialGate(state) };
+        }
+      }
+      if (missingNeed(state) === '') {
+        return { stop: true, ready: materialGate(state), question: null };
+      }
     }
     const question = String(q.question || '').trim();
     // 重复追问护栏（确定性）：LLM 与上一问同义/互相包含 → 换一个未确认维度问，绝不车轱辘。
@@ -772,6 +777,14 @@ async function askOnce(state, cfg, workspace) {
         (curQ.length >= 8 && curQ.includes(prevQ)));
     if (repeat) {
       state.repeatCount = (state.repeatCount || 0) + 1;
+      if (gapCtx) {
+        const lo = ensureLiveOutline(state);
+        const gap = nextOutlineGap(lo.progress);
+        if (gap) {
+          const g = gapQuestion(lo, gap, state);
+          return { ...g, ready: materialGate(state) };
+        }
+      }
       const f = nextFallback(state, need);
       const fb = f || fallbackFor(need, state);
       return {
@@ -789,31 +802,19 @@ async function askOnce(state, cfg, workspace) {
     //   a) ≥3 个问号；b) ≥2 个问号且两个分句指向不同维度（如"写多长？读者是谁？"）；
     //   c) 带编号/其次/另外/还有 的列举。同维度复述（"写多长？大概多少字？"）不算多问。
     const qMarks = (question.match(/[？?]/g) || []).length;
-    const DIM_CLASSES = [
-      /主题|写什么|想写/,
-      /读者|给谁|听众/,
-      /字数|多长|篇幅|多少字/,
-      /风格|写过|文风|旧稿/,
-      /素材|经历|画面|数据|引文|细节/,
-      /立意|中心意思|核心意思/,
-      /结尾|收尾|姿态/,
-      /情感|情绪|曲线|氛围/,
-      /论点|支撑|论证|观点/,
-      /大纲|开始写作|打磨/,
-    ];
-    const clauses = question.split(/[？?]/).map((s) => s.trim()).filter(Boolean);
-    const hitDims = new Set();
-    for (const c of clauses) {
-      for (let i = 0; i < DIM_CLASSES.length; i++) {
-        if (DIM_CLASSES[i].test(c)) hitDims.add(i);
-      }
-    }
     const multi =
       qMarks >= 3 ||
-      (qMarks >= 2 && hitDims.size >= 2) ||
       /(^|\n)\s*([1-9一二三四五六]、?\.?)\s*/.test(question) ||
       /另外|其次|最后，|同时|以及/.test(question);
     if (!question || multi) {
+      if (gapCtx) {
+        const lo = ensureLiveOutline(state);
+        const gap = nextOutlineGap(lo.progress);
+        if (gap) {
+          const g = gapQuestion(lo, gap, state);
+          return { ...g, ready: materialGate(state) };
+        }
+      }
       const f = fallbackFor(need, state);
       return {
         stop: false,
@@ -832,9 +833,18 @@ async function askOnce(state, cfg, workspace) {
       recommendation: q.recommendation,
       options: q.options || [],
       blueprintUpdate: q.blueprintUpdate || null,
+      outlineGap: Boolean(gapCtx),
     };
   } catch (err) {
     // LLM 不可用时的确定性兜底：按缺口依次问，绝不死循环。
+    if (gapCtx) {
+      const lo = ensureLiveOutline(state);
+      const gap = nextOutlineGap(lo.progress);
+      if (gap) {
+        const g = gapQuestion(lo, gap, state);
+        return { ...g, ready: materialGate(state) };
+      }
+    }
     const f = pickFallback(state, need);
     return {
       stop: false,
@@ -908,22 +918,41 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
       ws.logContext(workspace, 'clarify', `识别文体：${genre}`);
     }
     // 首轮主题预填（v0.35）：用户开局已说出主题，就不再重复问"你想写什么"。
-    // 只清理"帮我写一篇关于…"这类话术前缀，保留用户自己的说法；不匹配就不预填。
+    // LLM 优先提炼（自然语言理解），LLM 不可用时用启发式兜底；拿不准就不预填。
     if (lastInput && !state.lastQuestion && !state.confirmed?.topic) {
-      const cleaned = String(lastInput)
-        .trim()
-        .replace(
-          /^(好|可以|行)?\s*(我)?(想|要|打算|希望)?\s*(帮我|麻烦|请)?\s*(写一?[篇份个]?|创作|起草|来[一篇份个]?|整[一篇份个]?)?\s*(关于|一篇|一份|一个|的)?\s*/,
-          '',
-        )
-        .replace(/[，。！？、\s]+$/, '')
-        .slice(0, 40);
-      const startsCommand = /^(开始|写吧|开写|你看着办|随便|帮我写$|写吧$)/.test(
-        String(lastInput).trim(),
-      );
-      if (cleaned && cleaned.length >= 4 && !startsCommand) {
-        state.confirmed.topic = cleaned;
-        ws.logContext(workspace, 'clarify', `首轮预填主题：${cleaned.slice(0, 30)}`);
+      let topic = '';
+      try {
+        const content = await chatWithRetry(
+          cfg,
+          [
+            { role: 'system', content: '你是主题提炼器。只输出严格 JSON。' },
+            {
+              role: 'user',
+              content: `【主题提炼】\n用户开局说了：${String(lastInput).slice(0, 200)}\n\n如果这句话里给出了要写的主题/题目，提炼成 4-20 字的主题词（去掉"帮我写一篇关于"这类话术）；如果没有明确主题，输出 {"topic":""}。`,
+            },
+          ],
+          { json: true, temperature: 0.1, maxTokens: 200 },
+        );
+        const parsed = parseJsonContent(content, '主题提炼');
+        topic = String(parsed?.topic || '').trim().slice(0, 40);
+      } catch {}
+      if (!topic) {
+        // 启发式兜底（LLM 不可用）：去掉"帮我写一篇关于…"话术前缀。
+        topic = String(lastInput)
+          .trim()
+          .replace(
+            /^(好|可以|行)?\s*(我)?(想|要|打算|希望)?\s*(帮我|麻烦|请)?\s*(写一?[篇份个]?|创作|起草|来[一篇份个]?|整[一篇份个]?)?\s*(关于|一篇|一份|一个|的)?\s*/,
+            '',
+          )
+          .replace(/[，。！？、\s]+$/, '')
+          .slice(0, 40);
+        if (/^(开始|写吧|开写|你看着办|随便|帮我写$|写吧$)/.test(String(lastInput).trim())) {
+          topic = '';
+        }
+      }
+      if (topic && topic.length >= 4) {
+        state.confirmed.topic = topic;
+        ws.logContext(workspace, 'clarify', `首轮预填主题：${topic.slice(0, 30)}`);
       }
     }
     // 多模态输入：用户给出文件路径（docx/xlsx/图片/md）→ 提取成文本素材。
@@ -954,7 +983,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
       );
     if (explicitStart) {
       // 用户明确拍板开始写作 → 素材未齐也放行（缺失项占位，写作时再补）。
-      if (!materialGate(state)) waiveMissingRequired(state);
+      if (!materialGate(state)) markDeferred(state);
       state.confirmed.outlineConfirmed = true;
       state.confirmed.blueprintConfirmed = true;
       if (state.liveOutline) state.liveOutline.complete = true;

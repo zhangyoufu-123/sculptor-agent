@@ -36,6 +36,16 @@ export function styleSummary(file) {
 
 export function gate(workspace) {
   const state = ws.readState(workspace);
+  // 用户明确放弃继续追问（deferred）→ 只要求主题，其余缺口交给大纲标注与写作时补全，
+  // 不硬卡门槛把用户困在澄清里。
+  if (state.deferred) {
+    const needTopic = !state.confirmed?.topic;
+    return {
+      ok: !needTopic,
+      missing: needTopic ? ['主题'] : [],
+      state,
+    };
+  }
   const missing = [];
   if (!state.confirmed?.topic) missing.push('主题');
   const g = state.confirmed?.genre || '';
