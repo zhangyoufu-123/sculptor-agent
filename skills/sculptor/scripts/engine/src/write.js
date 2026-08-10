@@ -11,11 +11,12 @@ import { latestStyleDirection } from './style.js';
 import { genreBrief, genreToCategory } from './genre.js';
 import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
-import { knowledgeBrief } from './knowledge.js';
 import { pulseAfterWrite, pushPulseToState } from './style-pulse.js';
 import { refreshStyleVector } from './style-vector.js';
 import { snapshot } from './history.js';
-import { buildSearchQueries, requestHostSearch, parseDataNeed } from './rag.js';
+import { buildSearchQueries, requestHostSearch, parseDataNeed, unifiedBrief } from './rag.js';
+import { simulateCharacter } from './character.js';
+import { academicNarrative, academicStyleNote } from './academic.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -73,6 +74,31 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
     const section = sections[i];
     const words = section.words || Math.round(targetWords / sections.length);
     const previousEnd = i > 0 ? sections[i - 1].heading : '';
+    // 小说/故事：先做角色预演（让角色自己反应），再把预测注入本节写作。
+    let characterShot = '';
+    if (/小说/.test(state.confirmed?.genre || '')) {
+      const chars = state.confirmed?.characters || [];
+      if (chars.length) {
+        const pick =
+          chars.find((c) =>
+            `${section.heading || ''} ${(section.keyPoints || []).join(' ')} ${
+              section.materials || []
+            }`.includes(c.replace(/《|》/g, '')),
+          ) || chars[i % chars.length];
+        const sim = await simulateCharacter(cfg, workspace, {
+          name: pick,
+          scene: `${section.heading || ''}：${section.function || ''}（${
+            (section.keyPoints || []).join('、') || '场景推进'
+          }）`,
+          obstacle: section.thesis || section.function || '出现了新的阻碍',
+          clues: state.mystery?.clues || [],
+        });
+        if (sim.ok) {
+          const p = sim.prediction;
+          characterShot = `【角色预演：${sim.name}】\n心里想：${p.thoughts || '（沉默）'}\n会说出口：${p.speech || '（沉默）'}\n会做的动作：${p.action || '（不动）'}\n情绪：${p.mood || '复杂'}\n被场景推向：${p.nextPull || '下一步'}`;
+        }
+      }
+    }
     const ctx = {
       title: outline.title || state.confirmed.topic,
       theme: state.confirmed?.theme || '',
@@ -92,10 +118,17 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
         category: state.confirmed?.libraryCategory || genreToCategory(state.confirmed?.genre || ''),
       }),
       styleAdapter: loadStyleAdapter(workspace, 600),
-      knowledgeBrief: knowledgeBrief(
+      unifiedBrief: unifiedBrief(
         workspace,
         `${outline.title || ''} ${section.heading || ''} ${section.thesis || ''} ${section.function || ''}`,
       ),
+      academicArc: /学术论文/.test(state.confirmed?.genre || '')
+        ? academicNarrative(state)
+        : '',
+      academicStyleNote: /学术论文/.test(state.confirmed?.genre || '')
+        ? academicStyleNote()
+        : '',
+      characterShot,
       recentPulse: prevPulse
         ? `上一节「${prevPulse.section}」的风格脉搏建议：${prevPulse.suggestion || '（无）'}`
         : '',

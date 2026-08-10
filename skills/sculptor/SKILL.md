@@ -266,6 +266,42 @@ Web 端将按 session 为单元组织这些作品。
 - 设计细节与竞品参考（MemGPT 分层记忆 / Alexandria 来源可引 / memories-off 代码化管理 / read-aware 引导访谈）
   → [references/knowledge.md](references/knowledge.md)
 
+### 荐书联想（归纳式推荐：心里有想法 → AI 递上一本相近的书）
+
+澄清时，若用户心里已有构思（主题/立意/论点），Sculptor 从内置**思想库**（28 部经典书/理论，
+每条带"一句话核心 + 适用场景"，见 `templates/thought-library.json`）匹配一本相近的作品，
+用简明语言说明：**这本书的理论是什么、为什么可以用在你的文章里**（联系用户的具体主题）。
+只问一次、可拒绝；用户确认"读过/感兴趣"→ 一键记入个人知识库，成为后续写作参考。
+思想库与用户知识库互通：已收录的书不再重复推荐，库里相近条目会互相勾连提示。
+手动触发：`sculptor recommend`。
+
+### 统一素材体系（一套体系 · 数据互通 · 共同使用）
+
+大纲与写作的素材注入统一为 `unifiedBrief`：**个人知识库（读过/经历）+ 检索回灌来源（文献/数据）
++ 内置写作资产（文法连接/诗词典故/论证骨架，`templates/asset-library.json`）**联合检索、限量轮换。
+诗词与出处全部来自确定性资产库（杜绝幻觉）；文法连接词按"承接/转折/递进/让步/收束"选取；
+论证骨架提供 claim-evidence-warrant、gap-tension-insight、concession-refute 等范式。
+各库之间互相转移：检索来源可进素材、素材可进知识库、知识库条目与写作库分类互链。
+
+### 学术论证链（学术实质能力：不依赖外部学术 agent）
+
+学术论文自带行文思路骨架（参考 AgenTex 的 IMRaD + BuildIntroArgumentChain 的论证链）：
+**known（已知共识）→ gap（研究缺口）→ tension（核心张力）→ insight（洞见/贡献）→ method（方法与证据）
+→ evidence（证据承诺）→ limitation（局限/边界）**。澄清可补问缺口/方法/局限（不强制），
+大纲与每节写作按论证链位置推进，不跳步；学术表达注入限定词、让步反驳、证据纪律等规范。
+交付前可 `sculptor academic` 看论证链与**完备性扫描**（每节的 claim/evidence/warrant，
+结论节还要求 limitation）。文学/公文等非论文文体不触发。
+
+### 角色预演（小说/推理：让故事自己长出来）
+
+小说写作前，Sculptor 为每个角色建**持久档案**（`vault/characters/<名>.json`：
+背景/最想要/最怕/秘密/说话方式/当前情绪/最近记忆），写作时对每节先做**角色预演**——
+让 LLM 以角色第一人称，基于"愿望 vs 现实阻碍"预测他此刻的心里话、会说出口的话、
+会做的具体动作、情绪状态与下一步倾向（参考 MATE/DiriGent 的理想-现实张力模型）。
+预演结果注入本节写作："按角色的真实反应推进，不替角色圆场"。情绪与记忆回写档案，
+角色在整篇里连续、可信，推理小说可附带线索/怀疑让误导自然生长。无 LLM 时确定性兜底，流程不崩。
+管理：`sculptor character list|add|view|remove|simulate`。
+
 ### 多模态输入输出（docx / xlsx / 图片 / md）
 
 - 输入：对话里直接给出文件路径（docx/xlsx/md/txt/图片）→ 自动提取成素材；
@@ -399,3 +435,4 @@ node scripts/sculptor.mjs panel / status / checklist / absorb / fingerprint / qu
 - 用户要求深度审视时读：sensibility.md
 - 用户选中某句要求修改时读：point-edit.md
 - 涉及"读过什么/去过哪里/自己的理论"时读：knowledge.md
+- 学术论文行文/论证链/完备性、小说角色预演、统一素材体系：见上文对应小节（含行业方法参考）

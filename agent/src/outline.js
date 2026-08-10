@@ -10,11 +10,12 @@ import { genreBrief, genreToCategory, isOfficialGenre } from './genre.js';
 import { contentBudget } from './budget.js';
 import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
-import { knowledgeBrief } from './knowledge.js';
+import { unifiedBrief } from './rag.js';
 import { reviewOutline } from './outline-review.js';
 import { pulseAfterOutline, pushPulseToState } from './style-pulse.js';
 import { refreshStyleVector } from './style-vector.js';
 import { buildSearchQueries, requestHostSearch, pendingDataNeeds } from './rag.js';
+import { academicNarrative } from './academic.js';
 
 export function styleSummary(file) {
   try {
@@ -93,17 +94,21 @@ export async function generateOutline(cfg, wsDir) {
       category: state.confirmed?.libraryCategory || genreToCategory(state.confirmed?.genre || ''),
     }),
     styleAdapter: loadStyleAdapter(workspace, 600),
-    knowledgeBrief: knowledgeBrief(
+    unifiedBrief: unifiedBrief(
       workspace,
       [
         state.confirmed.topic,
         state.confirmed.genre || '',
         state.confirmed.theme,
+        state.confirmed.gap || '',
         (state.confirmed.arguments || []).join(' '),
       ]
         .filter(Boolean)
         .join(' '),
     ),
+    academicArc: /学术论文/.test(state.confirmed?.genre || '')
+      ? academicNarrative(state)
+      : '',
   };
   const content = await chatWithRetry(
     cfg,

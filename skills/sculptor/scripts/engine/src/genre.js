@@ -505,6 +505,10 @@ export function genreBlueprint(name, opts = {}) {
         { key: 'materials', label: '论据/文献/数据（≥2 条）', required: true, count: 2, list: 'materials' },
         { key: 'theme', label: '核心论点/贡献', required: true },
         { key: 'argument', label: '支撑论点（≥2 个）', required: true, count: 2, list: 'arguments' },
+        { key: 'known', label: '已知共识/现状（可选）', required: false },
+        { key: 'gap', label: '研究缺口/核心张力（可选）', required: false },
+        { key: 'method', label: '方法与证据（可选）', required: false },
+        { key: 'limitation', label: '局限/边界（可选）', required: false },
         { key: 'ending', label: '结论姿态', required: false },
         { key: 'styleSample', label: '风格底稿（同文体旧稿）', required: false },
       ]);
@@ -571,6 +575,7 @@ export function genreBlueprint(name, opts = {}) {
         { key: 'recipient', label: '读者与题材定位', required: true },
         { key: 'materials', label: '人物/场景/素材（≥2 条）', required: true, count: 2, list: 'materials' },
         { key: 'plot', label: '情节架构（伏笔/冲突/反转设计）', required: true },
+        { key: 'character', label: '角色（谁、想要什么、怕什么）', required: false },
         { key: 'emotion', label: '情感曲线', required: false },
         { key: 'ending', label: '结局/反转落点', required: false },
         { key: 'styleSample', label: '风格底稿（可选）', required: false },

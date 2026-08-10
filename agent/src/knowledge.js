@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as ws from './workspace.js';
+import { recommendWorks } from './asset.js';
 
 const KB_DIR = 'knowledge';
 const ASKED_FILE = 'asked.jsonl';
@@ -300,4 +301,34 @@ export function captureKbMentions(workspace, input, { pendingBook = '' } = {}) {
     }
   }
   return captured;
+}
+
+/**
+ * 荐书联想（归纳式推荐）：作者心里有想法 → 从思想库匹配相近的书/理论，
+ * 用简明语言说明"理论是什么、为什么可以用"，并关联用户已有知识库（互链、共享）。
+ * 只问一次、可拒绝：用户确认读过/感兴趣 → 由调用方 addEntry 收录。
+ */
+export function recommendReadings(state, workspace, { sessionAsked = false } = {}) {
+  if (sessionAsked) return '';
+  const recs = recommendWorks(state).filter(
+    (r) => !listEntries(workspace).some((e) => normTitle(e.title) === normTitle(r.title)),
+  );
+  if (!recs.length) return '';
+  const r = recs[0];
+  const topic =
+    state?.confirmed?.topic ||
+    String(state?.lastInput || '').slice(0, 24) ||
+    '这个主题';
+  const why = (r.apply || []).slice(0, 3).join('、');
+  // 与用户已有知识库互链：库里有相近条目时带上，让"读过的东西"彼此勾连
+  const related = listEntries(workspace)
+    .filter((e) => (e.relatedTo || []).some((t) => (r.apply || []).includes(t)) || r.apply?.some((a) => normTitle(e.title).includes(normTitle(a))))
+    .slice(0, 1)
+    .map((e) => `（你知识库里已有「${e.title}」，和它思路相通）`)
+    .join('');
+  return (
+    `（我想到一本和你想法相近的书：${r.title}（${r.author}）。它的核心是：${r.core}。` +
+    `用在这篇文章里，是因为你谈的是「${topic}」——它能提供「${why}」这一层的支撑。${related}` +
+    '读过或感兴趣的话告诉我一声，我记进你的个人知识库并作为写作参考；没读过也没关系。）'
+  );
 }

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0",
+  "description": "Sculptor 内置写作资产库：文法连接、诗词典故、论证骨架。确定性内容，供检索注入，杜绝幻觉。",
+  "grammar": [
+    { "name": "承接", "examples": ["顺着刚才的话往深处走", "由此往下看", "这层意思再推进一步"], "usage": "段落内部推进" },
+    { "name": "转折", "examples": ["可事情并不这样简单", "偏偏在这里拐了个弯", "但换个角度看"], "usage": "制造张力/纠偏" },
+    { "name": "递进", "examples": ["还不止于此", "更关键的是", "再往上一步"], "usage": "由表及里" },
+    { "name": "让步限定", "examples": ["即便承认这一点", "姑且退一步说", "这并不等于"], "usage": "论证严谨、防绝对化" },
+    { "name": "收束", "examples": ["回头看这一路", "把话再说回开头", "最终落在一处"], "usage": "结尾回扣" },
+    { "name": "举例", "examples": ["拿一件小事说", "最直观的例子是", "不妨看一个具体的人"], "usage": "抽象转具体" }
+  ],
+  "poetry": [
+    { "text": "千淘万漉虽辛苦，吹尽狂沙始到金", "source": "刘禹锡《浪淘沙》", "meaning": "历经反复磨洗，真金才现", "usage": ["坚持", "磨砺", "时间检验", "去伪存真"] },
+    { "text": "山重水复疑无路，柳暗花明又一村", "source": "陆游《游山西村》", "meaning": "绝处往往有转机", "usage": ["困境", "转机", "坚持"] },
+    { "text": "沉舟侧畔千帆过，病树前头万木春", "source": "刘禹锡《酬乐天扬州初逢席上见赠》", "meaning": "新旧代谢，生机不息", "usage": ["时代更替", "新陈代谢", "希望"] },
+    { "text": "长风破浪会有时，直挂云帆济沧海", "source": "李白《行路难》", "meaning": "相信终能扬帆远航", "usage": ["信念", "抱负", "少年意气"] },
+    { "text": "会当凌绝顶，一览众山小", "source": "杜甫《望岳》", "meaning": "站上高处，视野顿开", "usage": ["志向", "登高", "视野"] },
+    { "text": "问渠那得清如许？为有源头活水来", "source": "朱熹《观书有感》", "meaning": "思想需活水不断", "usage": ["学习", "阅读", "创新之源"] },
+    { "text": "纸上得来终觉浅，绝知此事要躬行", "source": "陆游《冬夜读书示子聿》", "meaning": "书本之外要实践", "usage": ["知行合一", "实践", "经验"] },
+    { "text": "不畏浮云遮望眼，自缘身在最高层", "source": "王安石《登飞来峰》", "meaning": "站得高才不被遮蔽", "usage": ["格局", "远见", "立场"] },
+    { "text": "人生自古谁无死，留取丹心照汗青", "source": "文天祥《过零丁洋》", "meaning": "以气节超越生死", "usage": ["气节", "牺牲", "历史"] },
+    { "text": "路漫漫其修远兮，吾将上下而求索", "source": "屈原《离骚》", "meaning": "求索之路漫长不止", "usage": ["追求", "探索", "坚持"] },
+    { "text": "落红不是无情物，化作春泥更护花", "source": "龚自珍《己亥杂诗》", "meaning": "消逝也滋养新生", "usage": ["奉献", "传承", "生命循环"] },
+    { "text": "苟利国家生死以，岂因祸福避趋之", "source": "林则徐", "meaning": "家国面前不计祸福", "usage": ["担当", "家国", "抉择"] },
+    { "text": "横眉冷对千夫指，俯首甘为孺子牛", "source": "鲁迅《自嘲》", "meaning": "对敌刚硬，对民俯首", "usage": ["风骨", "立场", "民本"] },
+    { "text": "天行健，君子以自强不息", "source": "《周易·乾》", "meaning": "效法天道，自强不止", "usage": ["自强", "进取", "中国精神"] },
+    { "text": "海内存知己，天涯若比邻", "source": "王勃《送杜少府之任蜀州》", "meaning": "情谊超越距离", "usage": ["友谊", "离别", "共鸣"] }
+  ],
+  "argument": [
+    { "name": "claim-evidence-warrant", "template": "立观点（claim）→ 给可查证的证据（evidence：数据/引文/案例，注明来源）→ 说明证据如何支撑观点（warrant）", "check": ["有明确 claim", "有可查证 evidence", "有 warrant 推理桥"] },
+    { "name": "gap-tension-insight", "template": "先说明已知共识（known）→ 指出缺口（gap）→ 点出张力（tension）→ 给出洞见（insight）", "check": ["有 known", "有 gap", "有 tension", "有 insight"] },
+    { "name": "concession-refute", "template": "承认反方最强的一点（concession）→ 限定其适用边界 → 用证据反驳或收编（refute）", "check": ["有 concession", "有边界限定", "有 refute"] },
+    { "name": "implication-limitation", "template": "结论之后明确适用范围与局限（limitation）→ 给出可检验的推论（implication）", "check": ["有 limitation", "有 implication"] }
+  ]
+}

@@ -19,10 +19,12 @@ import { extractInput } from './io.js';
 import {
   knowledgeSuggestion,
   captureKbMentions,
+  recommendReadings,
   normTitle,
   markAsked,
 } from './knowledge.js';
 import { dataSuggestion } from './rag.js';
+import { academicGap } from './academic.js';
 
 const LOW_WILL = /没(有|什么)?更多|你决定|你自己决定|就这样|先这样|可以了|够了|你看着办/;
 const NEED_LABELS = {
@@ -40,6 +42,11 @@ const NEED_LABELS = {
   recipient: '主送/对象',
   basis: '依据/缘由',
   plot: '情节架构',
+  character: '角色设计',
+  known: '已知共识/现状',
+  gap: '研究缺口',
+  method: '方法与证据',
+  limitation: '局限/边界',
 };
 
 const FALLBACK_QUESTIONS = [
@@ -159,6 +166,11 @@ function classifyAnswer(question, _answer) {
   if (/立意|中心意思|核心意思|想表达的最核心/.test(q)) return { field: 'theme' };
   if (/情绪|情感|曲线|氛围/.test(q)) return { field: 'emotion' };
   if (/结尾|收尾|收束|姿态/.test(q)) return { field: 'ending' };
+  if (/角色|人物|主角|配角|想要什么|怕什么/.test(q)) return { field: 'character' };
+  if (/缺口|没人做|没做透|张力|矛盾/.test(q)) return { field: 'gap' };
+  if (/方法|证据|数据支撑|用什么证据|研究方法/.test(q)) return { field: 'method' };
+  if (/局限|边界|不适用|适用范围/.test(q)) return { field: 'limitation' };
+  if (/已知|现状|学界共识|已有研究/.test(q)) return { field: 'known' };
   if (/立场|目的|想让人|希望读者|相信什么/.test(q)) return { field: 'stance' };
   if (/依据|缘由|出台背景|必要性/.test(q)) return { field: 'basis' };
   if (/主送|对象|收件人|当事人|甲方|乙方/.test(q)) return { field: 'recipient' };
@@ -201,6 +213,13 @@ function applyAnswer(state, field, answer) {
   else if (field === 'audience') state.confirmed.audience = a;
   else if (field === 'style') state.confirmed.styleNote = a;
   else if (field === 'theme') state.confirmed.theme = a;
+  else if (field === 'character') {
+    state.confirmed.characters = state.confirmed.characters || [];
+    if (!state.confirmed.characters.includes(a)) state.confirmed.characters.push(a);
+  } else if (field === 'known') state.confirmed.known = a;
+  else if (field === 'gap') state.confirmed.gap = a;
+  else if (field === 'method') state.confirmed.method = a;
+  else if (field === 'limitation') state.confirmed.limitation = a;
   else if (field === 'argument') {
     state.confirmed.arguments = state.confirmed.arguments || [];
     if (!state.confirmed.arguments.includes(a)) state.confirmed.arguments.push(a);
@@ -480,6 +499,21 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
   });
   if (dataSuggest) state.dataGenericAsked = true;
   state.dataSuggestion = dataSuggest || '';
+  // 荐书联想（归纳式推荐）：匹配思想库 → 一次一问，可拒绝；确认后由 captureKbMentions 收录。
+  const recSuggest = recommendReadings(state, workspace, {
+    sessionAsked: Boolean(state.kbRecommendAsked),
+  });
+  if (recSuggest) {
+    state.kbRecommendAsked = true;
+    const bookMatch = recSuggest.match(/《([^》]{1,30})》/);
+    if (bookMatch) markAsked(workspace, `recommend:${normTitle(bookMatch[1])}`);
+  }
+  state.recommendSuggestion = recSuggest || '';
+  // 学术论证链缺口提示（仅论文）：缺缺口/方法时提示补一次（不强制，写作时会按论证链补全）。
+  const acGap = academicGap(state);
+  state.academicHint = acGap.ok
+    ? ''
+    : `（这篇论文还差：${acGap.missing.join('、')}——答不出来也没关系，我会在写作时按论证链补全。）`;
   // 合并 LLM 读出的蓝图增量，让"整篇文章"在澄清中持续生长。
   if (next.blueprintUpdate) {
     const u = next.blueprintUpdate;
@@ -507,6 +541,8 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     blueprint: state.blueprint,
     knowledgeSuggestion: state.knowledgeSuggestion || '',
     dataSuggestion: state.dataSuggestion || '',
+    recommendSuggestion: state.recommendSuggestion || '',
+    academicHint: state.academicHint || '',
     style: styleProgress(workspace),
     stylePulse: lastInput
       ? { summary: clarifyPulse?.summary || '', suggestion: clarifyPulse?.suggestion || '' }
@@ -554,6 +590,8 @@ export async function clarifyInteractive(cfg, wsDir) {
         prompt += `\n选项: ${next.options.map((o, i) => `${'ABC'[i]}. ${o}`).join('  ')}`;
       if (next.knowledgeSuggestion) prompt += `\n${next.knowledgeSuggestion}`;
       if (next.dataSuggestion) prompt += `\n${next.dataSuggestion}`;
+      if (next.recommendSuggestion) prompt += `\n${next.recommendSuggestion}`;
+      if (next.academicHint) prompt += `\n${next.academicHint}`;
       const answer = await ask(prompt + '\n> ');
       if (LOW_WILL.test(answer)) lowWill += 1;
       else lowWill = 0;

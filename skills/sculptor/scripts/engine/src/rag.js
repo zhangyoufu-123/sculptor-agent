@@ -10,6 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as ws from './workspace.js';
 import { extractCitations, formatReferences } from './citation.js';
+import { knowledgeBrief } from './knowledge.js';
+import { assetBrief } from './asset.js';
 
 const CACHE_FILE = 'rag-cache.json';
 const CACHE_MAX = 100;
@@ -156,6 +158,49 @@ function writeCache(workspace, entries) {
     schemaVersion: '1.0',
     entries: entries.slice(-CACHE_MAX),
   });
+}
+
+/** 检索缓存里的高价值来源（按查询二元组命中，限量）。 */
+function cacheBrief(workspace, query, limit = 2) {
+  const entries = readCache(workspace);
+  if (!entries.length) return '';
+  const clean = String(query || '').toLowerCase().replace(/[\s\d]+/g, '');
+  const grams = new Set();
+  for (let i = 0; i < clean.length - 1; i++) {
+    const g = clean.slice(i, i + 2);
+    if (/[\u4e00-\u9fff]/.test(g)) grams.add(g);
+  }
+  const scored = [];
+  for (const e of entries) {
+    const text = `${e.query} ${(e.results || []).map((h) => `${h.title || ''}${h.source || ''}`).join(' ')}`;
+    let score = 0;
+    for (const g of grams) if (text.includes(g)) score += 1;
+    if (score > 0) scored.push({ e, score });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored
+    .slice(0, limit)
+    .map(({ e }) => {
+      const first = (e.results || [])[0];
+      return `- ${first?.title || e.query}${first?.source ? `（${first.source}）` : ''}`;
+    })
+    .join('\n');
+}
+
+/**
+ * 统一素材注入（v0.21）：一套体系、数据互通——
+ * 个人知识库（读过/经历）+ 检索回灌来源（文献/数据）+ 内置写作资产（文法/诗词/论证骨架）。
+ * 限量、轮换，只作辅助参考；个人写作库的文体蒸馏由 outline/write 单独注入，避免重复。
+ */
+export function unifiedBrief(workspace, query, { limit = 4 } = {}) {
+  const parts = [];
+  const kb = knowledgeBrief(workspace, query);
+  if (kb) parts.push(`【你读过的/经历的（个人知识库，轮换使用）】\n${kb}`);
+  const assets = assetBrief(query, { limit: 3 });
+  if (assets.length) parts.push(`【写作资产（文法/诗词/论证骨架，按主题选取）】\n- ${assets.join('\n- ')}`);
+  const cache = cacheBrief(workspace, query);
+  if (cache) parts.push(`【检索回灌来源】\n${cache}`);
+  return parts.slice(0, limit).join('\n\n');
 }
 
 /** 回灌检索结果：缓存 + 把命中片段作为素材加入 state.materials（限量）。 */

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.21.0 (2026-08-10)
+
+### Added（学术论证链 · 荐书联想 · 角色预演 · 统一素材体系）
+
+- **学术实质能力（不依赖外部学术 agent）**：学术论证链 known→gap→tension→insight→method→
+  evidence→limitation（参考 AgenTex / BuildIntroArgumentChain）；澄清可补问缺口/方法/局限；
+  大纲与写作按论证链位置推进；学术表达规范注入（限定词/让步反驳/证据纪律）；
+  `sculptor academic` 查看论证链 + 成稿完备性扫描（claim/evidence/warrant，结论节加 limitation）。
+- **荐书联想**：内置思想库（28 部经典书/理论，`templates/thought-library.json`），按用户主题
+  匹配相近作品，用简明语言说明"理论是什么、为什么可以用"；只问一次、可拒绝；
+  确认后收入个人知识库；已收录的不重复推荐、相近条目互链。`sculptor recommend`。
+- **角色预演（小说/推理）**：持久角色档案（背景/愿望/恐惧/秘密/说话方式/情绪/记忆，
+  `vault/characters/`）；写作前按"理想-现实张力"让 LLM 以角色第一人称预测
+  心里话/会说的话/具体动作/情绪/下一步（参考 MATE/DiriGent）；预演注入本节写作；
+  情绪记忆回写保持连续；无 LLM 确定性兜底。`sculptor character list|add|view|remove|simulate`。
+- **统一素材体系**：`unifiedBrief` = 个人知识库 + 检索回灌来源 + 内置写作资产
+  （文法连接/诗词典故/论证骨架，`templates/asset-library.json`，确定性防幻觉）；
+  大纲/写作联合注入、限量轮换；各库数据互通。
+- **测试**：`agent/test/asset-academic-character.test.mjs`（22 项）；全套 300 项断言全绿。
+
 ## 0.20.0 (2026-08-09)
 
 ### Added（数据回灌闭环 + 自动参考文献）

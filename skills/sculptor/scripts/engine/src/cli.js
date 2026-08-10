@@ -34,7 +34,16 @@ import {
   removeEntry,
   matchKb,
   normTitle,
+  recommendReadings,
 } from './knowledge.js';
+import { academicNarrative, argumentScan, academicGap } from './academic.js';
+import {
+  listCharacters,
+  loadCharacter,
+  saveCharacter,
+  removeCharacter,
+  simulateCharacter,
+} from './character.js';
 import {
   extractInput,
   exportDocx,
@@ -142,6 +151,12 @@ const HELP = `Sculptor Agent v0.17 — 完整写作 Agent（导演模式 · 四�
   sculptor knowledge list|search <关键词>|view <标题或id>|add <标题>|remove <标题或id> [工作区]
                                      列表/检索/查看/收录/移除个人知识（澄清中《书名》与"去过×"
                                      会自动归纳收录，只问一次、可随时在此管理）
+  sculptor recommend [工作区]        荐书联想：从思想库匹配与你主题相近的书/理论，说明为什么可用
+  sculptor academic [工作区]         学术论证链：known→gap→tension→insight→method→evidence→limitation
+                                     + 成稿论证完备性扫描（claim/evidence/warrant/limitation）
+  sculptor character list|add|view|remove|simulate <名字> [--scene 场景] [工作区]
+                                     小说角色档案与预演：add 建档案（--want/--fear/--secret/--speech），
+                                     simulate 让角色按档案预测情绪/言语/行为，供写作注入
   sculptor ingest <file...> [工作区]  多模态输入：docx/xlsx/图片/md → 提取成素材
   sculptor dictate <音频...> [--to-draft] [工作区]  语音口述：whisper 转录 → 素材；--to-draft 生成口述草稿
   sculptor export [--docx out.docx] [--md out.md] [工作区]  把 draft.md 导出为 docx/md
@@ -776,6 +791,85 @@ export async function runCli(argv, io = {}) {
           if (hit.note) console.log(`\n${hit.note}\n`);
         } else {
           throw new Error(`未知子命令「${sub}」。可用: list / add / remove / search / view`);
+        }
+        break;
+      }
+      case 'recommend': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const state = ws.readState(w);
+        const r = recommendReadings(state, w, { sessionAsked: false });
+        console.log(r || '（暂时没匹配到与你主题相近的思想库条目——再多说一点你的主题/立意试试）');
+        break;
+      }
+      case 'academic': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const state = ws.readState(w);
+        console.log('【学术论证链】（行文思路骨架）');
+        console.log(academicNarrative(state));
+        const gap = academicGap(state);
+        if (!gap.ok) console.log(`\n缺口：${gap.missing.join('、')}（写作时会按论证链补全）`);
+        const draft = path.join(w, 'draft.md');
+        if (flags.file || fs.existsSync(draft)) {
+          const text = fs.readFileSync(flags.file ? path.resolve(String(flags.file)) : draft, 'utf8');
+          const scan = argumentScan(text);
+          console.log('\n【论证完备性扫描】');
+          for (const s of scan) {
+            console.log(`  ${s.ok ? '✓' : '✗'} ${s.heading}${s.issues.length ? ` — ${s.issues.join('；')}` : ''}`);
+          }
+        } else {
+          console.log('\n（还没有 draft.md；写作完成后可再跑一次看完备性）');
+        }
+        break;
+      }
+      case 'character': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const sub = positional[0] || 'list';
+        if (sub === 'list') {
+          const chars = listCharacters(w);
+          if (!chars.length) {
+            console.log('（还没有角色档案。小说/推理写作时，澄清里答"角色"会自动建档；也可 sculptor character add <名字>）');
+            break;
+          }
+          for (const c of chars) {
+            console.log(`• ${c.name}${c.mood ? `（情绪：${c.mood}）` : ''}${c.want ? ` — 想要：${c.want}` : ''}`);
+          }
+        } else if (sub === 'add') {
+          if (positional.length < 2) throw new Error('用法: sculptor character add <名字> [--background 背景] [--want 想要的] [--fear 最怕的] [--secret 秘密] [--speech 说话方式]');
+          const c = saveCharacter(w, {
+            name: positional[1],
+            background: flags.background || '',
+            want: flags.want || '',
+            fear: flags.fear || '',
+            secret: flags.secret || '',
+            speech: flags.speech || '',
+            mood: flags.mood || '',
+          });
+          console.log(`角色档案已建 → vault/characters/${c.name}.json`);
+        } else if (sub === 'view') {
+          if (positional.length < 2) throw new Error('用法: sculptor character view <名字>');
+          const c = loadCharacter(w, positional[1]);
+          if (!c) throw new Error(`角色不存在: ${positional[1]}`);
+          console.log(JSON.stringify(c, null, 2));
+        } else if (sub === 'remove') {
+          if (positional.length < 2) throw new Error('用法: sculptor character remove <名字>');
+          const r = removeCharacter(w, positional[1]);
+          console.log(`已移除角色 ${r.removed}`);
+        } else if (sub === 'simulate') {
+          if (positional.length < 2) throw new Error('用法: sculptor character simulate <名字> [--scene "场景"]');
+          const scene = flags.scene || '一个关键场景：他/她必须做一个决定';
+          const r = await simulateCharacter(cfg, w, { name: positional[1], scene });
+          if (!r.ok) {
+            console.log(r.hint);
+            break;
+          }
+          console.log(`【角色预演：${r.name}】${r.fallback ? '（LLM 不可用，确定性兜底）' : ''}`);
+          console.log(`心里想：${r.prediction.thoughts}`);
+          console.log(`会说：${r.prediction.speech}`);
+          console.log(`会做：${r.prediction.action}`);
+          console.log(`情绪：${r.prediction.mood}`);
+          console.log(`被推向：${r.prediction.nextPull}`);
+        } else {
+          throw new Error(`未知子命令「${sub}」。可用: list / add / view / remove / simulate`);
         }
         break;
       }
