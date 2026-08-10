@@ -107,6 +107,7 @@ import {
   summarizeResults,
 } from './experiment.js';
 import { originalityScan } from './originality.js';
+import { roundtripCheck, renderRoundtrip } from './roundtrip.js';
 import {
   discoverCredentials,
   describeCandidate,
@@ -215,6 +216,8 @@ const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四�
                                      自动接入：检测宿主→原生注册→装 skill→复用本机凭据
   sculptor point-edit "<引用/原文>" "<修改指令>" [--dir 项目] [--file 文件]
                                      深度定点修改：只改选中的那一处，吸收进风格档案
+  sculptor roundtrip [<文本|文件>] [--file x.md] [工作区]
+                                     翻译/回译校验：中译英→回译，信息点核对 + 风格对比
   sculptor probe "<任务描述>"         生态位探测：该不该让 Sculptor 主动介入
 
 环境变量（可选，默认指向 DeepSeek）:
@@ -245,7 +248,8 @@ function parseArgs(argv) {
 }
 
 function printError(err) {
-  console.error(`[sculptor] ${err.message}`);
+  if (process.env.SCULPTOR_DEBUG) console.error(err.stack || String(err));
+  else console.error(`[sculptor] ${err.message}`);
   process.exitCode = 1;
 }
 
@@ -1365,6 +1369,22 @@ export async function runCli(argv, io = {}) {
         console.log(`- ${r.quote}`);
         console.log(`+ ${r.replacement}`);
         console.log(`风格吸收: write ${r.writeUpdated} 维 + read ${r.readUpdated} 维`);
+        break;
+      }
+      case 'roundtrip': {
+        // 文本在 positional[0]，工作区只认 --workspace，避免把文本当目录创建。
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''), { create: true });
+        const arg = String(positional[0] || '').trim();
+        let file = null;
+        if (flags.file) file = path.resolve(String(flags.file));
+        else if (arg) {
+          try {
+            if (fs.statSync(arg).isFile()) file = path.resolve(arg);
+          } catch {}
+        }
+        const text = file ? '' : arg;
+        const r = await roundtripCheck(cfg, w, { text, file });
+        console.log(renderRoundtrip(r));
         break;
       }
       case 'probe': {

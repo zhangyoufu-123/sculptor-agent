@@ -294,6 +294,20 @@ export function respond(messages) {
   if (userMsg.includes('⟦待修改⟧') && userMsg.includes('修改指令')) {
     return '那扇窗没有开口，却什么都知道。';
   }
+  if (userMsg.includes('【内容要点提取】')) {
+    return JSON.stringify({
+      keyPoints: ['石阶被磨亮了一百年', '历史从不缺席，只等一个人走进去', '百年征程波澜壮阔'],
+    });
+  }
+  if (userMsg.includes('【中译英】')) {
+    return 'The stone steps have been polished for a hundred years. History never disappears; it only waits for someone to walk in.';
+  }
+  if (userMsg.includes('【英译中】')) {
+    return '石阶被磨亮了一百年。历史从不缺席，它只等一个人走进去。';
+  }
+  if (userMsg.includes('【信息点核对】')) {
+    return JSON.stringify({ kept: ['石阶被磨亮了一百年', '历史从不缺席，只等一个人走进去'], lost: [], drifted: [] });
+  }
   if (userMsg.includes('修订者') && userMsg.includes('【原文】')) return FIXED_TEXT;
   if (userMsg.includes('感性解剖师')) return JSON.stringify(DISSECT);
   if (userMsg.includes('整体重写') && userMsg.includes('【新风格方向】')) {

@@ -95,6 +95,7 @@ if [ "$UPDATE" -eq 1 ] && [ "$REPO_IS_CLONE" -eq 1 ] && [ "$DRY_RUN" -eq 0 ]; th
 fi
 
 SRC_SKILL="$REPO_DIR/skills/sculptor"
+SRC_TRANSLATOR="$REPO_DIR/skills/translator"
 
 # 2/5 targets
 declare -a TARGETS=()
@@ -141,6 +142,20 @@ sync_skill() { # dest label
   fi
 }
 
+sync_translator() { # dest label
+  local dest="$1" label="$2"
+  [ -d "$SRC_TRANSLATOR" ] || return 0
+  step "3/5 sync translator skill -> $dest ($label)"
+  if [ -e "$dest" ]; then backup_dir "$dest" "$label"; fi
+  if [ "$DRY_RUN" -eq 1 ]; then
+    echo "[dry-run] rsync -a --delete ${SRC_TRANSLATOR}/ $dest/"
+  else
+    mkdir -p "$(dirname "$dest")"
+    rsync -a --delete "${SRC_TRANSLATOR}/" "$dest/"
+    chmod +x "$dest/scripts/roundtrip.mjs" 2>/dev/null || true
+  fi
+}
+
 sync_mirror() { # dest
   local dest="$1"
   step "3/5 sync mirror -> $dest (selective, preserves .git/node_modules/.env.local/…)"
@@ -167,6 +182,7 @@ for t in "${TARGETS[@]}"; do
   dest="${t%%:*}"
   label="${t##*:}"
   sync_skill "$dest" "$label"
+  sync_translator "${dest%/sculptor}/translator" "$label"
 done
 [ "$MIRROR" -eq 1 ] && sync_mirror "$MIRROR_DIR"
 

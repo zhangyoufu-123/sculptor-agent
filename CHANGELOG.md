@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-08-10（v0.32：翻译/回译校验——翻译官 skill，按需启动）
+
+把"翻译的本质是同一件事用两种语言说清楚"落地为按需启用的能力，用于内容保真审计与风格对比：
+
+- **引擎 `agent/src/roundtrip.js`**：内容分析（提取专名/数字/论断/意象）→ 中译英直译 →
+  忠实回译 → 信息点核对（保留/丢失/漂移，LLM 判定 + 确定性兜底）→ 风格对比
+  （原文 vs 回译文：句长σ / 句首去重 / TTR / AI 套话，复用 humanMetrics 与风格向量）。
+  任何一步 LLM 不可用都确定性兜底，绝不中断。
+- **CLI `sculptor roundtrip [文本|文件] [--file x.md]`**：文本直接传或读文件，缺省读工作区
+  draft.md；`SCULPTOR_DEBUG=1` 可看完整堆栈。修复 CLI 工作区约定冲突
+  （文本在 positional[0] 时误把文本当工作区目录创建）。
+- **独立 skill `skills/translator/`**（随 install.sh 安装到 `.codex/skills/translator`）：
+  零依赖独立脚本 `scripts/roundtrip.mjs`（Node ≥18），离线 `--metrics-only` 可跑，
+  未配 API Key 自动降级；SKILL.md 明确触发条件——用户要求翻译/回译/翻译后查信息丢失时才启动，
+  不混入普通写作流程。
+- 测试：`roundtrip.test.mjs` 3 场景（全链路/LLM 不可用兜底/读 draft.md），全套单测通过；
+  skill 通过 quick_validate。
+
 ## 2026-08-10（v0.31：Web 补齐三能力——RAG 闭环 / 多模态上传 / 句子级点改）
 
 Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同一引擎：
