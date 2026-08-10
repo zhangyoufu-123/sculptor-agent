@@ -310,6 +310,7 @@ async function runStepAndRespond(res, id, message) {
       recommendSuggestion: r.recommendSuggestion || '',
       academicHint: r.academicHint || '',
       checklist: r.checklist || null,
+      liveOutline: r.liveOutline || null,
       message: r.message,
       phase: r.phase,
       outline: r.outline,
@@ -362,6 +363,7 @@ const server = http.createServer(async (req, res) => {
     const answerStats = { L0: 0, L1: 0, L2: 0, L3: 0, L4: 0, L5: 0 };
     for (const a of state.answerLevels || []) answerStats['L' + a.level] = (answerStats['L' + a.level] || 0) + 1;
     const sections = state.outline?.sections || [];
+    const lo = state.liveOutline;
     return json(res, 200, {
       id,
       phase: state.phase || 'clarify',
@@ -396,7 +398,45 @@ const server = http.createServer(async (req, res) => {
         done: state.director?.writeIndex || 0,
         total: sections.length,
       },
+      liveOutline: lo || null,
+      outlineComplete: Boolean(lo?.complete),
+      outlineConfirmed: Boolean(state.confirmed?.outlineConfirmed),
     });
+  }
+  if (req.method === 'POST' && p === '/api/outline') {
+    const { sessionId, outline } = await body(req);
+    const dir = sessionDir(String(sessionId || ''));
+    if (!fs.existsSync(path.join(dir, 'protocol', 'state.json'))) {
+      return json(res, 404, { error: '会话不存在' });
+    }
+    const state = ws.readState(dir);
+    const secs = Array.isArray(outline?.sections) ? outline.sections : [];
+    const sanitized = secs
+      .slice(0, 12)
+      .map((s) => ({
+        heading: String(s?.heading || '').trim().slice(0, 40) || '未命名节',
+        function: String(s?.function || '').trim().slice(0, 16),
+        thesis: String(s?.thesis || '').trim().slice(0, 120),
+        words: Number(s?.words) > 0 ? Math.min(Number(s.words), 2000) : 0,
+        keyPoints: Array.isArray(s?.keyPoints)
+          ? s.keyPoints.map((k) => String(k).trim().slice(0, 80)).filter(Boolean).slice(0, 6)
+          : [],
+        materials: Array.isArray(s?.materials)
+          ? s.materials.map((m) => String(m).trim().slice(0, 80)).filter(Boolean).slice(0, 4)
+          : [],
+      }))
+      .filter((s) => s.heading);
+    state.liveOutline = {
+      title: String(outline?.title || state.confirmed?.topic || '').trim().slice(0, 40),
+      sections: sanitized.length ? sanitized : state.liveOutline?.sections || [],
+      complete: false,
+      updatedAt: ws.nowIso(),
+    };
+    // 用户手动编辑 → 下一问围绕"按用户大纲打磨"，大纲确认题暂缓
+    state.justRefined = true;
+    ws.writeState(dir, state);
+    ws.logContext(dir, 'outline', `用户手动编辑实时大纲（${state.liveOutline.sections.length} 节）`);
+    return json(res, 200, { ok: true, liveOutline: state.liveOutline });
   }
   if (req.method === 'GET' && p === '/api/overview') {
     const sessions = listSessions();

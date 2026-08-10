@@ -139,6 +139,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
         recommendSuggestion: r.recommendSuggestion || '',
         academicHint: r.academicHint || '',
         checklist: r.checklist || null,
+        liveOutline: r.liveOutline || null,
         phase: state.phase,
         blueprint: state.blueprint,
         stylePulse: r.stylePulse || null,

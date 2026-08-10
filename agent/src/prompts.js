@@ -18,6 +18,7 @@ ${ctx.context}
 ${ctx.intentBrief ? `【我的理解与核心诉求（先对齐，再追问）】\n${ctx.intentBrief}` : ''}
 ${ctx.styleNote ? `【用户风格底稿/自述: ${ctx.styleNote}】` : ''}
 ${ctx.blueprintText ? `【目前我理解的整篇文章蓝图】\n${ctx.blueprintText}` : ''}
+${ctx.liveOutline ? `【当前实时大纲（每一问都要让它长大或变完整——这是讨论的可见核心）】\n${ctx.liveOutline}` : ''}
 ${ctx.userNegated ? '【用户刚否定了方向】按"反向引导"处理：不辩解、不回退模板；先复述你理解到的"不要什么"，再直接问"那你要的是什么"。' : ''}
 
 追问原则（grilling 式）：
@@ -52,11 +53,17 @@ ${ctx.userNegated ? '【用户刚否定了方向】按"反向引导"处理：不
 - 用户给固定台词/结局 → 一字保留，视为最高优先级素材，不问"要不要改"，只问它出现的位置与节奏。
 - 小问题（选型/素材）与大问题（立意/结尾）交替，避免连续疲劳；"可以/挺好"是推进信号。
 - 蓝图回显时引导用户做全篇级校正（结构、伏笔回收、收束），不催碎片修改。
+- **大纲驱动提问（v0.29 最重要）**：问题由【当前实时大纲】的缺口决定——缺开头/主体/结尾、
+  某节缺素材/缺要点/缺结尾姿态，就问那一块；每轮根据用户回答用 outlineUpdate 输出**更新后的
+  完整节列表**（只增删改有变化的部分，其余原样保留），让用户在右侧面板看到大纲逐轮生长。
+- 当大纲结构完整（≥3 节、覆盖起承转合、每节有要点或素材、有结尾姿态）→ outlineComplete: true；
+  确认题由系统给出，你不要替用户宣布完成。
 
 输出严格 JSON：
-{"question":"一句话追问（1-2句，含用户原词）","recommendation":"你的建议或理解","options":["可选A","可选B","可选C"],"blueprintUpdate":{"article":"","tension":"","readerTakeaway":"","skeleton":[""],"points":[""],"emotion":"","ending":""},"stop":false}
+{"question":"一句话追问（1-2句，含用户原词）","recommendation":"你的建议或理解","options":["可选A","可选B","可选C"],"blueprintUpdate":{"article":"","tension":"","readerTakeaway":"","skeleton":[""],"points":[""],"emotion":"","ending":""},"outlineUpdate":{"title":"","sections":[{"heading":"","function":"","thesis":"","words":0,"keyPoints":[],"materials":[]}]},"outlineComplete":false,"stop":false}
 options 2–3 个真实方向（每个代表一种站得住的写法，recommendation 里给理由）；只有确实无分支时才给空数组。
 blueprintUpdate：从用户回答里读出的蓝图新信息，没有就不填（空字符串/空数组）。
+outlineUpdate：更新后的实时大纲节列表；本论没有大纲变化就给空 sections（不要因为没变化就乱改）。
 skeleton 是"这篇文章按什么顺序走"的简写，例如 ["从门口写起","窗前的停顿","百年之后"]。`;
 
 export const OUTLINE_PROMPT = (
@@ -86,6 +93,7 @@ ${ctx.styleAdapter ? `【风格适配卡（压缩自你的全部样本，最高�
 ${ctx.persona ? `【人物风格肖像（侧写自你的知识库/旧作/修改记录）】\n${ctx.persona}` : ''}
 ${ctx.unifiedBrief ? `【统一素材·辅助参考】（你的知识库 + 检索来源 + 写作资产，只作联想引子；轮换使用，绝不反复引用同一本）\n${ctx.unifiedBrief}` : ''}
 ${ctx.academicArc ? `【学术论证链】（行文思路骨架：known → gap → tension → insight → method → evidence → limitation，每节按它在论证链上的位置推进，别跳步）\n${ctx.academicArc}` : ''}
+${ctx.liveOutline ? `【你们一起打磨出的实时大纲】（以它为准的起点：保留其结构与要点，补充字数/论点/素材分配，不要推倒重来）\n${ctx.liveOutline}` : ''}
 
 要求：
 1. 每节一句话功能（铺垫/转折/细节/收束/升华），连续段落不要做同一件事。

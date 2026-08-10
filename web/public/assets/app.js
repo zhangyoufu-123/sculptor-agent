@@ -151,64 +151,79 @@ function setPanelTab(tab) {
   });
 }
 
-function readOutlineEditsFromDom() {
-  return [...document.querySelectorAll('#pane-outline .ol-edit')].map((r) => {
-    const i = Number(r.dataset.i);
-    const head = r.querySelector('.ol-head')?.value.trim() || '';
-    return { ...(outlineEdits[i] || {}), heading: head || '（未命名）' };
-  });
-}
-
 function defaultTabFor(stage) {
   if (['write', 'revise', 'redteam', 'quality', 'style_fix', 'audience', 'deliver', 'rewrite_gaps'].includes(stage)) return 'draft';
   return 'outline';
 }
 
+function readOutlineEdits() {
+  return [...document.querySelectorAll('#pane-outline .ol-edit')].map((r) => {
+    const i = Number(r.dataset.i);
+    return {
+      ...(outlineEdits[i] || {}),
+      heading: r.querySelector('.ol-head')?.value.trim() || '未命名节',
+      function: r.querySelector('.ol-fn')?.value.trim() || '',
+      words: Number(r.querySelector('.ol-words')?.value) > 0 ? Number(r.querySelector('.ol-words').value) : 0,
+      keyPoints: (r.querySelector('.ol-points-edit')?.value || '')
+        .split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 6),
+    };
+  });
+}
+
+function collectOutlineEdits() {
+  return { title: $('olTitle')?.value.trim() || '', sections: readOutlineEdits() };
+}
+
 function renderOutlinePane(c) {
   const pane = $('pane-outline');
-  const isOutlineStage = c.stage === 'outline' || c.phase === 'plan';
-  const secs = c.outline?.sections || [];
-  const editable = isOutlineStage && secs.length > 0;
+  const stage = c.stage || c.phase || '';
+  const editable = !['write', 'revise', 'redteam', 'quality', 'style_fix', 'audience', 'deliver', 'rewrite_gaps'].includes(stage);
+  const lo = c.liveOutline || { title: '', sections: [], complete: false };
+  const secs = lo.sections || [];
   const parts = [];
-  const b = c.blueprint;
-  if (b && (b.article || b.tension || b.skeleton?.length)) {
-    const lines = [];
-    if (b.article) lines.push(`整篇 · ${b.article}`);
-    if (b.tension) lines.push(`张力 · ${b.tension}`);
-    if (b.readerTakeaway) lines.push(`读者带走 · ${b.readerTakeaway}`);
-    if (b.skeleton?.length) lines.push(`结构 · ${b.skeleton.join(' → ')}`);
-    if (b.corrections?.length) lines.push(`待吸收修正 · ${b.corrections.slice(-3).join('；')}`);
-    parts.push(ctxSection('整篇蓝图', `<details class="ctx-details"><summary>查看蓝图（${lines.length} 项）</summary>${lines.map((l) => `<div class="ctx-line">${esc(l)}</div>`).join('')}</details>`));
-  }
+  // 状态条：讨论推进一目了然
+  const statusBits = [];
+  if (c.outlineConfirmed) statusBits.push(['大纲已确认', 'ok']);
+  else if (secs.length >= 3) statusBits.push(['讨论中 · 大纲可确认', 'gold']);
+  else statusBits.push([`讨论中 · 大纲 ${secs.length} 节`, '']);
   if (c.checklist?.length) {
     const done = c.checklist.filter((x) => x.done).length;
-    parts.push(ctxSection(
-      `确认清单 ${done}/${c.checklist.length}`,
-      c.checklist.map((x) => `<div class="ctx-row ${x.done ? 'done' : ''}"><span>${x.done ? '✓' : '…'}</span>${esc(x.label)}</div>`).join(''),
-    ));
+    statusBits.push([`清单 ${done}/${c.checklist.length}`, '']);
   }
+  parts.push(`<div class="ol-status">${statusBits.map(([t, cls]) => `<span class="chip ${cls}">${esc(t)}</span>`).join('')}</div>`);
+  parts.push(ctxSection('大纲标题', `<input class="ol-title" id="olTitle" value="${esc(lo.title || '')}" ${editable ? '' : 'disabled'} placeholder="文章标题（可改）" />`));
   if (!secs.length) {
     parts.push(ctxSection('实时大纲', '<div class="ctx-line">大纲会在信息确认后实时生成——下方可以随时提建议。</div>'));
   } else {
     outlineEdits = secs.map((s) => ({ ...s }));
     const rows = secs.map((s, i) => `
       <div class="ol-edit" data-i="${i}">
-        <input class="ol-head" value="${esc(s.heading)}" ${editable ? '' : 'disabled'} placeholder="节标题" />
-        <div class="ol-meta"><span>${esc(s.function || '')}</span>${s.words ? `<span>约 ${s.words} 字</span>` : ''}</div>
+        <div class="ol-edit-row">
+          <span class="ol-no">${i + 1}</span>
+          <input class="ol-head" value="${esc(s.heading)}" ${editable ? '' : 'disabled'} placeholder="节标题" />
+          <input class="ol-fn" value="${esc(s.function || '')}" ${editable ? '' : 'disabled'} placeholder="功能" />
+          <input class="ol-words" type="number" min="0" step="50" value="${s.words || ''}" ${editable ? '' : 'disabled'} placeholder="字数" />
+        </div>
+        <textarea class="ol-points-edit" rows="${Math.max(1, (s.keyPoints || []).length)}" ${editable ? '' : 'disabled'} placeholder="要点（每行一条）">${esc((s.keyPoints || []).join('\n'))}</textarea>
         ${s.thesis ? `<div class="ol-thesis">${esc(s.thesis)}</div>` : ''}
-        ${(s.keyPoints || []).length ? `<div class="ol-points">${s.keyPoints.map((k) => `<span>${esc(k)}</span>`).join('')}</div>` : ''}
-        ${editable ? `<div class="ol-del-wrap"><button class="icon-btn danger ol-del" data-i="${i}">删节</button></div>` : ''}
+        ${(s.materials || []).length ? `<div class="ol-points">${s.materials.map((m) => `<span>${esc(m)}</span>`).join('')}</div>` : ''}
+        ${editable ? `<div class="ol-tools"><button class="icon-btn" data-act="up">↑</button><button class="icon-btn" data-act="down">↓</button><button class="icon-btn danger" data-act="del">删</button></div>` : ''}
       </div>`).join('');
     const editActions = editable
       ? `<div class="ol-actions">
           <button class="icon-btn" id="olAdd">＋ 新增一节</button>
-          <button class="btn btn-gold btn-sm" id="olSubmit">提交大纲修改</button>
+          <button class="btn btn-gold btn-sm" id="olSave">保存大纲</button>
         </div>`
       : '';
-    parts.push(ctxSection(`实时大纲 · ${secs.length} 节${editable ? '（可手改标题）' : ''}`, `${rows}${editActions}`));
-    if (!editable && c.progress?.total) {
-      parts.push(ctxSection('写作进度', `<div class="progress"><i style="width:${Math.round((c.progress.done / c.progress.total) * 100)}%"></i></div><div class="ctx-line">已写 ${c.progress.done}/${c.progress.total} 节 · 大纲此时只读，成稿后可在对话里继续调整</div>`));
-    }
+    parts.push(ctxSection(`实时大纲 · ${secs.length} 节${editable ? '（可直接编辑）' : '（写作中只读）'}`, `${rows}${editActions}`));
+  }
+  // 明确的"开始写作"确认点
+  if (editable && secs.length >= 3 && !c.outlineConfirmed) {
+    parts.push(`<div class="ctx-sec start-sec"><div class="ctx-line">大纲已成形——确认后进入写作，写作中仍可随时调整。</div><button class="btn btn-gold btn-block" id="olStartWrite">大纲完成，开始写作</button></div>`);
+  } else if (c.outlineConfirmed) {
+    parts.push(`<div class="ctx-sec start-sec"><div class="ctx-line">✅ 大纲已确认${c.progress?.total ? ` · 写作进度 ${c.progress.done}/${c.progress.total} 节` : ''}</div></div>`);
+  } else if (!editable && c.progress?.total) {
+    parts.push(ctxSection('写作进度', `<div class="progress"><i style="width:${Math.round((c.progress.done / c.progress.total) * 100)}%"></i></div><div class="ctx-line">已写 ${c.progress.done}/${c.progress.total} 节</div>`));
   }
   const writingNow = c.stage === 'write' && !c.hasDraft;
   parts.push(ctxSection(
@@ -224,24 +239,28 @@ function renderOutlinePane(c) {
     submitChat(v);
   });
   $('olAdd')?.addEventListener('click', () => {
-    outlineEdits = readOutlineEditsFromDom();
+    outlineEdits = readOutlineEdits();
     outlineEdits.push({ heading: `新的一节${outlineEdits.length + 1}`, function: '待定', words: 0, thesis: '', keyPoints: [] });
-    renderOutlinePane({ ...c, outline: { title: c.outline?.title || '', sections: outlineEdits } });
+    renderOutlinePane({ ...c, liveOutline: { ...lo, sections: outlineEdits } });
   });
-  document.querySelectorAll('#pane-outline .ol-del').forEach((btn) => {
+  $('olSave')?.addEventListener('click', async () => {
+    try {
+      await apiPost('/api/outline', { sessionId, outline: collectOutlineEdits() });
+      toast('大纲已保存，AI 会按它继续');
+      refreshPanel();
+    } catch (e) { toast(e.message); }
+  });
+  $('olStartWrite')?.addEventListener('click', () => submitChat('大纲完成，开始写作'));
+  document.querySelectorAll('#pane-outline .ol-tools [data-act]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const i = Number(btn.dataset.i);
-      outlineEdits = readOutlineEditsFromDom();
-      outlineEdits.splice(i, 1);
-      renderOutlinePane({ ...c, outline: { title: c.outline?.title || '', sections: outlineEdits } });
+      const i = Number(btn.closest('.ol-edit').dataset.i);
+      const act = btn.dataset.act;
+      outlineEdits = readOutlineEdits();
+      if (act === 'up' && i > 0) [outlineEdits[i - 1], outlineEdits[i]] = [outlineEdits[i], outlineEdits[i - 1]];
+      if (act === 'down' && i < outlineEdits.length - 1) [outlineEdits[i + 1], outlineEdits[i]] = [outlineEdits[i], outlineEdits[i + 1]];
+      if (act === 'del') outlineEdits.splice(i, 1);
+      renderOutlinePane({ ...c, liveOutline: { ...lo, sections: outlineEdits } });
     });
-  });
-  $('olSubmit')?.addEventListener('click', () => {
-    const edited = readOutlineEditsFromDom();
-    const msg = `请把大纲重排成这样（保留可用素材与要点）：\n${edited
-      .map((s, i) => `${i + 1}. ${s.heading}（${s.function || '功能待定'}${s.words ? `，约${s.words}字` : ''}）${s.thesis ? `｜论点：${s.thesis}` : ''}`)
-      .join('\n')}`;
-    submitChat(msg);
   });
 }
 
@@ -304,6 +323,23 @@ function renderPaneDraft(c) {
 function renderPaneContext(c) {
   const pane = $('pane-context');
   const parts = [];
+  if (c.checklist?.length) {
+    const done = c.checklist.filter((x) => x.done).length;
+    parts.push(ctxSection(
+      `确认清单 ${done}/${c.checklist.length}`,
+      c.checklist.map((x) => `<div class="ctx-row ${x.done ? 'done' : ''}"><span>${x.done ? '✓' : '…'}</span>${esc(x.label)}</div>`).join(''),
+    ));
+  }
+  const b = c.blueprint;
+  if (b && (b.article || b.tension || b.skeleton?.length)) {
+    const lines = [];
+    if (b.article) lines.push(`整篇 · ${b.article}`);
+    if (b.tension) lines.push(`张力 · ${b.tension}`);
+    if (b.readerTakeaway) lines.push(`读者带走 · ${b.readerTakeaway}`);
+    if (b.skeleton?.length) lines.push(`结构 · ${b.skeleton.join(' → ')}`);
+    if (b.corrections?.length) lines.push(`待吸收修正 · ${b.corrections.slice(-3).join('；')}`);
+    parts.push(ctxSection('整篇蓝图', lines.map((l) => `<div class="ctx-line">${esc(l)}</div>`).join('')));
+  }
   if (c.intent?.summary) {
     let h = `<div class="ctx-intent">${esc(c.intent.summary)}</div>`;
     if (c.intent.coreNeed) h += `<div class="ctx-core">核心诉求 · ${esc(c.intent.coreNeed)}</div>`;

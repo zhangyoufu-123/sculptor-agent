@@ -903,6 +903,84 @@ body {
 .ol-edit .ol-head:focus { border-color: var(--accent); background: var(--paper-2); }
 .ol-edit .ol-head:disabled { opacity: 1; cursor: default; }
 
+.ol-status { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.ol-title {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 6px 8px;
+  outline: none;
+  transition: all 0.18s ease;
+}
+
+.ol-title:focus { border-color: var(--accent); background: var(--paper-2); }
+.ol-title:disabled { opacity: 1; cursor: default; }
+
+.ol-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ol-no {
+  flex: 0 0 20px;
+  color: var(--gold);
+  font-size: 12px;
+  text-align: center;
+}
+
+.ol-head { flex: 1 1 auto; }
+.ol-fn { flex: 0 1 72px; }
+.ol-words { flex: 0 1 62px; }
+
+.ol-edit-row input {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 6px;
+  outline: none;
+  transition: all 0.18s ease;
+}
+
+.ol-edit-row input:focus { border-color: var(--accent); background: var(--paper-2); }
+.ol-edit-row input:disabled { opacity: 1; cursor: default; }
+
+.ol-points-edit {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 4px 6px;
+  outline: none;
+  resize: vertical;
+  margin-top: 4px;
+}
+
+.ol-points-edit:focus { border-color: var(--accent); background: var(--paper-2); color: var(--ink); }
+.ol-points-edit:disabled { opacity: 1; cursor: default; }
+
+.ol-tools { display: flex; gap: 6px; margin-top: 8px; }
+
+.btn-block { width: 100%; }
+
+.start-sec {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, var(--accent-soft), var(--paper-2));
+}
+
 .ol-meta {
   display: flex;
   gap: 10px;

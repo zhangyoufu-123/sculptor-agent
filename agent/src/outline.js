@@ -108,6 +108,11 @@ export async function generateOutline(cfg, wsDir) {
       genre: state.confirmed.genre || '',
     }),
     corrections: state.blueprint?.corrections || [],
+    liveOutline: state.liveOutline?.sections?.length
+      ? `《${state.liveOutline.title || ''}》\n${state.liveOutline.sections
+          .map((s, i) => `${i + 1}. ${s.heading}（${s.function || ''}${s.words ? `，约${s.words}字` : ''}）${s.thesis ? `｜${s.thesis}` : ''}`)
+          .join('\n')}`
+      : '',
     styleDirection: latestStyleDirection(workspace)?.phrase || '',
     genreBrief: genreBrief(state.confirmed?.genre || ''),
     personalSkill: loadPersonalSkill(workspace, {

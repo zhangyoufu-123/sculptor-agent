@@ -41,6 +41,8 @@ const NEED_LABELS = {
   ending: '结尾姿态',
   styleSample: '风格底稿',
   blueprintConfirm: '整篇文章蓝图确认',
+  outlineConfirm: '大纲确认',
+  outlineRefine: '大纲打磨',
   items: '事项要点',
   recipient: '主送/对象',
   basis: '依据/缘由',
@@ -161,10 +163,79 @@ export function renderBlueprint(state) {
   return lines.join('\n');
 }
 
+/* ── 实时大纲（v0.29）：讨论中持续生长、大纲状态驱动提问 ────────── */
+function sanitizeOutlineSections(secs) {
+  if (!Array.isArray(secs)) return [];
+  return secs
+    .slice(0, 12)
+    .map((s) => ({
+      heading: String(s?.heading || '').trim().slice(0, 40) || '未命名节',
+      function: String(s?.function || '').trim().slice(0, 16),
+      thesis: String(s?.thesis || '').trim().slice(0, 120),
+      words: Number(s?.words) > 0 ? Math.min(Number(s.words), 2000) : 0,
+      keyPoints: Array.isArray(s?.keyPoints)
+        ? s.keyPoints.map((k) => String(k).trim().slice(0, 80)).filter(Boolean).slice(0, 6)
+        : [],
+      materials: Array.isArray(s?.materials)
+        ? s.materials.map((m) => String(m).trim().slice(0, 80)).filter(Boolean).slice(0, 4)
+        : [],
+    }))
+    .filter((s) => s.heading);
+}
+
+/** 实时大纲必然存在：无则用已确认信息生成"开头/主体/结尾"种子骨架。 */
+export function ensureLiveOutline(state) {
+  if (state.liveOutline && Array.isArray(state.liveOutline.sections)) {
+    state.liveOutline.sections = sanitizeOutlineSections(state.liveOutline.sections);
+    return state.liveOutline;
+  }
+  const c = state.confirmed || {};
+  state.liveOutline = {
+    title: String(c.topic || '').trim().slice(0, 40),
+    sections: sanitizeOutlineSections([
+      { heading: '开头', function: '铺垫', thesis: c.topic ? `从「${c.topic}」进入` : '', words: 0, keyPoints: [], materials: [] },
+      { heading: '主体', function: '展开', thesis: c.theme || c.stance || '', words: 0, keyPoints: [], materials: [] },
+      { heading: '结尾', function: '收束', thesis: c.endingTaste || '', words: 0, keyPoints: [], materials: [] },
+    ]),
+    complete: false,
+    updatedAt: ws.nowIso(),
+  };
+  return state.liveOutline;
+}
+
+/** 合并 LLM 的 outlineUpdate（每轮让大纲长大；保留用户已编辑的节）。 */
+function mergeLiveOutline(state, update) {
+  const lo = ensureLiveOutline(state);
+  const secs = sanitizeOutlineSections(update?.sections);
+  if (secs.length) lo.sections = secs;
+  if (typeof update?.title === 'string' && update.title.trim()) {
+    lo.title = update.title.trim().slice(0, 40);
+  }
+  lo.updatedAt = ws.nowIso();
+  return lo;
+}
+
+/** 渲染实时大纲给提示词/面板/确认题。 */
+export function liveOutlineText(state) {
+  const lo = ensureLiveOutline(state);
+  const lines = [`《${lo.title || '（标题待定）'}》`];
+  lo.sections.forEach((s, i) => {
+    lines.push(
+      `${i + 1}. ${s.heading}（${s.function || '功能待定'}${s.words ? `，约${s.words}字` : ''}）${s.thesis ? `｜${s.thesis}` : ''}`,
+    );
+    if (s.keyPoints?.length) lines.push(`   要点：${s.keyPoints.join('；')}`);
+    if (s.materials?.length) lines.push(`   素材：${s.materials.join('；')}`);
+  });
+  if (lo.complete) lines.push('（当前大纲已被判定为完整）');
+  return lines.join('\n');
+}
+
 function classifyAnswer(question, _answer) {
   const q = question || '';
   // 蓝图回显优先识别：问题以"整篇文章"开头，不能被里面的"支撑论点"字样带偏。
   if (/整篇文章|蓝图确认|我理解的整篇/.test(q)) return { field: 'blueprint' };
+  // 实时大纲确认/打磨：问题里带"大纲/开始写作"
+  if (/大纲|开始写作/.test(q)) return { field: 'outlineConfirm' };
   if (/论点|支撑|理由|论证|观点/.test(q)) return { field: 'argument' };
   if (/立意|中心意思|核心意思|想表达的最核心/.test(q)) return { field: 'theme' };
   if (/情绪|情感|曲线|氛围/.test(q)) return { field: 'emotion' };
@@ -189,6 +260,30 @@ function classifyAnswer(question, _answer) {
 function applyAnswer(state, field, answer) {
   state.confirmed = state.confirmed || {};
   const a = answer.trim();
+  // 实时大纲确认：说"开始写作/可以" → 大纲完成，进大纲生成；说"再打磨/改某节" → 记下修正继续问
+  if (field === 'outlineConfirm') {
+    state.blueprint = state.blueprint || {};
+    state.blueprint.corrections = state.blueprint.corrections || [];
+    const norm = a.replace(/[，。！？、,.！\s]/g, '');
+    const confirm =
+      !a ||
+      LOW_WILL.test(a) ||
+      /^(对|对的|可以|可以的|同意|没问题|就是这样|是|是的|好的|好|嗯|没错|ok|开始|开始写作|写吧|确认|定稿|可以了)/i.test(
+        norm,
+      ) ||
+      norm.includes('大纲完成') ||
+      norm.includes('就这样');
+    if (confirm) {
+      state.confirmed.outlineConfirmed = true;
+      state.confirmed.blueprintConfirmed = true;
+      if (state.liveOutline) state.liveOutline.complete = true;
+    } else if (a) {
+      state.blueprint.corrections.push(a);
+      state.justRefined = true;
+      if (state.liveOutline) state.liveOutline.complete = false;
+    }
+    return state;
+  }
   // 蓝图确认在低意愿早退之前处理：用户说"可以/你决定"都算确认，防死循环。
   if (field === 'blueprint') {
     state.blueprint = state.blueprint || {};
@@ -276,6 +371,11 @@ function blueprintNeed(state) {
   for (const f of activeBlueprint(state)) {
     if (!fieldDone(state, f)) return f.key;
   }
+  // 用户刚说"再打磨"→ 先补一个打磨问题，确认题延后
+  if (state.justRefined) return 'outlineRefine';
+  if (state.confirmed?.outlineConfirmed) return '';
+  // 实时大纲 ≥3 节 → 需要"大纲完成，开始写作"的明确确认
+  if (ensureLiveOutline(state).sections.length >= 3) return 'outlineConfirm';
   if (!state.confirmed?.blueprintConfirmed) return 'blueprintConfirm';
   return '';
 }
@@ -355,7 +455,21 @@ async function askOnce(state, cfg, workspace) {
     }
   }
   const style = workspace ? styleProgress(workspace) : null;
-  // 蓝图回显：核心信息齐 + 风格底稿问过之后，把整篇文章回显给用户确认，再进大纲。
+  // 实时大纲确认（v0.29）：大纲 ≥3 节且核心字段齐 → 明确的"开始写作"确认点。
+  if (need === 'outlineConfirm') {
+    const outlineText = liveOutlineText(state);
+    return {
+      stop: false,
+      ready: materialGate(state),
+      question: `大纲已经成形——\n${outlineText}\n\n确认这份大纲，开始写作吗？`,
+      recommendation:
+        '回"开始写作"或"可以"进入写作；想再打磨就说具体改哪里（如"第二节能加个例子"），我会继续陪你磨到大纲满意。',
+      options: ['大纲完成，开始写作', '再打磨一下'],
+      liveOutline: ensureLiveOutline(state),
+      outlineConfirm: true,
+    };
+  }
+  // 蓝图回显（兜底）：实时大纲不足 3 节时的旧确认路径。
   if (need === 'blueprintConfirm') {
     const blueprintText = renderBlueprint(state);
     return {
@@ -380,6 +494,7 @@ async function askOnce(state, cfg, workspace) {
     coreReady,
     styleNote: state.confirmed.styleNote || '',
     blueprintText: state.blueprint && renderBlueprint(state),
+    liveOutline: liveOutlineText(state),
     intentBrief: intentBrief(state),
     userNegated: /不不不|不是这样|不是这个|你说错了|理解错了|不是要|不要这样|不对[，。,.]/.test(
       state.lastInput || '',
@@ -481,6 +596,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
   const workspace = ws.ensureWorkspace(wsDir);
   let state = ws.readState(workspace);
   state.phase = 'clarify';
+  ensureLiveOutline(state);
   state.blueprint = state.blueprint || {
     article: '',
     whyNow: '',
@@ -586,6 +702,9 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     ws.logContext(workspace, 'clarify', `${state.lastQuestion || '（首轮）'} → ${lastInput}`);
   }
   const next = await askOnce(state, cfg, workspace);
+  // 实时大纲生长：LLM 每轮可输出 outlineUpdate（节列表），面板随之逐轮变化。
+  if (next.outlineUpdate) mergeLiveOutline(state, next.outlineUpdate);
+  if (next.outlineComplete === true && state.liveOutline) state.liveOutline.complete = true;
   // 归纳式知识一问（非阻塞）：《书名》未问过才问；主题泛问每会话最多一次。
   const kbSuggest = knowledgeSuggestion(state, workspace, {
     sessionAsked: Boolean(state.kbGenericAsked),
@@ -664,6 +783,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
   state.summary = next.ready
     ? '立意、论点与素材已确认，可生成大纲'
     : `澄清中（清单 ${doneCount}/${checklist.length}）`;
+  state.justRefined = false; // 打磨问题已问出，下一轮恢复"大纲确认"判断
   state.nextStep = next.ready ? '运行 sculptor outline' : '继续回答澄清问题';
   ws.writeState(workspace, state);
   return {
@@ -682,6 +802,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
       ? { summary: clarifyPulse?.summary || '', suggestion: clarifyPulse?.suggestion || '' }
       : null,
     checklist,
+    liveOutline: state.liveOutline,
   };
 }
 
@@ -730,6 +851,10 @@ export async function clarifyInteractive(cfg, wsDir) {
       if (next.academicHint) prompt += `\n${next.academicHint}`;
       if (next.checklist?.length)
         prompt += `\n[清单] ${next.checklist.map((c) => `${c.done ? '✓' : '…'} ${c.label}`).join(' · ')}`;
+      if (next.liveOutline?.sections?.length)
+        prompt += `\n[实时大纲]\n${next.liveOutline.sections
+          .map((s, i) => `${i + 1}. ${s.heading}（${s.function || ''}${s.words ? `，约${s.words}字` : ''}）${s.thesis ? `｜${s.thesis}` : ''}`)
+          .join('\n')}`;
       const answer = await ask(prompt + '\n> ');
       if (LOW_WILL.test(answer)) lowWill += 1;
       else lowWill = 0;

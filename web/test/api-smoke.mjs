@@ -133,6 +133,20 @@ await step('上下文面板与概览接口', async () => {
   assert(typeof ctx.materials === 'object', 'context 素材字段');
   assert(typeof ctx.progress === 'object' && 'done' in ctx.progress, 'context 写作进度字段');
   assert(ctx.outline === null || Array.isArray(ctx.outline.sections), 'context 大纲完整节列表');
+  assert(ctx.liveOutline === null || Array.isArray(ctx.liveOutline.sections), 'context 实时大纲字段');
+  const save = await call('/api/outline', 'POST', {
+    sessionId: sid,
+    outline: {
+      title: '实时大纲测试',
+      sections: [
+        { heading: '开头', function: '铺垫', words: 200, keyPoints: ['门'], materials: [] },
+        { heading: '主体', function: '展开', words: 500, keyPoints: ['窗', '灰'], materials: [] },
+      ],
+    },
+  });
+  assert(JSON.parse(save._body()).ok, 'POST /api/outline 保存实时大纲');
+  const ctx2 = JSON.parse((await call(`/api/context?sessionId=${sid}`))._body());
+  assert(ctx2.liveOutline?.sections?.length === 2, '保存后 liveOutline 已更新');
   const ov = JSON.parse((await call('/api/overview'))._body());
   assert(typeof ov.sessions === 'number' && ov.sessions >= 1, 'overview 会话统计');
   assert(typeof ov.byCat === 'object', 'overview 分类统计');
