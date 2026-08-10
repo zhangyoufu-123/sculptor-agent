@@ -305,6 +305,7 @@ async function runStepAndRespond(res, id, message) {
       sessionId: id,
       kind: r.kind,
       question: r.question,
+      outlineGap: r.outlineGap || false,
       recommendation: r.recommendation,
       options: r.options,
       knowledgeSuggestion: r.knowledgeSuggestion || '',
