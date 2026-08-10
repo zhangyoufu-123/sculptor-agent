@@ -146,7 +146,17 @@ export function respond(messages) {
     else if (!has(/^emotionalCurve:/m)) q = CLARIFY_QUESTIONS[9];
     else if (!has(/^endingTaste:/m)) q = CLARIFY_QUESTIONS[10];
     else if (!has(/^styleSample:/m)) q = CLARIFY_QUESTIONS[11];
-    else q = { question: null, recommendation: null, options: [], stop: true };
+    else {
+      // 全部字段确认完 → 模拟 LLM"从对话总结出大纲并宣布成形"（presentation artifact）。
+      q = {
+        question: null,
+        recommendation: null,
+        options: [],
+        stop: true,
+        outlineUpdate: { title: OUTLINE.title, sections: OUTLINE.sections },
+        outlineComplete: true,
+      };
+    }
     // 蓝图增量：模拟 LLM 从回答里读出"整篇文章"的结构信息，随澄清逐步合并进 state.blueprint
     return JSON.stringify({
       ...q,

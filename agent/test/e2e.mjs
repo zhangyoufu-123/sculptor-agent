@@ -108,11 +108,8 @@ try {
     '先好奇，再触动，最后安宁',
     '停在"心安则上"',
     '史铁生在文中将地坛视为宿命的等待，于荒芜与辉煌的落日中体悟个体生命的流逝 [1.1]。他在生死边缘选择平静审视，将死亡视为必然降临的节日，以通透的智慧将苦难化为对美的沉思',
-    // v0.30：核心字段齐后进入"缺口驱动"——逐节补要点，大纲完成度满格后才出现确认题。
-    '第一层写石阶被百年脚步磨出的光泽，第二层写窗台积灰上那道细痕',
-    '第一层写纪念牌上的字，第二层写百年前的脚步声',
-    '第一层写"心安则上"，第二层写走出门口的那一步',
-    '可以，就是这样',
+    // v0.37：大纲是 LLM 从对话总结的呈现物——字段齐后由 LLM 宣布成形并直接进入大纲确认，
+    // 不再有"缺口补要点"阶段；用户只需确认正式大纲。
   ];
   let last;
   r = await run(['clarify', '--once'], { input: '\n' });
@@ -121,6 +118,7 @@ try {
     r = await run(['clarify', '--once'], { input: a + '\n' });
     check('clarify --once 正常', r.code === 0, r.out.slice(0, 100));
     last = JSON.parse(r.out);
+    if (last.stop || last.question === null) break; // 字段齐 + LLM 判定成形 → 澄清收尾
   }
   check(
     '澄清挖透立意与论点',
@@ -128,12 +126,11 @@ try {
     JSON.stringify({ c: last.confirmed, m: last.materials }),
   );
   check(
-    '整篇文章蓝图已回显并确认',
-    last.confirmed?.blueprintConfirmed === true &&
-      Boolean(last.blueprint) &&
+    '整篇文章蓝图已回显（LLM 随对话总结）',
+    Boolean(last.blueprint) &&
       last.blueprint?.skeleton?.length >= 1 &&
       Boolean(last.blueprint?.tension),
-    JSON.stringify({ b: last.blueprint, rounds: last.blueprintRounds }),
+    JSON.stringify({ b: last.blueprint, confirmed: last.confirmed?.blueprintConfirmed }),
   );
   check('风格底稿问题已问并收尾', last.confirmed?.styleSample === true);
   const writeStyle = JSON.parse(
@@ -190,6 +187,8 @@ try {
   for (const a of answers) {
     r = await run(['interview', '--once'], { input: a + '\n' });
     check('interview --once 正常', r.code === 0, r.out.slice(0, 100));
+    const cur = JSON.parse(r.out);
+    if (cur.stop || cur.question === null) break;
   }
   const iLast = JSON.parse(r.out);
   check(
@@ -220,6 +219,7 @@ try {
   for (const a of answers) {
     r = await run(['agent', '--once'], { input: a + '\n' });
     ar = JSON.parse(r.out);
+    if (['confirm_outline', 'working', 'deliver'].includes(ar.kind)) break;
   }
   check(
     '导演澄清完成后自动生成大纲并请求确认',

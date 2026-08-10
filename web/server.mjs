@@ -59,7 +59,7 @@ const { listEntries, removeEntry } = await import(
 const { checklistOf } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'clarify.js')).href
 );
-const { outlineProgress, nextOutlineGap } = await import(
+const { outlineProgress } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'outline-state.js')).href
 );
 const { exportDocx, docxAvailable } = await import(
@@ -453,9 +453,8 @@ const server = http.createServer(async (req, res) => {
     state.liveOutline = {
       title: String(outline?.title || state.confirmed?.topic || prev.title || '').trim().slice(0, 40),
       sections: liveSections,
-      complete: progress.complete,
+      complete: Boolean(prev.complete),
       progress,
-      nextGap: progress.complete ? null : nextOutlineGap(progress),
       updatedAt: ws.nowIso(),
     };
     // 编辑已即时生效，不扰动确认流程：完成度判定会自然决定下一问（缺口/确认）。

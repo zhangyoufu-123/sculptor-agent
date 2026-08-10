@@ -1,5 +1,5 @@
-// v0.30：实时大纲驱动验证——种子骨架、缺口驱动提问、确定性完成度、
-// 大纲确认点、"再打磨"回路、用户随时拍板。
+// v0.37：大纲是 LLM 从对话总结的呈现物——随对话更新、由 LLM/用户判断成形，
+// 代码不预造骨架、不拿完成度框住 LLM；确定性兜底只保证不卡死。
 import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -36,144 +36,102 @@ function seedCore(state) {
     emotionalCurve: '先好奇，再触动，最后安宁',
     endingTaste: '心安则上',
     styleSample: true,
+    blueprintConfirmed: true,
   };
   state.materials = ['石阶', '窗台积灰', '木楼梯的声响', '纪念牌上的字'];
 }
 
-/** 核心字段 + 每节补上要点 → 大纲结构性完整（完成度 ≥80 且无待补节）。 */
-function seedReadyOutline(state) {
-  seedCore(state);
-  const lo = ensureLiveOutline(state);
-  lo.sections.forEach((s) => {
-    if (!s.function) s.function = '展开';
-    s.keyPoints = ['第一层写现场', '第二层写人物'];
-    s.thesis = s.thesis || '历史是站得进去的现场';
-  });
-  state.liveOutline = lo;
-}
-
-// 1) 实时大纲必然存在（种子骨架 ≥3 节），首轮即返回
+// 1) 实时大纲从空开始，不预造"开头/主体/结尾"骨架；文本渲染不带完成度/状态机字样
 {
   const w = ws.ensureWorkspace(path.join(tmp, 'w1'), { create: true });
   const r = await clarifyStep(cfg, w, { lastInput: '我想写一篇关于北大红楼的散文' });
   const st = ws.readState(w);
-  assert(st.liveOutline && st.liveOutline.sections.length >= 3, '实时大纲种子骨架 ≥3 节');
-  assert(r.liveOutline && r.liveOutline.sections.length >= 3, 'clarifyStep 返回实时大纲');
-  console.log('PASS 实时大纲种子骨架即时生成并返回');
+  assert(st.liveOutline && Array.isArray(st.liveOutline.sections), '实时大纲必然存在');
+  assert.strictEqual(st.liveOutline.sections.length, 0, '开局不预造骨架');
+  assert(r.liveOutline && Array.isArray(r.liveOutline.sections), 'clarifyStep 返回实时大纲');
+  assert(!liveOutlineText(st).includes('完成度'), '文本不展示机器完成度');
+  console.log('PASS 实时大纲从空开始、无骨架、无完成度');
 }
 
-// 2) 完成度确定性结算挂在大纲上（百分比/每节状态/全局缺口）
+// 2) 核心字段齐 + LLM 判定 outlineComplete → 大纲由 LLM 总结（mock 返回 3 部分）+ 确认题出现
 {
   const w = ws.ensureWorkspace(path.join(tmp, 'w2'), { create: true });
-  const st = ws.readState(w);
+  let st = ws.readState(w);
   seedCore(st);
-  ensureLiveOutline(st);
   ws.writeState(w, st);
-  const r = await clarifyStep(cfg, w, { lastInput: '' });
-  st.liveOutline = (ws.readState(w)).liveOutline;
-  assert(st.liveOutline.progress, 'liveOutline 带确定性完成度结算');
-  assert(st.liveOutline.progress.total >= 3, '完成度覆盖全部节');
-  assert(st.liveOutline.progress.perSection.every((p) => p.status === 'needs'), '未补要点 → 每节为待补');
-  assert(st.liveOutline.nextGap && st.liveOutline.nextGap.missing.includes('要点'), 'nextGap 指向最早缺口');
-  assert(r.outlineGap === true, '核心字段齐但大纲未满 → 缺口驱动提问');
-  assert(r.question.includes('第 1 节') || r.question.includes('要点'), '问题指向最早未就绪的一节');
-  console.log('PASS 完成度结算 + 缺口驱动提问');
+  let r = await clarifyStep(cfg, w, { lastInput: '' });
+  st = ws.readState(w);
+  // mock 在字段齐后返回 outlineUpdate + outlineComplete：大纲被总结成形
+  assert(st.liveOutline.sections.length >= 3, `LLM 总结出大纲（${st.liveOutline.sections.length} 部分）`);
+  // 下一轮：成形 → 确认题
+  r = await clarifyStep(cfg, w, { lastInput: '' });
+  assert(r.question && r.question.includes('确认这份大纲'), '成形后出现明确确认点');
+  assert(r.outlineConfirm === true, '标记 outlineConfirm');
+  console.log('PASS LLM 总结大纲并宣布成形 → 确认题（非确定性百分比）');
 }
 
-// 3) 缺口回答直接落进对应节，大纲真实长大
+// 3) 用户确认"大纲完成，开始写作" → 澄清完成，可进大纲
 {
   const w = ws.ensureWorkspace(path.join(tmp, 'w3'), { create: true });
   const st = ws.readState(w);
   seedCore(st);
-  ensureLiveOutline(st);
   ws.writeState(w, st);
-  await clarifyStep(cfg, w, { lastInput: '' }); // 拿到缺口题（第 1 节·要点）
-  await clarifyStep(cfg, w, { lastInput: '第一层写现场的物件，第二层写人物的凝视' });
+  await clarifyStep(cfg, w, { lastInput: '' }); // 总结成形
+  await clarifyStep(cfg, w, { lastInput: '' }); // 拿到确认题
+  const r = await clarifyStep(cfg, w, { lastInput: '大纲完成，开始写作' });
   const st2 = ws.readState(w);
-  const sec0 = st2.liveOutline.sections[0];
-  assert((sec0.keyPoints || []).length >= 2, '回答落进第 1 节 keyPoints');
-  assert(st2.liveOutline.progress.ready >= 1, '第 1 节就绪，完成度上升');
-  console.log('PASS 缺口回答落进对应节，完成度实时上升');
+  assert(st2.confirmed.outlineConfirmed === true, '大纲已确认');
+  assert(r.question === null && r.ready === true, '确认后不再追问');
+  assert(missingNeed(st2) === '', '无剩余缺口');
+  console.log('PASS 用户确认 → 自然进入大纲生成');
 }
 
-// 4) 用户对缺口说"没有" → 放弃该项换下一缺口，不车轱辘
+// 4) 用户随时拍板："开始写作"在任何一轮都直接确认（大纲只是呈现物）
 {
   const w = ws.ensureWorkspace(path.join(tmp, 'w4'), { create: true });
   const st = ws.readState(w);
   seedCore(st);
   ensureLiveOutline(st);
   ws.writeState(w, st);
-  await clarifyStep(cfg, w, { lastInput: '' });
-  const r = await clarifyStep(cfg, w, { lastInput: '没有' });
+  const r = await clarifyStep(cfg, w, { lastInput: '开始写作' });
   const st2 = ws.readState(w);
-  assert((st2.liveOutline.sections[0].waived || []).includes('要点'), '放弃项被记录');
-  assert(r.outlineGap === true && r.question.includes('第 2 节'), '换到下一缺口继续问');
-  console.log('PASS 放弃缺口 → 换下一缺口，绝不死循环');
+  assert(st2.confirmed.outlineConfirmed === true, '用户拍板生效');
+  assert(r.question === null && r.ready === true, '拍板后不再追问');
+  console.log('PASS 用户随时拍板（大纲不限制用户）');
 }
 
-// 5) 核心字段齐 + 大纲结构性完整 → 出现"大纲确认"题（明确的开始写作确认点）
+// 5) 低意愿 ×2 → 放行进大纲（逃生门，防死循环）
 {
   const w = ws.ensureWorkspace(path.join(tmp, 'w5'), { create: true });
-  let st = ws.readState(w);
-  seedReadyOutline(st);
-  ws.writeState(w, st);
-  const r = await clarifyStep(cfg, w, { lastInput: '' });
-  assert(r.question && r.question.includes('大纲'), '出现大纲确认题');
-  assert(r.outlineConfirm === true, '标记 outlineConfirm');
-  st = ws.readState(w);
-  assert(st.liveOutline.progress.complete === true, '完成度判定为完整');
-  assert(liveOutlineText(st).includes('北大红楼'), '大纲文本包含已确认主题');
-  assert.strictEqual(st.lastField, 'outlineConfirm', '答案归类为大纲确认');
-  console.log('PASS 大纲确认题出现（明确的开始写作确认点）');
-}
-
-// 6) 用户确认"大纲完成，开始写作" → 澄清完成，可进大纲生成
-{
-  const w = ws.ensureWorkspace(path.join(tmp, 'w6'), { create: true });
-  let st = ws.readState(w);
-  seedReadyOutline(st);
-  ws.writeState(w, st);
-  await clarifyStep(cfg, w, { lastInput: '' }); // 先拿到确认题
-  const r = await clarifyStep(cfg, w, { lastInput: '大纲完成，开始写作' });
-  st = ws.readState(w);
-  assert(st.confirmed.outlineConfirmed === true, '大纲已确认');
-  assert(r.question === null && r.ready === true, '确认后不再追问，可进大纲');
-  assert(missingNeed(st) === '', '无剩余缺口');
-  console.log('PASS 大纲完成确认 → 自然进入大纲生成');
-}
-
-// 7) 缺口模式下用户随时拍板："大纲完成，开始写作"直接确认（大纲只是视图，不是唯一真源）
-{
-  const w = ws.ensureWorkspace(path.join(tmp, 'w7'), { create: true });
   const st = ws.readState(w);
   seedCore(st);
   ensureLiveOutline(st);
   ws.writeState(w, st);
-  await clarifyStep(cfg, w, { lastInput: '' }); // 缺口题
-  const r = await clarifyStep(cfg, w, { lastInput: '大纲完成，开始写作' });
+  await clarifyStep(cfg, w, { lastInput: '' });
+  const r = await clarifyStep(cfg, w, { lastInput: '你决定' });
+  const r2 = await clarifyStep(cfg, w, { lastInput: '你决定' });
   const st2 = ws.readState(w);
-  assert(st2.confirmed.outlineConfirmed === true, '缺口模式下用户拍板也生效');
-  assert(r.question === null && r.ready === true, '拍板后不再追问');
-  console.log('PASS 缺口模式下用户随时拍板');
+  assert(r2.question === null && r2.ready === true, '低意愿 ×2 放行');
+  assert(st2.liveOutline.complete === true || st2.deferred === true, '不困住用户');
+  console.log('PASS 低意愿逃生门');
 }
 
-// 8) 用户说"再打磨一下" → 记下修正、补一个打磨问题，然后恢复确认判断
+// 6) 确认题上"再打磨" → 打磨问题 → "不用改了，开始写作"回到确认
 {
-  const w = ws.ensureWorkspace(path.join(tmp, 'w8'), { create: true });
-  let st = ws.readState(w);
-  seedReadyOutline(st);
+  const w = ws.ensureWorkspace(path.join(tmp, 'w6'), { create: true });
+  const st = ws.readState(w);
+  seedCore(st);
   ws.writeState(w, st);
-  await clarifyStep(cfg, w, { lastInput: '' }); // 拿到确认题
+  await clarifyStep(cfg, w, { lastInput: '' }); // 总结成形
+  await clarifyStep(cfg, w, { lastInput: '' }); // 确认题
   const r = await clarifyStep(cfg, w, { lastInput: '再打磨一下，第二节能加个例子' });
-  st = ws.readState(w);
-  assert(st.confirmed.outlineConfirmed !== true, '未误确认');
-  assert((st.blueprint?.corrections || []).length >= 1, '修正已记录');
-  assert(r.question && r.question.includes('打磨'), '确定性打磨问题，不退回无关模板');
-  assert(st.justRefined === false, '打磨问题已问出，下一轮恢复确认判断');
-  // 再跑一轮空输入 → 回到"大纲确认"判断
-  const r2 = await clarifyStep(cfg, w, { lastInput: '' });
-  assert(r2.question && r2.outlineConfirm === true, '打磨后可再次进入大纲确认');
-  console.log('PASS 再打磨回路：修正入档 + 打磨问题 + 恢复确认');
+  const st2 = ws.readState(w);
+  assert((st2.blueprint?.corrections || []).length >= 1, '修正已记录');
+  assert(r.question && r.question.includes('打磨'), '补出打磨问题');
+  const r2 = await clarifyStep(cfg, w, { lastInput: '不用改了，开始写作' });
+  const st3 = ws.readState(w);
+  assert(st3.confirmed.outlineConfirmed === true, '打磨后拍板定稿');
+  console.log('PASS 打磨回路：修正入档 + 拍板定稿');
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });

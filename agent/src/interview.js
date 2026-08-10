@@ -16,7 +16,14 @@ function checklistOf(state) {
     count: f.count || 1,
     list: f.list || '',
   }));
-  rows.push({ key: 'blueprintConfirm', label: '整篇文章蓝图确认', required: true, count: 1, list: '' });
+  // v0.37：大纲/蓝图由 LLM 从对话总结并进入"正式大纲确认"，不再单列蓝图确认项。
+  rows.push({
+    key: 'outlineConfirm',
+    label: '大纲确认',
+    required: true,
+    count: 1,
+    list: '',
+  });
   return rows.map((row) => {
     let done = false;
     let note = '';
@@ -40,9 +47,9 @@ function checklistOf(state) {
     } else if (row.key === 'ending') {
       done = Boolean(c.endingTaste);
       note = c.endingTaste ? '已确认' : '';
-    } else if (row.key === 'blueprintConfirm') {
-      done = Boolean(c.blueprintConfirmed);
-      note = c.blueprintConfirmed ? '已确认' : '';
+    } else if (row.key === 'outlineConfirm') {
+      done = Boolean(c.outlineConfirmed) || Boolean(state.liveOutline?.complete);
+      note = c.outlineConfirmed ? '已确认' : state.liveOutline?.complete ? '已成形，待确认' : '';
     } else {
       done = Boolean(c[row.key]);
       note = c[row.key] ? '已确认' : '';
@@ -96,7 +103,7 @@ export async function interviewStep(cfg, wsDir, { lastInput = '' } = {}) {
     done:
       remaining.coreCount === 0 &&
       Boolean(state.confirmed?.styleSample) &&
-      Boolean(state.confirmed?.blueprintConfirmed),
+      (Boolean(state.confirmed?.outlineConfirmed) || Boolean(state.liveOutline?.complete)),
     blueprint: state.blueprint,
     summary: renderChecklist(state),
     style: styleProgress(workspace),

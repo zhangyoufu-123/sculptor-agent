@@ -77,6 +77,21 @@ console.log('\n═══ 会话 1 · 认真用户主流程（北大红楼散文�
   const start = j(await call('/api/start', 'POST', { topic: '写一篇百年历久的北大红楼散文' }));
   let sid = start.sessionId;
   check('start → 第一问', start.kind === 'ask' && !!start.question, start.kind);
+  // 大纲深度编辑器：手动保存一份大纲应即时生效（不阻塞对话流程）
+  {
+    const save = j(await call('/api/outline', 'POST', {
+      sessionId: sid,
+      outline: {
+        title: '测试大纲',
+        sections: [
+          { heading: '开篇', function: '铺垫', words: 200, keyPoints: ['门'], materials: [] },
+          { heading: '收束', function: '收尾', words: 200, keyPoints: ['心安则上'], materials: [] },
+        ],
+      },
+    }));
+    const ctx2 = j(await call(`/api/context?sessionId=${sid}`));
+    check('大纲深度编辑器即时生效', save.ok === true && ctx2.liveOutline?.sections?.length === 2, `sections=${ctx2.liveOutline?.sections?.length}`);
+  }
   // 首轮主题已由 /api/start 预填，问序从"字数"开始；答案数组与之对齐。
   const answers = [
     '大约一千字',
@@ -91,18 +106,15 @@ console.log('\n═══ 会话 1 · 认真用户主流程（北大红楼散文�
     '先好奇，再触动，最后安宁',
     '停在心安则上',
     '史铁生在文中将地坛视为宿命的等待，于荒芜与辉煌的落日中体悟个体生命的流逝。他在生死边缘选择平静审视，将死亡视为必然降临的节日，以通透的智慧将苦难化为对美的沉思。',
-    '第一层写石阶被磨出的光泽，第二层写窗台积灰上那道细痕',
-    '第一层写纪念牌上的字，第二层写百年前的脚步声',
-    '第一层写心安则上，第二层写走出门口的那一步',
-    '可以，就是这样',
+    // v0.37：字段齐后由 LLM 总结大纲并进入正式大纲确认，不再有缺口补要点阶段。
   ];
   const questions = [];
-  const progressTrack = [];
-  let outlineEditOk = false;
   let kind = start.kind;
+  let confirmMsg = '';
   for (let i = 0; i < answers.length; i++) {
     const r = j(await call('/api/step', 'POST', { sessionId: sid, message: answers[i] }));
     kind = r.kind;
+    if (kind === 'confirm_outline') confirmMsg = r.message || '';
     if (r.question) {
       questions.push(r.question);
       const qMarks = (r.question.match(/[？?]/g) || []).length;
@@ -114,25 +126,21 @@ console.log('\n═══ 会话 1 · 认真用户主流程（北大红楼散文�
         check(`第 ${i + 1} 轮不重复上轮问题`, !dup, r.question.slice(0, 24));
       }
     }
-    if (r.liveOutline?.progress) progressTrack.push(r.liveOutline.progress.percent);
-    // 中途手动编辑一次大纲（模拟用户改大纲）
-    if (i === 12 && r.liveOutline?.sections?.length) {
-      const lo = r.liveOutline;
-      const edited = {
-        title: lo.title,
-        sections: lo.sections.map((s, idx) => idx === 0 ? { ...s, heading: '开篇 · 站在门口', words: 300 } : s),
-      };
-      const save = j(await call('/api/outline', 'POST', { sessionId: sid, outline: edited }));
-      const ctx = j(await call(`/api/context?sessionId=${sid}`));
-      outlineEditOk = save.ok === true && ctx.liveOutline?.sections?.[0]?.heading === '开篇 · 站在门口';
-    }
+    if (['confirm_outline', 'working', 'deliver'].includes(kind)) break; // 澄清结束，进入大纲/写作
   }
-  check('大纲编辑保存并生效', outlineEditOk);
   check('问题总数合理（≤22）', questions.length <= 22, `${questions.length} 问`);
-  // 大纲完成度应达到 100（最终确认前）
-  const lastPct = progressTrack[progressTrack.length - 1];
-  check('大纲完成度推进到 100%', lastPct === 100, `${progressTrack.join('→')}%`);
-  check('有明确的确认点', questions.some((q) => q.includes('大纲完成度') || q.includes('开始写作')), '');
+  const ctxAfter = j(await call(`/api/context?sessionId=${sid}`));
+  check(
+    '大纲由 AI 总结成形（liveOutline 有内容）',
+    (ctxAfter.liveOutline?.sections?.length || 0) >= 1 && ctxAfter.liveOutline?.complete === true,
+    `${ctxAfter.liveOutline?.sections?.length || 0} 部分 · complete=${ctxAfter.liveOutline?.complete}`,
+  );
+  check(
+    '有明确的确认点（正式大纲确认）',
+    questions.some((q) => q.includes('确认这份大纲') || q.includes('开始写作')) ||
+      confirmMsg.includes('请确认'),
+    confirmMsg.slice(0, 30),
+  );
   // 空步进推进到交付
   let guard = 0;
   let deliverKind = kind;
@@ -237,7 +245,7 @@ console.log('\n═══ 会话 3 · 对话记录可查看 ═══');
   const botAsks = tr.entries.filter((e) => e.kind === 'ask').length;
   const working = tr.entries.filter((e) => e.kind === 'working').length;
   const deliver = tr.entries.filter((e) => e.kind === 'deliver').length;
-  check('记录含用户发言/澄清问/过程/交付', userMsgs >= 15 && botAsks >= 10 && working >= 2 && deliver === 1,
+  check('记录含用户发言/澄清问/过程/交付', userMsgs >= 12 && botAsks >= 9 && working >= 2 && deliver === 1,
     `user=${userMsgs} ask=${botAsks} working=${working} deliver=${deliver}`);
   console.log('  · 最后 3 条记录：');
   for (const e of tr.entries.slice(-3)) {

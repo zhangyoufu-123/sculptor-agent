@@ -180,78 +180,51 @@ function renderOutlinePane(c) {
   const editable = !['write', 'revise', 'redteam', 'quality', 'style_fix', 'audience', 'deliver', 'rewrite_gaps'].includes(stage);
   const lo = c.liveOutline || { title: '', sections: [], complete: false };
   const secs = lo.sections || [];
-  const prog = lo.progress || null;
   const parts = [];
-  // 状态条：讨论推进一目了然
+  // 状态条：只表达"确认/成形/讨论中"，不再展示完成度百分比与机器状态徽章。
   const statusBits = [];
   if (c.outlineConfirmed) statusBits.push(['大纲已确认', 'ok']);
-  else if (prog) statusBits.push([`大纲完成度 ${prog.percent}%`, prog.complete ? 'ok' : prog.percent >= 60 ? 'gold' : '']);
-  else statusBits.push([`讨论中 · 大纲 ${secs.length} 节`, '']);
-  if (prog) statusBits.push([`可写 ${prog.ready} · 待补 ${prog.needs} · 未定型 ${prog.idea}`, '']);
-  if (prog && prog.targetWords > 0) {
-    statusBits.push([
-      prog.sumWords > 0 ? `字数 ${prog.sumWords}/${prog.targetWords}` : `目标字数 ${prog.targetWords} · 待分配`,
-      prog.wordCoverage >= 60 ? 'ok' : '',
-    ]);
-  }
+  else if (lo.complete) statusBits.push(['大纲已成形 · AI 已从对话总结', 'gold']);
+  else statusBits.push([`讨论中 · AI 正在从对话里总结大纲${secs.length ? `（已 ${secs.length} 部分）` : ''}`, '']);
   if (c.checklist?.length) {
     const done = c.checklist.filter((x) => x.done).length;
     statusBits.push([`清单 ${done}/${c.checklist.length}`, '']);
   }
   parts.push(`<div class="ol-status">${statusBits.map(([t, cls]) => `<span class="chip ${cls}">${esc(t)}</span>`).join('')}</div>`);
-  if (prog && !c.outlineConfirmed) {
-    const pct = Math.max(0, Math.min(100, prog.percent));
-    parts.push(`<div class="ctx-sec"><div class="progress"><i style="width:${pct}%"></i></div>` +
-      (prog.missingGlobal?.length
-        ? `<div class="ctx-line">全局还缺：${prog.missingGlobal.map((m) => `<span class="miss">${esc(m)}</span>`).join('')}</div>`
-        : '') + `</div>`);
-  }
   parts.push(ctxSection('大纲标题', `<input class="ol-title" id="olTitle" value="${esc(lo.title || '')}" ${editable ? '' : 'disabled'} placeholder="文章标题（可改）" />`));
   if (!secs.length) {
-    parts.push(ctxSection('实时大纲', '<div class="ctx-line">大纲会在信息确认后实时生成——下方可以随时提建议。</div>'));
+    parts.push(ctxSection('实时大纲', '<div class="ctx-line">大纲会随我们的讨论由 AI 总结成形——你只管聊，我来归纳。</div>'));
   } else {
     outlineEdits = secs.map((s) => ({ ...s }));
-    if (lo.nextGap && editable && !c.outlineConfirmed) {
-      const g = lo.nextGap;
-      parts.push(`<div class="ctx-line hint-next">⬇ 下一问将补：第 ${g.index + 1} 节「${esc(g.heading || '未命名')}」· 缺${(g.missing || []).map((m) => esc(m)).join('/')}</div>`);
-    }
     const rows = secs.map((s, i) => `
       <div class="ol-edit" data-i="${i}">
-        <div class="ol-edit-meta">
-          ${s.status === 'ready' ? '<span class="badge ok">✓ 可写</span>' : s.status === 'needs' ? '<span class="badge gold">… 待补</span>' : '<span class="badge">○ 未定型</span>'}
-          ${(s.missing || []).map((m) => `<span class="miss">缺${esc(m)}</span>`).join('')}
-        </div>
         <div class="ol-edit-row">
           <span class="ol-no">${i + 1}</span>
-          <input class="ol-head" value="${esc(s.heading)}" ${editable ? '' : 'disabled'} placeholder="节标题" />
-          <input class="ol-fn" value="${esc(s.function || '')}" ${editable ? '' : 'disabled'} placeholder="功能" />
+          <input class="ol-head" value="${esc(s.heading)}" ${editable ? '' : 'disabled'} placeholder="部分标题" />
+          <input class="ol-fn" value="${esc(s.function || '')}" ${editable ? '' : 'disabled'} placeholder="作用" />
           <input class="ol-words" type="number" min="0" step="50" value="${s.words || ''}" ${editable ? '' : 'disabled'} placeholder="字数" />
         </div>
         <textarea class="ol-points-edit" rows="${Math.max(1, (s.keyPoints || []).length)}" ${editable ? '' : 'disabled'} placeholder="要点（每行一条）">${esc((s.keyPoints || []).join('\n'))}</textarea>
         ${s.thesis ? `<div class="ol-thesis">${esc(s.thesis)}</div>` : ''}
-        ${(s.materials || []).length ? `<div class="ol-points">${s.materials.map((m) => `<span>${esc(m)}</span>`).join('')}</div>` : ''}
+        ${s.notes ? `<div class="ol-thesis">${esc(s.notes)}</div>` : ''}
         ${editable ? `<div class="ol-tools"><button class="icon-btn" data-act="up">↑</button><button class="icon-btn" data-act="down">↓</button><button class="icon-btn danger" data-act="del">删</button></div>` : ''}
       </div>`).join('');
     const editActions = editable
       ? `<div class="ol-actions">
-          <button class="icon-btn" id="olAdd">＋ 新增一节</button>
+          <button class="icon-btn" id="olAdd">＋ 新增一部分</button>
           <button class="btn btn-gold btn-sm" id="olSave">保存大纲</button>
         </div>`
       : '';
-    parts.push(ctxSection(`实时大纲 · ${secs.length} 节${editable ? '（可直接编辑）' : '（写作中只读）'}`, `${rows}${editActions}`));
+    parts.push(ctxSection(`实时大纲 · AI 总结${secs.length ? ` · ${secs.length} 部分` : ''}${editable ? '（可直接编辑）' : '（写作中只读）'}`, `${rows}${editActions}`));
   }
-  // 明确的"开始写作"确认点
-  if (editable && secs.length >= 3 && !c.outlineConfirmed) {
-    const label = prog?.complete
-      ? '大纲完成，开始写作'
-      : prog && prog.percent >= 60
-        ? `大纲 ${prog.percent}% · 可以先写（随时可再打磨）`
-        : '大纲未满 · 仍可先开始写作';
-    parts.push(`<div class="ctx-sec start-sec"><div class="ctx-line">大纲只是结构视图——你随时可以拍板开始写作，写作中仍可调整。</div><button class="btn btn-gold btn-block" id="olStartWrite">${esc(label)}</button></div>`);
+  // 明确的"开始写作"确认点：AI 已总结成形或已有内容时即可拍板
+  if (editable && !c.outlineConfirmed && (lo.complete || secs.length >= 1)) {
+    const label = lo.complete ? '大纲完成，开始写作' : '先开始写作（可随时调整）';
+    parts.push(`<div class="ctx-sec start-sec"><div class="ctx-line">大纲是 AI 从我们对话里总结出来的——你可以直接拍板开始写作，写作中仍可调整。</div><button class="btn btn-gold btn-block" id="olStartWrite">${esc(label)}</button></div>`);
   } else if (c.outlineConfirmed) {
-    parts.push(`<div class="ctx-sec start-sec"><div class="ctx-line">✅ 大纲已确认${c.progress?.total ? ` · 写作进度 ${c.progress.done}/${c.progress.total} 节` : ''}</div></div>`);
+    parts.push(`<div class="ctx-sec start-sec"><div class="ctx-line">✅ 大纲已确认${c.progress?.total ? ` · 写作进度 ${c.progress.done}/${c.progress.total} 部分` : ''}</div></div>`);
   } else if (!editable && c.progress?.total) {
-    parts.push(ctxSection('写作进度', `<div class="progress"><i style="width:${Math.round((c.progress.done / c.progress.total) * 100)}%"></i></div><div class="ctx-line">已写 ${c.progress.done}/${c.progress.total} 节</div>`));
+    parts.push(ctxSection('写作进度', `<div class="progress"><i style="width:${Math.round((c.progress.done / c.progress.total) * 100)}%"></i></div><div class="ctx-line">已写 ${c.progress.done}/${c.progress.total} 部分</div>`));
   }
   const writingNow = c.stage === 'write' && !c.hasDraft;
   parts.push(ctxSection(
