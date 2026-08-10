@@ -143,6 +143,12 @@ function addWorking(label) {
 
 function renderAsk(r) {
   let html = esc(r.question || '');
+  if (r.checklist && r.checklist.length) {
+    const done = r.checklist.filter((c) => c.done).length;
+    html += `<div class="hint">清单 ${done}/${r.checklist.length}：${r.checklist
+      .map((c) => `${c.done ? '✓' : '…'} ${esc(c.label)}`)
+      .join(' · ')}</div>`;
+  }
   if (r.knowledgeSuggestion) html += `<div class="hint">${esc(r.knowledgeSuggestion)}</div>`;
   if (r.dataSuggestion) html += `<div class="hint">${esc(r.dataSuggestion)}</div>`;
   if (r.recommendSuggestion) html += `<div class="hint">${esc(r.recommendSuggestion)}</div>`;

@@ -304,6 +304,7 @@ async function runStepAndRespond(res, id, message) {
       dataSuggestion: r.dataSuggestion || '',
       recommendSuggestion: r.recommendSuggestion || '',
       academicHint: r.academicHint || '',
+      checklist: r.checklist || null,
       message: r.message,
       phase: r.phase,
       outline: r.outline,

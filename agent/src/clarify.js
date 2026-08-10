@@ -293,6 +293,33 @@ function missingNeed(state) {
   return blueprintNeed(state);
 }
 
+/** 引导质量自检（内置，不打扰用户）：把每轮回答按 L0–L5 分级，供数据采集与复盘。
+ *  L0 空答 / L1 方向型 / L2 素材型 / L3 结构隐喻型 / L4 修正型 / L5 精准指令型。
+ *  规则参考 docs/DIALOGUE-GUIDE.md 第一节。 */
+export function classifyAnswerLevel(input) {
+  const t = String(input || '').trim();
+  if (!t) return 0;
+  if (/^(没有|不知道|随便|算了|跳过|none|na|你看着办)$/i.test(t) || LOW_WILL.test(t)) return 0;
+  // L5 精准指令：具体到词/句/写法（引号、改词、句式、留白节奏）
+  if (/["「『“”]|改为|改成|换成|删掉|加个|不要用|不用|替代|双引号|标点|句号|逗号|留白|口语/.test(t)) return 5;
+  // L4 修正型：否定开头＋给出新需求
+  if (/^(不不不|不是|不对|不要|别[，。]?)/.test(t) && t.length >= 6) return 4;
+  // L3 结构/隐喻型：自发递进、比喻、结构词
+  if (/就是|像|仿佛|如同|比喻|递进|结构|伏笔|反转|首尾|收束|结尾|开头|曲线/.test(t)) return 3;
+  // L2 素材型：有成句的画面/事件/原话
+  if (t.length >= 12 && /[，。！？；]/.test(t)) return 2;
+  // L1 方向型：短句决策或字母选项
+  return 1;
+}
+
+/** 澄清确认清单（技术 6：让用户看见"自己被认真记录"）。 */
+export function checklistOf(state) {
+  return activeBlueprint(state).map((f) => ({
+    label: f.label,
+    done: fieldDone(state, f),
+  }));
+}
+
 /** 换一个角度问：优先挑"还没确认、也不是当前缺口"的维度，避免同一问题翻来覆去。 */
 function nextFallback(state, need) {
   const done = new Set(
@@ -354,6 +381,9 @@ async function askOnce(state, cfg, workspace) {
     styleNote: state.confirmed.styleNote || '',
     blueprintText: state.blueprint && renderBlueprint(state),
     intentBrief: intentBrief(state),
+    userNegated: /不不不|不是这样|不是这个|你说错了|理解错了|不是要|不要这样|不对[，。,.]/.test(
+      state.lastInput || '',
+    ),
     styleProgress: style
       ? `write ${style.write.learned}/${style.write.total} 维 · read ${style.read.learned}/${style.read.total} 维`
       : '',
@@ -491,6 +521,12 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     // 低意愿计数（确定性）："没有更多/你决定/可以了/就这样"→ 连续两次且核心字段齐就早退进大纲。
     if (LOW_WILL.test(lastInput)) state.lowWill = (state.lowWill || 0) + 1;
     else state.lowWill = 0;
+    // 引导质量自检：记录每轮回答的 L0–L5 级别（内置，不展示给用户，供实验与复盘）。
+    const level = classifyAnswerLevel(lastInput);
+    state.answerLevels = state.answerLevels || [];
+    state.answerLevels.push({ ts: ws.nowIso(), level, sample: String(lastInput).slice(0, 60) });
+    if (state.answerLevels.length > 20) state.answerLevels = state.answerLevels.slice(-20);
+    ws.logContext(workspace, 'answer-level', `L${level}：${String(lastInput).slice(0, 80)}`);
     // 风格全程采集：用户每一句话（含修改理由、素材、语气）都是风格信号。
     const style = applyStyleSignals(workspace, lastInput);
     if (style.writeUpdated + style.readUpdated > 0) {
@@ -613,7 +649,11 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     state.lastQuestion = next.question;
     state.lastField = classifyAnswer(next.question, '').field;
   }
-  state.summary = next.ready ? '立意、论点与素材已确认，可生成大纲' : '澄清中';
+  const checklist = checklistOf(state);
+  const doneCount = checklist.filter((c) => c.done).length;
+  state.summary = next.ready
+    ? '立意、论点与素材已确认，可生成大纲'
+    : `澄清中（清单 ${doneCount}/${checklist.length}）`;
   state.nextStep = next.ready ? '运行 sculptor outline' : '继续回答澄清问题';
   ws.writeState(workspace, state);
   return {
@@ -630,6 +670,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     stylePulse: lastInput
       ? { summary: clarifyPulse?.summary || '', suggestion: clarifyPulse?.suggestion || '' }
       : null,
+    checklist,
   };
 }
 
@@ -675,6 +716,8 @@ export async function clarifyInteractive(cfg, wsDir) {
       if (next.dataSuggestion) prompt += `\n${next.dataSuggestion}`;
       if (next.recommendSuggestion) prompt += `\n${next.recommendSuggestion}`;
       if (next.academicHint) prompt += `\n${next.academicHint}`;
+      if (next.checklist?.length)
+        prompt += `\n[清单] ${next.checklist.map((c) => `${c.done ? '✓' : '…'} ${c.label}`).join(' · ')}`;
       const answer = await ask(prompt + '\n> ');
       if (LOW_WILL.test(answer)) lowWill += 1;
       else lowWill = 0;
