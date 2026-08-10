@@ -180,24 +180,47 @@ function renderOutlinePane(c) {
   const editable = !['write', 'revise', 'redteam', 'quality', 'style_fix', 'audience', 'deliver', 'rewrite_gaps'].includes(stage);
   const lo = c.liveOutline || { title: '', sections: [], complete: false };
   const secs = lo.sections || [];
+  const prog = lo.progress || null;
   const parts = [];
   // 状态条：讨论推进一目了然
   const statusBits = [];
   if (c.outlineConfirmed) statusBits.push(['大纲已确认', 'ok']);
-  else if (secs.length >= 3) statusBits.push(['讨论中 · 大纲可确认', 'gold']);
+  else if (prog) statusBits.push([`大纲完成度 ${prog.percent}%`, prog.complete ? 'ok' : prog.percent >= 60 ? 'gold' : '']);
   else statusBits.push([`讨论中 · 大纲 ${secs.length} 节`, '']);
+  if (prog) statusBits.push([`可写 ${prog.ready} · 待补 ${prog.needs} · 未定型 ${prog.idea}`, '']);
+  if (prog && prog.targetWords > 0) {
+    statusBits.push([
+      prog.sumWords > 0 ? `字数 ${prog.sumWords}/${prog.targetWords}` : `目标字数 ${prog.targetWords} · 待分配`,
+      prog.wordCoverage >= 60 ? 'ok' : '',
+    ]);
+  }
   if (c.checklist?.length) {
     const done = c.checklist.filter((x) => x.done).length;
     statusBits.push([`清单 ${done}/${c.checklist.length}`, '']);
   }
   parts.push(`<div class="ol-status">${statusBits.map(([t, cls]) => `<span class="chip ${cls}">${esc(t)}</span>`).join('')}</div>`);
+  if (prog && !c.outlineConfirmed) {
+    const pct = Math.max(0, Math.min(100, prog.percent));
+    parts.push(`<div class="ctx-sec"><div class="progress"><i style="width:${pct}%"></i></div>` +
+      (prog.missingGlobal?.length
+        ? `<div class="ctx-line">全局还缺：${prog.missingGlobal.map((m) => `<span class="miss">${esc(m)}</span>`).join('')}</div>`
+        : '') + `</div>`);
+  }
   parts.push(ctxSection('大纲标题', `<input class="ol-title" id="olTitle" value="${esc(lo.title || '')}" ${editable ? '' : 'disabled'} placeholder="文章标题（可改）" />`));
   if (!secs.length) {
     parts.push(ctxSection('实时大纲', '<div class="ctx-line">大纲会在信息确认后实时生成——下方可以随时提建议。</div>'));
   } else {
     outlineEdits = secs.map((s) => ({ ...s }));
+    if (lo.nextGap && editable && !c.outlineConfirmed) {
+      const g = lo.nextGap;
+      parts.push(`<div class="ctx-line hint-next">⬇ 下一问将补：第 ${g.index + 1} 节「${esc(g.heading || '未命名')}」· 缺${(g.missing || []).map((m) => esc(m)).join('/')}</div>`);
+    }
     const rows = secs.map((s, i) => `
       <div class="ol-edit" data-i="${i}">
+        <div class="ol-edit-meta">
+          ${s.status === 'ready' ? '<span class="badge ok">✓ 可写</span>' : s.status === 'needs' ? '<span class="badge gold">… 待补</span>' : '<span class="badge">○ 未定型</span>'}
+          ${(s.missing || []).map((m) => `<span class="miss">缺${esc(m)}</span>`).join('')}
+        </div>
         <div class="ol-edit-row">
           <span class="ol-no">${i + 1}</span>
           <input class="ol-head" value="${esc(s.heading)}" ${editable ? '' : 'disabled'} placeholder="节标题" />
@@ -219,7 +242,12 @@ function renderOutlinePane(c) {
   }
   // 明确的"开始写作"确认点
   if (editable && secs.length >= 3 && !c.outlineConfirmed) {
-    parts.push(`<div class="ctx-sec start-sec"><div class="ctx-line">大纲已成形——确认后进入写作，写作中仍可随时调整。</div><button class="btn btn-gold btn-block" id="olStartWrite">大纲完成，开始写作</button></div>`);
+    const label = prog?.complete
+      ? '大纲完成，开始写作'
+      : prog && prog.percent >= 60
+        ? `大纲 ${prog.percent}% · 可以先写（随时可再打磨）`
+        : '大纲未满 · 仍可先开始写作';
+    parts.push(`<div class="ctx-sec start-sec"><div class="ctx-line">大纲只是结构视图——你随时可以拍板开始写作，写作中仍可调整。</div><button class="btn btn-gold btn-block" id="olStartWrite">${esc(label)}</button></div>`);
   } else if (c.outlineConfirmed) {
     parts.push(`<div class="ctx-sec start-sec"><div class="ctx-line">✅ 大纲已确认${c.progress?.total ? ` · 写作进度 ${c.progress.done}/${c.progress.total} 节` : ''}</div></div>`);
   } else if (!editable && c.progress?.total) {
@@ -427,12 +455,15 @@ function renderAsk(r) {
 function renderOutline(r) {
   const o = r && r.outline ? r.outline : r;
   if (!o || !o.sections) return;
-  $('outlineTitle').textContent = `《${o.title || '未命名'}》`;
+  const pct = r.progress?.percent;
+  $('outlineTitle').textContent = `《${o.title || '未命名'}》${typeof pct === 'number' ? ` · 大纲完成度 ${pct}%` : ''}`;
   $('outlineBody').innerHTML = o.sections.map((s, i) => `
     <div class="sec">
       <span class="no">${['一', '二', '三', '四', '五', '六', '七', '八'][i] || i + 1}</span>
       <span class="fn">${esc(s.function || '')}</span>
+      ${s.status ? `<span class="badge ${s.status === 'ready' ? 'ok' : s.status === 'needs' ? 'gold' : ''}">${s.status === 'ready' ? '✓ 可写' : s.status === 'needs' ? '… 待补' : '○ 未定型'}</span>` : ''}
       <span class="txt">${esc(s.heading)}${s.thesis ? `<br><span style="color:var(--ink-2);font-size:13px">${esc(s.thesis)}</span>` : ''}</span>
+      ${(s.missing || []).length ? `<div style="padding:4px 0 0 34px">${s.missing.map((m) => `<span class="miss">缺${esc(m)}</span>`).join('')}</div>` : ''}
     </div>`).join('');
   showView('outline', { keepStage: true });
   setStage('outline');
@@ -1123,3 +1154,15 @@ document.addEventListener('keydown', (e) => {
 
 /* ── 初始化 ───────────────────────────────────────── */
 renderDash();
+
+// 实时伴随：面板每 4 秒自动刷新一次，让大纲/进度在讨论与写作中"自己长大"。
+let panelRefreshing = false;
+setInterval(() => {
+  if (document.hidden || panelRefreshing) return;
+  if (!contextVisible || !sessionId) return;
+  if (!['session', 'outline', 'draft', 'report'].includes(currentView)) return;
+  panelRefreshing = true;
+  refreshPanel().finally(() => {
+    panelRefreshing = false;
+  });
+}, 4000);

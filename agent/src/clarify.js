@@ -28,6 +28,7 @@ import {
 } from './knowledge.js';
 import { dataSuggestion, queueAssetSearch, webRecommendation, explicitSearchSuggestion } from './rag.js';
 import { academicGap } from './academic.js';
+import { outlineProgress, nextOutlineGap } from './outline-state.js';
 
 const LOW_WILL = /没(有|什么)?更多|你决定|你自己决定|就这样|先这样|可以了|够了|你看着办/;
 const NEED_LABELS = {
@@ -179,6 +180,10 @@ function sanitizeOutlineSections(secs) {
       materials: Array.isArray(s?.materials)
         ? s.materials.map((m) => String(m).trim().slice(0, 80)).filter(Boolean).slice(0, 4)
         : [],
+      // 用户对某缺口的"放弃项"必须保留，否则下一轮 sanitize 会把它冲掉导致死循环。
+      ...(Array.isArray(s?.waived)
+        ? { waived: s.waived.filter((w) => typeof w === 'string').slice(0, 4) }
+        : {}),
     }))
     .filter((s) => s.heading);
 }
@@ -187,6 +192,7 @@ function sanitizeOutlineSections(secs) {
 export function ensureLiveOutline(state) {
   if (state.liveOutline && Array.isArray(state.liveOutline.sections)) {
     state.liveOutline.sections = sanitizeOutlineSections(state.liveOutline.sections);
+    refreshOutlineProgress(state);
     return state.liveOutline;
   }
   const c = state.confirmed || {};
@@ -200,18 +206,55 @@ export function ensureLiveOutline(state) {
     complete: false,
     updatedAt: ws.nowIso(),
   };
+  refreshOutlineProgress(state);
   return state.liveOutline;
+}
+
+/** 把确定性完成度结算挂到实时大纲上（v0.30）：百分比、每节状态、全局缺口、下一问目标。 */
+function refreshOutlineProgress(state) {
+  const lo = state.liveOutline;
+  if (!lo) return lo;
+  const progress = outlineProgress(lo, state);
+  lo.progress = progress;
+  lo.complete = progress.complete;
+  lo.nextGap = progress.complete ? null : nextOutlineGap(progress);
+  if (Array.isArray(lo.sections)) {
+    lo.sections.forEach((s, i) => {
+      const p = progress.perSection[i];
+      if (p) {
+        s.status = p.status;
+        s.missing = p.missing || [];
+      }
+    });
+  }
+  return lo;
 }
 
 /** 合并 LLM 的 outlineUpdate（每轮让大纲长大；保留用户已编辑的节）。 */
 function mergeLiveOutline(state, update) {
   const lo = ensureLiveOutline(state);
   const secs = sanitizeOutlineSections(update?.sections);
-  if (secs.length) lo.sections = secs;
+  if (secs.length) {
+    // 同标题节合并时保留用户已填内容（要点/素材/核心句/字数/放弃项），
+    // 防止模型每轮 outlineUpdate 把刚补上的信息冲掉，进度来回跳。
+    const prevMap = new Map(lo.sections.map((s) => [String(s.heading || '').trim(), s]));
+    for (const s of secs) {
+      const prev = prevMap.get(String(s.heading || '').trim());
+      if (prev) {
+        s.keyPoints = s.keyPoints?.length ? s.keyPoints : prev.keyPoints || [];
+        s.materials = s.materials?.length ? s.materials : prev.materials || [];
+        s.thesis = s.thesis || prev.thesis || '';
+        s.words = s.words || prev.words || 0;
+        s.waived = s.waived?.length ? s.waived : prev.waived || [];
+      }
+    }
+    lo.sections = secs;
+  }
   if (typeof update?.title === 'string' && update.title.trim()) {
     lo.title = update.title.trim().slice(0, 40);
   }
   lo.updatedAt = ws.nowIso();
+  refreshOutlineProgress(state);
   return lo;
 }
 
@@ -220,13 +263,20 @@ export function liveOutlineText(state) {
   const lo = ensureLiveOutline(state);
   const lines = [`《${lo.title || '（标题待定）'}》`];
   lo.sections.forEach((s, i) => {
+    const mark = s.status === 'ready' ? '✓' : s.status === 'needs' ? '…' : '○';
     lines.push(
-      `${i + 1}. ${s.heading}（${s.function || '功能待定'}${s.words ? `，约${s.words}字` : ''}）${s.thesis ? `｜${s.thesis}` : ''}`,
+      `${mark} ${i + 1}. ${s.heading}（${s.function || '功能待定'}${s.words ? `，约${s.words}字` : ''}）${s.thesis ? `｜${s.thesis}` : ''}${(s.missing || []).length ? `〔缺${s.missing.join('/')}〕` : ''}`,
     );
     if (s.keyPoints?.length) lines.push(`   要点：${s.keyPoints.join('；')}`);
     if (s.materials?.length) lines.push(`   素材：${s.materials.join('；')}`);
   });
   if (lo.complete) lines.push('（当前大纲已被判定为完整）');
+  else if (lo.progress) {
+    const p = lo.progress;
+    lines.push(
+      `（大纲完成度 ${p.percent}%：可写 ${p.ready} · 待补 ${p.needs} · 未定型 ${p.idea}${p.missingGlobal.length ? `；还缺：${p.missingGlobal.join('、')}` : ''}）`,
+    );
+  }
   return lines.join('\n');
 }
 
@@ -374,10 +424,105 @@ function blueprintNeed(state) {
   // 用户刚说"再打磨"→ 先补一个打磨问题，确认题延后
   if (state.justRefined) return 'outlineRefine';
   if (state.confirmed?.outlineConfirmed) return '';
-  // 实时大纲 ≥3 节 → 需要"大纲完成，开始写作"的明确确认
-  if (ensureLiveOutline(state).sections.length >= 3) return 'outlineConfirm';
+  const lo = ensureLiveOutline(state);
+  const prog = lo.progress;
+  // v0.30：大纲完成度由确定性结算判定——完成（≥80% 且无待补节）才进入明确确认；
+  // 未完成但结构已立 → 缺口驱动提问（每轮回答都让大纲长大一格）。
+  if (prog.complete) return 'outlineConfirm';
+  if (materialGate(state) && lo.sections.length >= 3 && prog.needs + prog.idea > 0) return 'outlineGap';
+  if (lo.sections.length >= 3) return 'outlineConfirm';
   if (!state.confirmed?.blueprintConfirmed) return 'blueprintConfirm';
   return '';
+}
+
+/** 大纲缺口对应的确定性追问（v0.30）：问题由大纲状态决定，不靠模板、不靠 LLM 临场发挥。 */
+function gapQuestion(lo, gap, state) {
+  const n = gap.index + 1;
+  const heading = String(gap.heading || '这一节').slice(0, 24);
+  const missing = gap.missing || [];
+  const base = `第 ${n} 节「${heading}」`;
+  if (missing.includes('功能定位')) {
+    return {
+      stop: false,
+      ready: materialGate(state),
+      question: `${base}还没有定位它在整篇文章里的功能——它是铺垫引入、转折递进、细节展开，还是收束升华？`,
+      recommendation: '功能决定这节的节奏与篇幅：开头节负责带入，转折节负责换气，收束节负责立住立意。',
+      options: ['铺垫/引入', '转折/递进', '细节/展开', '收束/升华'],
+      liveOutline: lo,
+      outlineGap: true,
+    };
+  }
+  if (missing.includes('要点')) {
+    return {
+      stop: false,
+      ready: materialGate(state),
+      question: `${base}打算讲哪几个要点？先给一两个最关键的，我来排进这节的要点。`,
+      recommendation: '要点是这节要兑现的承诺，给一个具体的方向（如"现场感来自具体的人"）就够我往下写。',
+      options: [],
+      liveOutline: lo,
+      outlineGap: true,
+    };
+  }
+  if (missing.includes('素材')) {
+    return {
+      stop: false,
+      ready: materialGate(state),
+      question: `${base}还缺具体素材——你有对应的经历、数据或引文吗？哪怕一个小画面也行。`,
+      recommendation: '素材是防"假大空"的命门：一个真实的细节胜过三句抽象判断。',
+      options: [],
+      liveOutline: lo,
+      outlineGap: true,
+    };
+  }
+  return {
+    stop: false,
+    ready: materialGate(state),
+    question: `${base}的核心句想说什么？用一句话点明这一节要论证的意思。`,
+    recommendation: '核心句 = 这一节回答的问题：写清楚它，这节就不会空转。',
+    options: [],
+    liveOutline: lo,
+    outlineGap: true,
+  };
+}
+
+/** 用户对缺口问题的回答，直接落进对应节（v0.30）：大纲真实长大，不是只在聊天里过一遍。
+ *  注意：大纲只是"呈现给用户的结构视图"，回答同时会走常规 applyAnswer 进入全局真源
+ *  （materials/confirmed），这里只是把同一份信息再投影到视图上。 */
+function applyAnswerToOutlineGap(state, a) {
+  const g = state.pendingOutlineGap;
+  const lo = ensureLiveOutline(state);
+  const sec = g && lo.sections[g.index];
+  if (!sec || !Array.isArray(g.missing)) return;
+  const missing = g.missing;
+  const text = String(a || '').trim();
+  // 用户对该缺口表示"没有/不知道"→ 视为放弃该项，换下一个缺口问，绝不车轱辘。
+  if (/^(没有|不知道|没有素材|没想好|想不出|随便|算了|跳过|none|na|你看着办|不清楚|没有想法|不确定|好|嗯|行|可以|对|ok|行吧|嗯嗯|哦)$/i.test(text)) {
+    sec.waived = [...new Set([...(sec.waived || []), ...missing])];
+    lo.updatedAt = ws.nowIso();
+    refreshOutlineProgress(state);
+    return;
+  }
+  if (missing.includes('功能定位')) {
+    const fn = text.slice(0, 16).replace(/^(就是|它负责|用来|主要|想|要)/, '');
+    if (fn) sec.function = fn;
+  }
+  if (missing.includes('要点')) {
+    const pts = text
+      .split(/[；;、\n，,。]/)
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .slice(0, 6);
+    if (pts.length) sec.keyPoints = [...new Set([...(sec.keyPoints || []), ...pts])].slice(0, 6);
+  }
+  if (missing.includes('素材')) {
+    if (text) sec.materials = [...(sec.materials || []), text.slice(0, 80)].slice(0, 4);
+  }
+  if (missing.includes('核心句')) {
+    if (text) sec.thesis = text.slice(0, 120);
+  }
+  lo.updatedAt = ws.nowIso();
+  state.askedOutlineGaps = {}; // 内容落节成功 → 重置重复计数
+  refreshOutlineProgress(state);
 }
 
 /** 核心（必填、非风格底稿）维度是否齐了——齐了就能进大纲。 */
@@ -455,13 +600,51 @@ async function askOnce(state, cfg, workspace) {
     }
   }
   const style = workspace ? styleProgress(workspace) : null;
-  // 实时大纲确认（v0.29）：大纲 ≥3 节且核心字段齐 → 明确的"开始写作"确认点。
-  if (need === 'outlineConfirm') {
-    const outlineText = liveOutlineText(state);
+  // v0.30：大纲缺口驱动提问——核心信息已齐、大纲未满时，问题由"最早未就绪的一节"决定。
+  if (need === 'outlineGap') {
+    const lo = ensureLiveOutline(state);
+    // 同一缺口连续问过两次还没补上 → 自动放弃该项换下一缺口，绝不车轱辘。
+    state.askedOutlineGaps = state.askedOutlineGaps || {};
+    let gap = nextOutlineGap(lo.progress);
+    while (gap) {
+      const gapKey = `${gap.index}:${(gap.missing || []).join(',')}`;
+      if ((state.askedOutlineGaps[gapKey] || 0) < 2) break;
+      const sec = lo.sections[gap.index];
+      if (sec) sec.waived = [...new Set([...(sec.waived || []), ...(gap.missing || [])])];
+      refreshOutlineProgress(state);
+      gap = nextOutlineGap(lo.progress);
+    }
+    if (gap) {
+      const gapKey = `${gap.index}:${(gap.missing || []).join(',')}`;
+      state.askedOutlineGaps[gapKey] = (state.askedOutlineGaps[gapKey] || 0) + 1;
+      state.pendingOutlineGap = { index: gap.index, missing: gap.missing };
+      const q = gapQuestion(lo, gap, state);
+      return { ...q, ready: materialGate(state) };
+    }
+  }
+  // 确认题上用户说"再打磨一下"→ 确定性打磨问题（不依赖 LLM 临场发挥，绝不退回无关模板）。
+  if (need === 'outlineRefine') {
     return {
       stop: false,
       ready: materialGate(state),
-      question: `大纲已经成形——\n${outlineText}\n\n确认这份大纲，开始写作吗？`,
+      question:
+        '你想先打磨哪一处？说得具体一点（如"第二节能加个例子""结尾再克制一点"），我改完会把大纲重新呈现给你确认。',
+      recommendation: '直接说节号或方向即可；也可以回"不用改了，开始写作"。',
+      options: ['不用改了，开始写作'],
+      liveOutline: ensureLiveOutline(state),
+    };
+  }
+  // 实时大纲确认（v0.29）：大纲 ≥3 节且核心字段齐 → 明确的"开始写作"确认点。
+  if (need === 'outlineConfirm') {
+    const outlineText = liveOutlineText(state);
+    const prog = ensureLiveOutline(state).progress;
+    const head = prog
+      ? `大纲完成度 ${prog.percent}%（可写 ${prog.ready} · 待补 ${prog.needs} · 未定型 ${prog.idea}）`
+      : '大纲已经成形';
+    return {
+      stop: false,
+      ready: materialGate(state),
+      question: `${head}——\n${outlineText}\n\n确认这份大纲，开始写作吗？`,
       recommendation:
         '回"开始写作"或"可以"进入写作；想再打磨就说具体改哪里（如"第二节能加个例子"），我会继续陪你磨到大纲满意。',
       options: ['大纲完成，开始写作', '再打磨一下'],
@@ -633,7 +816,33 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     }
     // 答案归类到"上一个问题"的意图；提问时就推断并保存该意图。
     const field = state.lastField || 'material';
-    applyAnswer(state, field, lastInput);
+    // 大纲只是结构视图，用户有权随时拍板：任何一轮说"开始写作/大纲完成"→ 直接确认，
+    // 且不把拍板话术误当素材/要点收进大纲。
+    const explicitStart =
+      !state.confirmed.outlineConfirmed &&
+      materialGate(state) &&
+      /^(好|可以|行|嗯|对|没问题|就这样|行吧|ok)?\s*(开始写作|开始吧|写吧|开写|进入写作|大纲完成[，,、\s]*开始写作|大纲可以了|大纲没问题|确认大纲|就按这个写|定稿)/.test(
+        lastInput.trim(),
+      );
+    if (explicitStart) {
+      state.confirmed.outlineConfirmed = true;
+      state.confirmed.blueprintConfirmed = true;
+      if (state.liveOutline) state.liveOutline.complete = true;
+      state.pendingOutlineGap = null;
+      ws.logContext(workspace, 'outline', '用户主动确认大纲（视图允许随时拍板）');
+    } else {
+      applyAnswer(state, field, lastInput);
+      // v0.30：缺口问题的回答直接写进对应节，让大纲在每轮回答后真实长大。
+      if (state.pendingOutlineGap && lastInput.trim() && !LOW_WILL.test(lastInput)) {
+        applyAnswerToOutlineGap(state, lastInput);
+        ws.logContext(
+          workspace,
+          'outline',
+          `缺口回答落进第 ${state.pendingOutlineGap.index + 1} 节（${(state.pendingOutlineGap.missing || []).join('/')}）`,
+        );
+      }
+      state.pendingOutlineGap = null;
+    }
     // 低意愿计数（确定性）："没有更多/你决定/可以了/就这样"→ 连续两次且核心字段齐就早退进大纲。
     if (LOW_WILL.test(lastInput)) state.lowWill = (state.lowWill || 0) + 1;
     else state.lowWill = 0;
@@ -776,7 +985,8 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
   }
   if (next.question) {
     state.lastQuestion = next.question;
-    state.lastField = classifyAnswer(next.question, '').field;
+    // 缺口问题的回答统一进"素材"桶（通用），避免"要点"字样被误判成公文 items。
+    state.lastField = next.outlineGap ? 'material' : classifyAnswer(next.question, '').field;
   }
   const checklist = checklistOf(state);
   const doneCount = checklist.filter((c) => c.done).length;

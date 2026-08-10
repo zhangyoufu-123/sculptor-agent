@@ -120,6 +120,77 @@ export function dataSuggestion(state, workspace, { sessionAsked = false } = {}) 
   );
 }
 
+// ── 显式检索请求（"帮我查一查《乡土中国》中…"）────────────────────
+// 用户主动要求查证/搜索 → 不再依赖"论文/素材不足"才触发 RAG。
+// 通路：已配置 SCULPTOR_RAG_ENDPOINT 则直连检索并回灌；否则排队宿主代检（requests.jsonl）。
+const SEARCH_INTENT_RE =
+  /(?<![检审调核复盘排巡考])(查一查|查一下|查查|查一查资料|查一下资料|查查资料|查资料|查证一下|查证|搜一下|搜一搜|搜搜|搜索一下|搜索|检索一下|检索|找一下|找一找|找找|帮我查|帮我搜|帮我找|去查|上网查|找找资料|找一下资料|能不能查|可否查)/;
+
+const SEARCH_PHRASES = [
+  '你可以帮我查一查吗', '你能帮我查一查吗', '能不能帮我查一查', '可以帮我查一查吗',
+  '帮我查一查', '帮我查一下资料', '帮我查查资料', '帮我查一下', '帮我查查', '帮我查',
+  '你帮我查一查', '你帮我查一下', '你帮我查查', '帮我搜一下', '帮我搜搜', '帮我搜',
+  '帮我找一下', '帮我找找', '帮我找', '查一查资料', '查一下资料', '查查资料', '查资料',
+  '查一查', '查一下', '查查', '查证一下', '查证', '搜一下', '搜一搜', '搜搜', '搜索一下',
+  '搜索', '检索一下', '检索', '找一下', '找一找', '找找', '去查一下', '去查查', '去查',
+  '上网查', '找找资料', '找一下资料', '能不能查一下', '可否查一下',
+];
+
+function buildSearchQuery(input, state = {}) {
+  let q = String(input || '');
+  for (const p of SEARCH_PHRASES) q = q.split(p).join(' ');
+  q = q
+    .replace(/[吗呢吧啊呀。！？，,.]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (q.length < 6) {
+    const topic = String(state?.confirmed?.topic || '').trim();
+    q = topic ? `${topic} ${String(input || '').slice(0, 60)}` : String(input || '').slice(0, 60);
+  }
+  return q;
+}
+
+/**
+ * 处理用户显式检索请求：返回面向用户的提示语；同时把请求排队（宿主代检）
+ * 或直连检索回灌（配置了 RAG 端点时），并把命中书目写入个人知识库。
+ * 同一条查询去重；结果写入 state.lastSearchQuery 防重复。
+ */
+export async function explicitSearchSuggestion(cfg, workspace, input, state = {}) {
+  const text = String(input || '').trim();
+  if (!SEARCH_INTENT_RE.test(text)) return '';
+  const query = buildSearchQuery(text, state);
+  if (!query) return '';
+  if (state.lastSearchQuery === query) {
+    return `（「${query.slice(0, 40)}」我刚才已经帮你检索过了——结果回灌后会自动补进素材与知识库；没回灌的话我再催宿主。）`;
+  }
+  const existing = pendingDataNeeds(workspace);
+  const dup = existing.some(
+    (p) => p.purpose === 'user-request' && p.queries?.some((q) => q.includes(query.slice(0, 10))),
+  );
+  if (dup) {
+    state.lastSearchQuery = query;
+    return `（你让我查的「${query.slice(0, 40)}」已在待办检索队列里——回灌后我会自动用上，并把它记进素材与知识库。）`;
+  }
+  const online = await searchOnline(cfg, [query]);
+  if (online.searched) {
+    let kbNote = '';
+    try {
+      const ingested = ingestAssetResults(workspace, online.results, { purpose: 'user-request' });
+      if (ingested.kbAdded) kbNote = `，${ingested.kbAdded} 本书目已入知识库（来源未核实，标低置信）`;
+    } catch {}
+    state.lastSearchQuery = query;
+    const first = online.results?.[0]?.results?.[0];
+    if (first) {
+      return `（已直连检索「${query.slice(0, 40)}」：${String(first.title || '').slice(0, 60)}${first.snippet ? `——${String(first.snippet).slice(0, 90)}` : ''}。来源未核实，已入素材待你确认${kbNote}。）`;
+    }
+    return `（已直连检索「${query.slice(0, 40)}」，结果已缓存${kbNote}。）`;
+  }
+  const queued = requestHostSearch(workspace, [query], { purpose: 'user-request' });
+  if (!queued.queued) return '';
+  state.lastSearchQuery = query;
+  return `（你让我查「${query.slice(0, 40)}」——已排队检索（宿主代检），回灌后会自动补进素材与知识库。你直接贴片段给我也行。）`;
+}
+
 /** 通路 2：直连检索端点（可选）。约定 POST {endpoint}/search {queries} → {results:[{query,results:[...]}]}。 */
 export async function searchOnline(cfg, queries) {
   if (!cfg.ragEndpoint || !cfg.ragApiKey) {

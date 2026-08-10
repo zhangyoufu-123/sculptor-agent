@@ -59,6 +59,9 @@ const { listEntries, removeEntry } = await import(
 const { checklistOf } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'clarify.js')).href
 );
+const { outlineProgress, nextOutlineGap } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'outline-state.js')).href
+);
 const { exportDocx, docxAvailable } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'io.js')).href
 );
@@ -398,6 +401,7 @@ const server = http.createServer(async (req, res) => {
         done: state.director?.writeIndex || 0,
         total: sections.length,
       },
+      targetWords: Number(state.confirmed?.targetWords) || 0,
       liveOutline: lo || null,
       outlineComplete: Boolean(lo?.complete),
       outlineConfirmed: Boolean(state.confirmed?.outlineConfirmed),
@@ -426,10 +430,15 @@ const server = http.createServer(async (req, res) => {
           : [],
       }))
       .filter((s) => s.heading);
+    const prev = state.liveOutline || {};
+    const liveSections = sanitized.length ? sanitized : prev.sections || [];
+    const progress = outlineProgress({ title: prev.title || '', sections: liveSections }, state);
     state.liveOutline = {
-      title: String(outline?.title || state.confirmed?.topic || '').trim().slice(0, 40),
-      sections: sanitized.length ? sanitized : state.liveOutline?.sections || [],
-      complete: false,
+      title: String(outline?.title || state.confirmed?.topic || prev.title || '').trim().slice(0, 40),
+      sections: liveSections,
+      complete: progress.complete,
+      progress,
+      nextGap: progress.complete ? null : nextOutlineGap(progress),
       updatedAt: ws.nowIso(),
     };
     // 用户手动编辑 → 下一问围绕"按用户大纲打磨"，大纲确认题暂缓

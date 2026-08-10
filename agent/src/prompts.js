@@ -18,7 +18,7 @@ ${ctx.context}
 ${ctx.intentBrief ? `【我的理解与核心诉求（先对齐，再追问）】\n${ctx.intentBrief}` : ''}
 ${ctx.styleNote ? `【用户风格底稿/自述: ${ctx.styleNote}】` : ''}
 ${ctx.blueprintText ? `【目前我理解的整篇文章蓝图】\n${ctx.blueprintText}` : ''}
-${ctx.liveOutline ? `【当前实时大纲（每一问都要让它长大或变完整——这是讨论的可见核心）】\n${ctx.liveOutline}` : ''}
+${ctx.liveOutline ? `【当前实时大纲（讨论进度的可见视图，不是唯一真源——立意/素材/风格/知识库与它同步作为真源）】\n${ctx.liveOutline}` : ''}
 ${ctx.userNegated ? '【用户刚否定了方向】按"反向引导"处理：不辩解、不回退模板；先复述你理解到的"不要什么"，再直接问"那你要的是什么"。' : ''}
 
 追问原则（grilling 式）：
@@ -93,7 +93,7 @@ ${ctx.styleAdapter ? `【风格适配卡（压缩自你的全部样本，最高�
 ${ctx.persona ? `【人物风格肖像（侧写自你的知识库/旧作/修改记录）】\n${ctx.persona}` : ''}
 ${ctx.unifiedBrief ? `【统一素材·辅助参考】（你的知识库 + 检索来源 + 写作资产，只作联想引子；轮换使用，绝不反复引用同一本）\n${ctx.unifiedBrief}` : ''}
 ${ctx.academicArc ? `【学术论证链】（行文思路骨架：known → gap → tension → insight → method → evidence → limitation，每节按它在论证链上的位置推进，别跳步）\n${ctx.academicArc}` : ''}
-${ctx.liveOutline ? `【你们一起打磨出的实时大纲】（以它为准的起点：保留其结构与要点，补充字数/论点/素材分配，不要推倒重来）\n${ctx.liveOutline}` : ''}
+${ctx.liveOutline ? `【你们一起打磨出的实时大纲】（结构视图，仅供参考：把已确认信息组织成结构；立意/素材/风格/知识库才是写作真源，大纲只是其中一项）\n${ctx.liveOutline}` : ''}
 
 要求：
 1. 每节一句话功能（铺垫/转折/细节/收束/升华），连续段落不要做同一件事。

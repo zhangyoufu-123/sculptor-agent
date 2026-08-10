@@ -22,6 +22,7 @@ import { proofScan } from './proofread.js';
 import { originalityScan } from './originality.js';
 import { buildSearchQueries, requestHostSearch, autoReferences } from './rag.js';
 import { buildPersona, personaToVector } from './persona.js';
+import { understandIntent } from './intent.js';
 import { distillBible } from './bible.js';
 import { reviseScan } from './revise.js';
 import { evaluateStyleFidelity } from './style-eval.js';
@@ -66,6 +67,8 @@ function outlineView(outline) {
       thesis: s.thesis || '',
       words: s.words,
       keyPoints: s.keyPoints || [],
+      status: s.status || '',
+      missing: s.missing || [],
     })),
   };
 }
@@ -73,37 +76,42 @@ function outlineView(outline) {
 async function advanceToOutline(cfg, workspace, state) {
   try {
     const r = await generateOutline(cfg, workspace);
+    // generateOutline 已把最新状态（含 liveOutline.progress）写盘——
+    // 必须重读，否则用旧 state 写盘会冲掉大纲完成度等新字段。
+    const fresh = ws.readState(workspace);
     // 人物风格肖像（静默）：从知识库+写作库+修改记录侧写，并映射回风格向量。
     try {
       await buildPersona(cfg, workspace);
       await personaToVector(cfg, workspace);
     } catch {}
-    state.outline = r.outline;
-    state.outlineConfirmed = false;
-    state.phase = 'plan';
-    state.summary = `大纲已生成：${r.outline.sections.length} 节，等待用户确认`;
-    state.nextStep = '确认大纲（可提出修改）';
-    ws.writeState(workspace, state);
+    fresh.outline = fresh.outline || r.outline;
+    fresh.outlineConfirmed = false;
+    fresh.phase = 'plan';
+    fresh.summary = `大纲已生成：${fresh.outline.sections.length} 节，等待用户确认`;
+    fresh.nextStep = '确认大纲（可提出修改）';
+    ws.writeState(workspace, fresh);
     const dataNote =
       r.dataRequests?.queued > 0
         ? `另有 ${r.dataRequests.queued} 条资料检索已排队（宿主/协作 agent 检索后回灌，我会自动补进对应节）。`
         : '';
     return {
       kind: 'confirm_outline',
-      outline: outlineView(r.outline),
+      outline: outlineView(fresh.outline),
+      progress: fresh.liveOutline?.progress || r.progress || null,
       message: `需求已齐，这是我设计的整篇大纲——请确认，或直接告诉我要改哪里。${dataNote}`,
       dataRequests: r.dataRequests || { queued: 0 },
     };
   } catch (err) {
-    state.summary = '素材不足，暂不能生成大纲';
-    state.nextStep = '继续回答澄清问题';
-    ws.writeState(workspace, state);
+    const fresh = ws.readState(workspace);
+    fresh.summary = '素材不足，暂不能生成大纲';
+    fresh.nextStep = '继续回答澄清问题';
+    ws.writeState(workspace, fresh);
     return {
       kind: 'ask',
       question: `还差一点信息才能把整篇文章立起来：${String(err.message).replace(/^[^:]*:\s*/, '')}`,
       recommendation: '补齐缺失项后我会直接生成大纲，不需要你催。',
       options: [],
-      phase: state.phase,
+      phase: fresh.phase,
     };
   }
 }
@@ -134,8 +142,12 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
         options: r.options,
         knowledgeSuggestion: r.knowledgeSuggestion || '',
         dataSuggestion: r.dataSuggestion || '',
+        searchSuggestion: r.searchSuggestion || '',
         recommendSuggestion: r.recommendSuggestion || '',
         academicHint: r.academicHint || '',
+        checklist: r.checklist || null,
+        liveOutline: r.liveOutline || null,
+        outlineGap: r.outlineGap || false,
         phase: state.phase,
         blueprint: state.blueprint,
         stylePulse: r.stylePulse || null,
@@ -153,6 +165,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     // 澄清收尾：把用户全部发言做一次"对话级整体风格提炼"（write/read 双风格），
     // 让没贴旧稿的用户也能在进入大纲前建立高层次风格档案；失败静默，不阻塞。
     try {
+      await understandIntent(cfg, workspace, state);
       await extractStyleFromConversation(cfg, workspace);
       await refreshStyleVector(cfg, workspace, { kind: 'conversation', evidence: '澄清收尾整体提炼' });
     } catch {}
@@ -172,6 +185,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
         return {
           kind: 'confirm_outline',
           outline: outlineView(state.outline),
+          progress: state.liveOutline?.progress || null,
           message: '请确认这份大纲：回"可以"开始写；要改哪里直接说。',
         };
       }
@@ -210,6 +224,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
           return {
             kind: 'confirm_outline',
             outline: outlineView(r.outline),
+            progress: state.liveOutline?.progress || null,
             message: `已按你的意见「${lastInput.trim()}」调整大纲——这样对吗？`,
           };
         }

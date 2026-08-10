@@ -886,6 +886,44 @@ body {
   position: relative;
 }
 
+.ol-edit-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  background: var(--bg-2);
+  color: var(--ink-2);
+  font-size: 11px;
+  padding: 2px 9px;
+}
+
+.badge.ok { background: #e4efe1; color: var(--ok); }
+.badge.gold { background: var(--accent-soft); color: #9c4b24; }
+
+.miss {
+  display: inline-block;
+  border-radius: 999px;
+  border: 1px dashed var(--line-strong);
+  color: var(--ink-3);
+  font-size: 11px;
+  padding: 1px 8px;
+}
+
+.hint-next {
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 0 0 8px;
+}
+
 .ol-edit .ol-head {
   width: 100%;
   border: 1px solid transparent;

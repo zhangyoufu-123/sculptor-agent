@@ -17,6 +17,7 @@ import { refreshStyleVector } from './style-vector.js';
 import { buildSearchQueries, requestHostSearch, pendingDataNeeds, queueAssetSearch } from './rag.js';
 import { academicNarrative } from './academic.js';
 import { personaBrief } from './persona.js';
+import { outlineProgress, nextOutlineGap } from './outline-state.js';
 
 export function styleSummary(file) {
   try {
@@ -191,6 +192,24 @@ export async function generateOutline(cfg, wsDir) {
   state.targetWords = targetWords;
   state.nextStep = '确认大纲后运行 sculptor write';
   state.outline = outline;
+  // v0.30：大纲只是结构视图——确定性完成度只用于呈现与确认节奏，
+  // 写作真源仍是 state（立意/素材/风格/知识库/修正记录）。
+  const progress = outlineProgress({ title: outline.title, sections: outline.sections }, state);
+  outline.sections.forEach((s, i) => {
+    const p = progress.perSection[i];
+    if (p) {
+      s.status = p.status;
+      s.missing = p.missing || [];
+    }
+  });
+  state.liveOutline = {
+    title: outline.title,
+    sections: outline.sections,
+    complete: progress.complete,
+    progress,
+    nextGap: progress.complete ? null : nextOutlineGap(progress),
+    updatedAt: ws.nowIso(),
+  };
   // 修正已吸收进大纲，清空避免后续重写重复应用
   if (state.blueprint) state.blueprint.corrections = [];
 
@@ -224,5 +243,5 @@ export async function generateOutline(cfg, wsDir) {
     memoryFile,
     JSON.stringify({ ...outline, generatedAt: ws.nowIso() }, null, 2) + '\n',
   );
-  return { outline, state, memoryFile, dataRequests };
+  return { outline, state, memoryFile, dataRequests, progress };
 }
