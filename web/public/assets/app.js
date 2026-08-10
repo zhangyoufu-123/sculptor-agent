@@ -17,6 +17,8 @@ let busy = false;
 let currentView = 'home';
 let currentStage = 'home';
 let contextVisible = false;
+let lastPanelStage = '';
+let outlineEdits = [];
 let worksCache = [];
 let worksCat = '';
 let kbCache = [];
@@ -128,7 +130,7 @@ function downloadExport(sid, fmt, file) {
   a.remove();
 }
 
-/* ── 右侧 Agent 上下文面板 ────────────────────────── */
+/* ── 右侧伴随工作台（实时大纲 / 写作手写区 / 上下文） ── */
 function updateContextVisibility() {
   const show = ['session', 'outline', 'draft', 'report'].includes(currentView) && sessionId && contextVisible;
   $('contextPanel').hidden = !show;
@@ -139,59 +141,208 @@ function ctxSection(title, body) {
   return `<div class="ctx-sec"><h4>${esc(title)}</h4>${body}</div>`;
 }
 
-async function refreshContext() {
+function setPanelTab(tab) {
+  if (!['outline', 'draft', 'context'].includes(tab)) tab = 'outline';
+  document.querySelectorAll('#panelTabs .tab').forEach((b) => b.classList.toggle('is-active', b.dataset.tab === tab));
+  ['outline', 'draft', 'context'].forEach((t) => {
+    const el = $(`pane-${t}`);
+    if (el) el.classList.toggle('is-active', t === tab);
+  });
+}
+
+function readOutlineEditsFromDom() {
+  return [...document.querySelectorAll('#pane-outline .ol-edit')].map((r) => {
+    const i = Number(r.dataset.i);
+    const head = r.querySelector('.ol-head')?.value.trim() || '';
+    return { ...(outlineEdits[i] || {}), heading: head || '（未命名）' };
+  });
+}
+
+function defaultTabFor(stage) {
+  if (['write', 'revise', 'redteam', 'quality', 'style_fix', 'audience', 'deliver', 'rewrite_gaps'].includes(stage)) return 'draft';
+  return 'outline';
+}
+
+function renderOutlinePane(c) {
+  const pane = $('pane-outline');
+  const isOutlineStage = c.stage === 'outline' || c.phase === 'plan';
+  const secs = c.outline?.sections || [];
+  const editable = isOutlineStage && secs.length > 0;
+  const parts = [];
+  const b = c.blueprint;
+  if (b && (b.article || b.tension || b.skeleton?.length)) {
+    const lines = [];
+    if (b.article) lines.push(`整篇 · ${b.article}`);
+    if (b.tension) lines.push(`张力 · ${b.tension}`);
+    if (b.readerTakeaway) lines.push(`读者带走 · ${b.readerTakeaway}`);
+    if (b.skeleton?.length) lines.push(`结构 · ${b.skeleton.join(' → ')}`);
+    if (b.corrections?.length) lines.push(`待吸收修正 · ${b.corrections.slice(-3).join('；')}`);
+    parts.push(ctxSection('整篇蓝图', `<details class="ctx-details"><summary>查看蓝图（${lines.length} 项）</summary>${lines.map((l) => `<div class="ctx-line">${esc(l)}</div>`).join('')}</details>`));
+  }
+  if (c.checklist?.length) {
+    const done = c.checklist.filter((x) => x.done).length;
+    parts.push(ctxSection(
+      `确认清单 ${done}/${c.checklist.length}`,
+      c.checklist.map((x) => `<div class="ctx-row ${x.done ? 'done' : ''}"><span>${x.done ? '✓' : '…'}</span>${esc(x.label)}</div>`).join(''),
+    ));
+  }
+  if (!secs.length) {
+    parts.push(ctxSection('实时大纲', '<div class="ctx-line">大纲会在信息确认后实时生成——下方可以随时提建议。</div>'));
+  } else {
+    outlineEdits = secs.map((s) => ({ ...s }));
+    const rows = secs.map((s, i) => `
+      <div class="ol-edit" data-i="${i}">
+        <input class="ol-head" value="${esc(s.heading)}" ${editable ? '' : 'disabled'} placeholder="节标题" />
+        <div class="ol-meta"><span>${esc(s.function || '')}</span>${s.words ? `<span>约 ${s.words} 字</span>` : ''}</div>
+        ${s.thesis ? `<div class="ol-thesis">${esc(s.thesis)}</div>` : ''}
+        ${(s.keyPoints || []).length ? `<div class="ol-points">${s.keyPoints.map((k) => `<span>${esc(k)}</span>`).join('')}</div>` : ''}
+        ${editable ? `<div class="ol-del-wrap"><button class="icon-btn danger ol-del" data-i="${i}">删节</button></div>` : ''}
+      </div>`).join('');
+    const editActions = editable
+      ? `<div class="ol-actions">
+          <button class="icon-btn" id="olAdd">＋ 新增一节</button>
+          <button class="btn btn-gold btn-sm" id="olSubmit">提交大纲修改</button>
+        </div>`
+      : '';
+    parts.push(ctxSection(`实时大纲 · ${secs.length} 节${editable ? '（可手改标题）' : ''}`, `${rows}${editActions}`));
+    if (!editable && c.progress?.total) {
+      parts.push(ctxSection('写作进度', `<div class="progress"><i style="width:${Math.round((c.progress.done / c.progress.total) * 100)}%"></i></div><div class="ctx-line">已写 ${c.progress.done}/${c.progress.total} 节 · 大纲此时只读，成稿后可在对话里继续调整</div>`));
+    }
+  }
+  const writingNow = c.stage === 'write' && !c.hasDraft;
+  parts.push(ctxSection(
+    '给 Sculptor 的建议',
+    `<textarea class="suggest" id="outlineSuggest" rows="2" placeholder="${writingNow ? '写作进行中，写完再提修改意见…' : '直接说：哪一节要改、往哪个方向改…'}"></textarea>
+     <button class="btn btn-gold btn-sm" id="suggestSend" ${writingNow ? 'disabled' : ''}>发送建议</button>`,
+  ));
+  pane.innerHTML = parts.join('');
+  $('suggestSend')?.addEventListener('click', () => {
+    const v = $('outlineSuggest').value.trim();
+    if (!v) return;
+    $('outlineSuggest').value = '';
+    submitChat(v);
+  });
+  $('olAdd')?.addEventListener('click', () => {
+    outlineEdits = readOutlineEditsFromDom();
+    outlineEdits.push({ heading: `新的一节${outlineEdits.length + 1}`, function: '待定', words: 0, thesis: '', keyPoints: [] });
+    renderOutlinePane({ ...c, outline: { title: c.outline?.title || '', sections: outlineEdits } });
+  });
+  document.querySelectorAll('#pane-outline .ol-del').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const i = Number(btn.dataset.i);
+      outlineEdits = readOutlineEditsFromDom();
+      outlineEdits.splice(i, 1);
+      renderOutlinePane({ ...c, outline: { title: c.outline?.title || '', sections: outlineEdits } });
+    });
+  });
+  $('olSubmit')?.addEventListener('click', () => {
+    const edited = readOutlineEditsFromDom();
+    const msg = `请把大纲重排成这样（保留可用素材与要点）：\n${edited
+      .map((s, i) => `${i + 1}. ${s.heading}（${s.function || '功能待定'}${s.words ? `，约${s.words}字` : ''}）${s.thesis ? `｜论点：${s.thesis}` : ''}`)
+      .join('\n')}`;
+    submitChat(msg);
+  });
+}
+
+function renderPaneDraft(c) {
+  const pane = $('pane-draft');
+  const hasContent = c.hasDraft || c.progress?.total > 0;
+  if (!hasContent) {
+    pane.innerHTML = ctxSection('写作手写区', '<div class="ctx-line">大纲确认并开始写作后，这里会出现草稿编辑区——你可以一边看 AI 写，一边亲手改。</div>');
+    return;
+  }
+  let html = '';
+  if (c.progress?.total) {
+    html += ctxSection('写作进度', `<div class="progress"><i style="width:${Math.round((c.progress.done / c.progress.total) * 100)}%"></i></div><div class="ctx-line">已写 ${c.progress.done}/${c.progress.total} 节</div>`);
+  }
+  html += ctxSection(
+    '手写草稿',
+    `<textarea class="draft-edit" id="paneDraftText" rows="14" placeholder="在这里亲手改稿，改完点保存；保存会写回草稿文件。"></textarea>
+     <div class="draft-edit-bar"><span class="char-count" id="paneDraftChars"></span>
+       <button class="btn btn-gold btn-sm" id="paneDraftSave">保存修改</button>
+       <button class="btn btn-ghost btn-sm" id="paneDraftView">查看成稿</button>
+     </div>
+     <div class="draft-edit-bar">
+       <button class="icon-btn" id="paneDraftMd">导出 md</button>
+       <button class="icon-btn" id="paneDraftDocx">导出 docx</button>
+       <button class="icon-btn" id="paneDraftPptx">导出 pptx</button>
+     </div>`,
+  );
+  if (c.outline?.sections?.length) {
+    html += ctxSection('大纲参考', c.outline.sections.map((s, i) => `<div class="ol-ref"><span>${i + 1}.</span>${esc(s.heading)}<em>${esc(s.function || '')}</em></div>`).join(''));
+  }
+  pane.innerHTML = html;
+  if (c.hasDraft) {
+    apiGet(`/api/draft?sessionId=${sessionId}`).then((d) => {
+      const ta = $('paneDraftText');
+      if (ta && d.text) {
+        ta.value = d.text;
+        $('paneDraftChars').textContent = `${d.text.replace(/\s/g, '').length} 字`;
+      }
+    }).catch(() => {});
+  }
+  const ta = $('paneDraftText');
+  if (ta) ta.addEventListener('input', () => { $('paneDraftChars').textContent = `${ta.value.replace(/\s/g, '').length} 字`; });
+  $('paneDraftSave')?.addEventListener('click', async () => {
+    try {
+      await apiPost('/api/save-draft', { sessionId, text: ta.value });
+      toast('草稿已保存');
+    } catch (e) { toast(e.message); }
+  });
+  $('paneDraftView')?.addEventListener('click', async () => {
+    try {
+      const d = await apiGet(`/api/draft?sessionId=${sessionId}`);
+      if (d.text) renderDraft(d.text);
+    } catch (e) { toast(e.message); }
+  });
+  $('paneDraftMd')?.addEventListener('click', () => downloadExport(sessionId, 'md'));
+  $('paneDraftDocx')?.addEventListener('click', () => downloadExport(sessionId, 'docx'));
+  $('paneDraftPptx')?.addEventListener('click', () => downloadExport(sessionId, 'pptx'));
+}
+
+function renderPaneContext(c) {
+  const pane = $('pane-context');
+  const parts = [];
+  if (c.intent?.summary) {
+    let h = `<div class="ctx-intent">${esc(c.intent.summary)}</div>`;
+    if (c.intent.coreNeed) h += `<div class="ctx-core">核心诉求 · ${esc(c.intent.coreNeed)}</div>`;
+    if (c.intent.risks?.length) h += `<div class="ctx-risk">风险 · ${esc(c.intent.risks.join('；'))}</div>`;
+    parts.push(ctxSection('我的理解', h));
+  }
+  if (c.materials?.length) {
+    parts.push(ctxSection(`素材 ×${c.materials.length}`, c.materials.map((m) => `<div class="ctx-material">${esc(m.slice(0, 90))}</div>`).join('')));
+  }
+  const sp = c.styleProgress || {};
+  let styleHtml = `<div class="ctx-line">write ${sp.write?.learned || 0}/${sp.write?.total || 14} 维 · read ${sp.read?.learned || 0}/${sp.read?.total || 7} 维</div>`;
+  if (c.styleNote) styleHtml += `<div class="ctx-line">风格底稿 · ${esc(c.styleNote)}</div>`;
+  parts.push(ctxSection('风格进度', styleHtml));
+  if (c.answerLevels?.length) {
+    const stats = Object.entries(c.answerStats || {})
+      .filter(([, n]) => n)
+      .map(([k, n]) => `<span class="vchip">${k}×${n}</span>`)
+      .join('');
+    const recent = c.answerLevels.map((a) => `<div class="ctx-row"><span>L${a.level}</span>${esc(a.sample)}</div>`).join('');
+    parts.push(ctxSection('回答层次（L0–L5）', `<div class="vector-chips">${stats}</div>${recent}`));
+  }
+  if (!parts.length) {
+    parts.push('<div class="empty">还没有上下文——开始对话后，这里会实时显示 Sculptor 的理解、素材与风格进度。</div>');
+  }
+  pane.innerHTML = parts.join('');
+}
+
+async function refreshPanel() {
   if (!sessionId) return;
   try {
     const c = await apiGet(`/api/context?sessionId=${sessionId}`);
-    $('contextStatus').textContent = `${c.status || ''}${c.outline ? ` · 大纲 ${c.outline.sections} 节` : ''}`;
-    const parts = [];
-    if (c.intent?.summary) {
-      let h = `<div class="ctx-intent">${esc(c.intent.summary)}</div>`;
-      if (c.intent.coreNeed) h += `<div class="ctx-core">核心诉求 · ${esc(c.intent.coreNeed)}</div>`;
-      if (c.intent.risks?.length) h += `<div class="ctx-risk">风险 · ${esc(c.intent.risks.join('；'))}</div>`;
-      parts.push(ctxSection('我的理解', h));
+    $('contextStatus').textContent = `${c.status || ''}${c.outline?.sections?.length ? ` · 大纲 ${c.outline.sections.length} 节` : ''}${c.progress?.total ? ` · 写作 ${c.progress.done}/${c.progress.total}` : ''}`;
+    renderOutlinePane(c);
+    renderPaneDraft(c);
+    renderPaneContext(c);
+    const stageKey = c.stage || c.phase || '';
+    if (stageKey !== lastPanelStage) {
+      setPanelTab(defaultTabFor(stageKey));
+      lastPanelStage = stageKey;
     }
-    if (c.checklist?.length) {
-      const done = c.checklist.filter((x) => x.done).length;
-      parts.push(ctxSection(
-        `确认清单 ${done}/${c.checklist.length}`,
-        c.checklist.map((x) => `<div class="ctx-row ${x.done ? 'done' : ''}"><span>${x.done ? '✓' : '…'}</span>${esc(x.label)}</div>`).join(''),
-      ));
-    }
-    if (c.blueprint) {
-      const b = c.blueprint;
-      const lines = [];
-      if (b.article) lines.push(`整篇 · ${b.article}`);
-      if (b.tension) lines.push(`张力 · ${b.tension}`);
-      if (b.readerTakeaway) lines.push(`读者带走 · ${b.readerTakeaway}`);
-      if (b.skeleton?.length) lines.push(`结构 · ${b.skeleton.join(' → ')}`);
-      if (b.corrections?.length) lines.push(`待吸收修正 · ${b.corrections.slice(-3).join('；')}`);
-      if (lines.length) parts.push(ctxSection('整篇蓝图', lines.map((l) => `<div class="ctx-line">${esc(l)}</div>`).join('')));
-    }
-    if (c.materials?.length) {
-      parts.push(ctxSection(
-        `素材 ×${c.materials.length}`,
-        c.materials.map((m) => `<div class="ctx-material">${esc(m.slice(0, 90))}</div>`).join(''),
-      ));
-    }
-    const sp = c.styleProgress || {};
-    let styleHtml = `<div class="ctx-line">write ${sp.write?.learned || 0}/${sp.write?.total || 14} 维 · read ${sp.read?.learned || 0}/${sp.read?.total || 7} 维</div>`;
-    if (c.styleNote) styleHtml += `<div class="ctx-line">风格底稿 · ${esc(c.styleNote)}</div>`;
-    parts.push(ctxSection('风格进度', styleHtml));
-    if (c.answerLevels?.length) {
-      const stats = Object.entries(c.answerStats || {})
-        .filter(([, n]) => n)
-        .map(([k, n]) => `<span class="vchip">${k}×${n}</span>`)
-        .join('');
-      const recent = c.answerLevels
-        .map((a) => `<div class="ctx-row"><span>L${a.level}</span>${esc(a.sample)}</div>`)
-        .join('');
-      parts.push(ctxSection('回答层次（L0–L5）', `<div class="vector-chips">${stats}</div>${recent}`));
-    }
-    if (!parts.length) {
-      parts.push('<div class="empty">还没有上下文——开始对话后，这里会实时显示 Sculptor 的理解、清单与风格进度。</div>');
-    }
-    $('contextBody').innerHTML = parts.join('');
   } catch { /* 面板非关键，失败静默 */ }
 }
 
@@ -360,7 +511,23 @@ async function handleStep(r) {
   } else {
     addMsg('bot', esc(r.message || '（完成）'));
   }
-  refreshContext();
+  refreshPanel();
+}
+
+async function submitChat(text) {
+  const msg = String(text || '').trim();
+  if (!sessionId || !msg || busy) return;
+  addMsg('user', esc(msg));
+  busy = true; $('send').disabled = true;
+  const w = addWorking('Sculptor 正在思考…');
+  try {
+    const r = await apiPost('/api/step', { sessionId, message: msg });
+    w.remove();
+    await handleStep(r);
+  } catch (e) {
+    w.remove(); addMsg('bot', `<span style="color:var(--bad)">${esc(e.message)}</span>`);
+  }
+  busy = false; $('send').disabled = false;
 }
 
 async function send() {
@@ -374,6 +541,8 @@ async function send() {
       const r = await apiPost('/api/start', { topic: text });
       sessionId = r.sessionId;
       if (r.meta) applyMeta(r.meta);
+      contextVisible = true;
+      updateContextVisibility();
       showView('session', { keepStage: true });
       setStage('clarify');
       w.remove();
@@ -386,18 +555,8 @@ async function send() {
     renderDash();
     return;
   }
-  addMsg('user', esc(text));
-  busy = true; $('send').disabled = true;
-  const w = addWorking('Sculptor 正在思考…');
-  try {
-    const r = await apiPost('/api/step', { sessionId, message: text });
-    w.remove();
-    await handleStep(r);
-  } catch (e) {
-    w.remove(); addMsg('bot', `<span style="color:var(--bad)">${esc(e.message)}</span>`);
-  }
-  busy = false; $('send').disabled = false;
   $('input').value = '';
+  submitChat(text);
 }
 
 async function resumeSession(id) {
@@ -405,6 +564,8 @@ async function resumeSession(id) {
     const metaData = await apiGet(`/api/session?sessionId=${id}`);
     sessionId = id;
     applyMeta(metaData.meta);
+    contextVisible = true;
+    updateContextVisibility();
     const t = await apiGet(`/api/transcript?sessionId=${id}`);
     $('chat').innerHTML = '';
     let sawDraft = false;
@@ -435,7 +596,7 @@ async function resumeSession(id) {
         setStage(stageMap[metaData.meta.phase] || 'clarify');
       }
     }
-    refreshContext();
+    refreshPanel();
     renderDash();
   } catch (e) {
     toast('恢复会话失败：' + e.message);
@@ -840,11 +1001,14 @@ $('newSessionBtn').addEventListener('click', () => showView('home'));
 $('contextToggle').addEventListener('click', () => {
   contextVisible = !contextVisible;
   updateContextVisibility();
-  if (contextVisible) refreshContext();
+  if (contextVisible) refreshPanel();
 });
 $('contextClose').addEventListener('click', () => {
   contextVisible = false;
   updateContextVisibility();
+});
+document.querySelectorAll('#panelTabs .tab').forEach((b) => {
+  b.addEventListener('click', () => setPanelTab(b.dataset.tab));
 });
 $('worksSearch').addEventListener('input', applyWorksFilter);
 $('knowledgeSearch').addEventListener('input', applyKnowledgeFilter);

@@ -25,7 +25,7 @@
     </nav>
     <div class="side-foot">
       <span class="pill" id="modePill">离线演示</span>
-      <span class="ver">引擎 v0.27</span>
+      <span class="ver">引擎 v0.28</span>
     </div>
   </aside>
 
@@ -73,7 +73,7 @@
             <p class="recent-label">最近项目</p>
             <div class="recent-list" id="recentList"></div>
           </div>
-          <p class="home-note">多会话工作台 · 引擎 v0.27 · 写作数据保存在本机 web-data/</p>
+          <p class="home-note">多会话工作台 · 引擎 v0.28 · 写作数据保存在本机 web-data/</p>
         </div>
       </section>
 
@@ -220,16 +220,22 @@
     </footer>
   </div>
 
-  <!-- 右侧 Agent 上下文面板 -->
+  <!-- 右侧伴随工作台（实时大纲 / 写作手写区 / Agent 上下文） -->
   <aside class="context-panel" id="contextPanel" hidden>
     <div class="context-head">
-      <div>
-        <div class="ctx-title">Agent 工作台</div>
-        <div class="ctx-sub" id="contextStatus">未加载</div>
+      <div class="tabs" id="panelTabs" role="tablist">
+        <button class="tab is-active" data-tab="outline">大纲</button>
+        <button class="tab" data-tab="draft">写作</button>
+        <button class="tab" data-tab="context">上下文</button>
       </div>
       <button class="icon-btn" id="contextClose">收起</button>
     </div>
-    <div class="context-body" id="contextBody"></div>
+    <div class="ctx-status" id="contextStatus">未加载</div>
+    <div class="context-body">
+      <div class="tab-pane is-active" id="pane-outline"></div>
+      <div class="tab-pane" id="pane-draft"></div>
+      <div class="tab-pane" id="pane-context"></div>
+    </div>
   </aside>
 
   <!-- 作品阅读弹层 -->

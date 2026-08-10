@@ -361,6 +361,7 @@ const server = http.createServer(async (req, res) => {
     const answerLevels = Array.isArray(state.answerLevels) ? state.answerLevels.slice(-10) : [];
     const answerStats = { L0: 0, L1: 0, L2: 0, L3: 0, L4: 0, L5: 0 };
     for (const a of state.answerLevels || []) answerStats['L' + a.level] = (answerStats['L' + a.level] || 0) + 1;
+    const sections = state.outline?.sections || [];
     return json(res, 200, {
       id,
       phase: state.phase || 'clarify',
@@ -379,8 +380,22 @@ const server = http.createServer(async (req, res) => {
       answerStats,
       hasDraft: fs.existsSync(path.join(dir, 'draft.md')),
       outline: state.outline
-        ? { title: state.outline.title, sections: state.outline.sections?.length || 0 }
+        ? {
+            title: state.outline.title,
+            sections: sections.map((s) => ({
+              heading: s.heading,
+              function: s.function,
+              thesis: s.thesis || '',
+              words: s.words,
+              keyPoints: s.keyPoints || [],
+              materials: s.materials || [],
+            })),
+          }
         : null,
+      progress: {
+        done: state.director?.writeIndex || 0,
+        total: sections.length,
+      },
     });
   }
   if (req.method === 'GET' && p === '/api/overview') {

@@ -1,6 +1,6 @@
 {
   "name": "sculptor-agent",
-  "version": "0.27.1",
+  "version": "0.28.0",
   "description": "Sculptor complete agent: standalone writing workflow CLI + point-edit + MCP server for host agents (Codex/Claude Code/OpenCode)",
   "type": "module",
   "bin": {

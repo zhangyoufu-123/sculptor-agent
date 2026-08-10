@@ -131,6 +131,8 @@ await step('上下文面板与概览接口', async () => {
   assert(Array.isArray(ctx.checklist) && ctx.checklist.length > 0, 'context 返回确认清单');
   assert(typeof ctx.answerStats === 'object' && 'L0' in ctx.answerStats, 'context 回答层次统计');
   assert(typeof ctx.materials === 'object', 'context 素材字段');
+  assert(typeof ctx.progress === 'object' && 'done' in ctx.progress, 'context 写作进度字段');
+  assert(ctx.outline === null || Array.isArray(ctx.outline.sections), 'context 大纲完整节列表');
   const ov = JSON.parse((await call('/api/overview'))._body());
   assert(typeof ov.sessions === 'number' && ov.sessions >= 1, 'overview 会话统计');
   assert(typeof ov.byCat === 'object', 'overview 分类统计');
