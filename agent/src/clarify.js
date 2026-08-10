@@ -26,7 +26,7 @@ import {
   markAsked,
   wasAsked,
 } from './knowledge.js';
-import { dataSuggestion, queueAssetSearch, webRecommendation } from './rag.js';
+import { dataSuggestion, queueAssetSearch, webRecommendation, explicitSearchSuggestion } from './rag.js';
 import { academicGap } from './academic.js';
 
 const LOW_WILL = /没(有|什么)?更多|你决定|你自己决定|就这样|先这样|可以了|够了|你看着办/;
@@ -571,6 +571,16 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     if (kbCaptured.length) {
       ws.logContext(workspace, 'knowledge', `从对话归纳收录 ${kbCaptured.length} 条个人知识`);
     }
+    // 显式检索请求（"帮我查一查《乡土中国》中…"）→ 立即排队/直连检索，并把提示回给用户。
+    // 之前 RAG 只在"论文/素材不足"时被动触发，用户主动要求查证却被跳过——这里补上显式通路。
+    let userSearchSuggestion = '';
+    try {
+      userSearchSuggestion = await explicitSearchSuggestion(cfg, workspace, lastInput, state);
+      if (userSearchSuggestion) {
+        ws.logContext(workspace, 'rag', `用户显式检索请求 → ${userSearchSuggestion.slice(0, 120)}`);
+      }
+    } catch {}
+    state.userSearchSuggestion = userSearchSuggestion;
     // pending 书已得到明确回应（确认已入库/否认/答了别的）→ 只问一次，清掉防误记
     if (state.pendingKbBook && lastInput.trim()) state.pendingKbBook = null;
     ws.logContext(workspace, 'clarify', `${state.lastQuestion || '（首轮）'} → ${lastInput}`);
@@ -666,6 +676,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     dataSuggestion: state.dataSuggestion || '',
     recommendSuggestion: state.recommendSuggestion || '',
     academicHint: state.academicHint || '',
+    searchSuggestion: state.userSearchSuggestion || '',
     style: styleProgress(workspace),
     stylePulse: lastInput
       ? { summary: clarifyPulse?.summary || '', suggestion: clarifyPulse?.suggestion || '' }
@@ -714,6 +725,7 @@ export async function clarifyInteractive(cfg, wsDir) {
         prompt += `\n选项: ${next.options.map((o, i) => `${'ABC'[i]}. ${o}`).join('  ')}`;
       if (next.knowledgeSuggestion) prompt += `\n${next.knowledgeSuggestion}`;
       if (next.dataSuggestion) prompt += `\n${next.dataSuggestion}`;
+      if (next.searchSuggestion) prompt += `\n${next.searchSuggestion}`;
       if (next.recommendSuggestion) prompt += `\n${next.recommendSuggestion}`;
       if (next.academicHint) prompt += `\n${next.academicHint}`;
       if (next.checklist?.length)

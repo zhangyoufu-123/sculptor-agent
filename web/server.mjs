@@ -198,6 +198,7 @@ function botText(r) {
     if (r.recommendation) parts.push(`我的建议：${r.recommendation}`);
     if (r.knowledgeSuggestion) parts.push(r.knowledgeSuggestion);
     if (r.dataSuggestion) parts.push(r.dataSuggestion);
+    if (r.searchSuggestion) parts.push(r.searchSuggestion);
     if (r.recommendSuggestion) parts.push(r.recommendSuggestion);
     if (r.academicHint) parts.push(r.academicHint);
     if (r.options?.length) parts.push(`选项：${r.options.map((o, i) => `${'ABC'[i]}. ${o}`).join('  ')}`);
@@ -305,6 +306,7 @@ async function runStepAndRespond(res, id, message) {
       options: r.options,
       knowledgeSuggestion: r.knowledgeSuggestion || '',
       dataSuggestion: r.dataSuggestion || '',
+      searchSuggestion: r.searchSuggestion || '',
       recommendSuggestion: r.recommendSuggestion || '',
       academicHint: r.academicHint || '',
       checklist: r.checklist || null,

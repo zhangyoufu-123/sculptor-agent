@@ -245,6 +245,24 @@ const CONFIRM_RE =
   /读过|看过|喜欢|爱看|爱读|很喜欢|确实是|是的|对，|可以|好，|嗯|没错|同意|收录|记下|一直想看/;
 const DECLINE_RE = /没读过|没看过|没读|没看|没去过|没有读过|没有看过|不是|算了|不用|不记得|谈不上/;
 const GENERIC_PLACE = /^(地方|那里|那些|这边|这些|几次|许多|很多|不少|一些|好几个地方|别处)$/;
+// 引用式提及：无书名号、但明显在引用一本书/一段论述（"在乡土中国中听到…"）
+const BARE_REFER_RE =
+  /(?:(?<![站坐走待住躺放立挂贴摆存藏听看])在|读到|看到|听到|提到|讲到|论述|说过|读过|看过)([\u4e00-\u9fff·]{2,8})(?:中|里|一书|这本书|那本书|这部|那部|里面有|论述|讲到|提到)/g;
+const EXCLUDE_BARE = new Set([
+  '这里', '那里', '刚才', '之前', '现在', '时候', '之后', '上面', '下面', '里面',
+  '其中', '方面', '当中', '中间', '过程', '情况', '环境', '社会', '世界', '生活',
+  '学习', '工作', '对话', '讨论', '文章', '作品', '内容', '文字', '语言', '思想',
+  '观念', '理论', '问题', '事情', '东西', '原因', '说法', '段落', '章节',
+]);
+
+/** 书名号《书名》是否处于"引用"语境（读到/听到/论述/中/里…）。 */
+function isReferencedTitle(text, title) {
+  const t = String(title || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return (
+    new RegExp(`(?:在|读到|看到|听到|提到|讲到|论述|说过|读过|看过|书中|书里|作品|文章)[^。；，！？]{0,14}《${t}》`).test(text) ||
+    new RegExp(`《${t}》[^。；，！？]{0,10}(?:中|里|论述|讲到|提到|读到|看到|听到)`).test(text)
+  );
+}
 
 /** 用户输入是否带"确认读过/喜欢"信号。 */
 export function confirmSignal(input) {
@@ -269,14 +287,16 @@ export function captureKbMentions(workspace, input, { pendingBook = '' } = {}) {
   const confirmed = confirmSignal(text);
   const exists = (title) =>
     listEntries(workspace).some((e) => normTitle(e.title) === normTitle(title));
-  const handle = (title, type, source) => {
+  const handle = (title, type, source, confidence = 0.9, skipDeclined = false) => {
     const t = String(title || '').trim();
-    if (!t || declined || exists(t)) return;
+    if (!t || exists(t)) return;
+    if (declined && !skipDeclined) return;
     const { entry, created } = addEntry(workspace, {
       title: t,
       type,
       note: text.slice(0, 200),
       source,
+      confidence,
     });
     if (created) captured.push(entry.id);
   };
@@ -287,6 +307,29 @@ export function captureKbMentions(workspace, input, { pendingBook = '' } = {}) {
   for (const b of books) {
     if (confirmed || (pendingBook && normTitle(b) === normTitle(pendingBook))) {
       handle(b, 'book', 'user-confirmed');
+    } else if (isReferencedTitle(text, b)) {
+      // 引用式提及：即使没明说"读过"，用户主动引用/要求查证 → 低置信收录，标注来源
+      handle(b, 'book', 'user-referenced', 0.6, true);
+    }
+  }
+  // 无书名号的引用式提及："在乡土中国中听到一段论述" → 收录（低置信、可删除）
+  if (!declined) {
+    for (const m of text.matchAll(BARE_REFER_RE)) {
+      let name = String(m[1] || '')
+        .replace(/^(这|那|我|你|他|她|一|各|某|我们|你们|他们)/, '')
+        .replace(/(多了|很多|不少|一些|几个|好几次|等地|等)$/, '')
+        .trim();
+      // "站在那间教室里"这类不是书目引用：原名以"这/那"开头直接跳过
+      if (/^[这那]/.test(String(m[1] || ''))) continue;
+      if (name.length < 2 || EXCLUDE_BARE.has(name) || exists(name)) continue;
+      const { entry, created } = addEntry(workspace, {
+        title: name,
+        type: 'book',
+        note: text.slice(0, 200),
+        source: 'user-referenced',
+        confidence: 0.6,
+      });
+      if (created) captured.push(entry.id);
     }
   }
   // 去过/参观过的地方（泛问时已声明"说给我，我会记进知识库"）→ 收录为 place

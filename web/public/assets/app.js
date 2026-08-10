@@ -224,6 +224,7 @@ function renderAsk(r) {
   }
   if (r.knowledgeSuggestion) html += `<div class="hint">${esc(r.knowledgeSuggestion)}</div>`;
   if (r.dataSuggestion) html += `<div class="hint">${esc(r.dataSuggestion)}</div>`;
+  if (r.searchSuggestion) html += `<div class="hint">🔎 ${esc(r.searchSuggestion)}</div>`;
   if (r.recommendSuggestion) html += `<div class="hint">${esc(r.recommendSuggestion)}</div>`;
   if (r.recommendation) html += `<div class="rec">我的建议 · ${esc(r.recommendation)}</div>`;
   if (r.options && r.options.length) {
