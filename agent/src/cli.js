@@ -106,7 +106,7 @@ import {
 } from './credentials.js';
 import { runReview, renderReview } from './review.js';
 
-const HELP = `Sculptor Agent v0.17 — 完整写作 Agent（导演模式 · 四层复合风格向量 · 深度审阅 · 多模态）
+const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四层复合风格向量 · 个人知识库 · 多 Agent 协作 · 多模态）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
