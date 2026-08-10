@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-10（比赛成果 · 研究论文）
+
+- **新增 [docs/competition/RESEARCH-PAPER.md](docs/competition/RESEARCH-PAPER.md)**：
+  正式研究论文《SCULPTOR：以"作者建模"为中心的深度协作写作 Agent》——
+  形式化"风格 = 个体表达对完美表达的结构化偏离"的差异弥补模型、四层风格表征、
+  双风格分离原则、PKB 三纪律、认知写作流程实例化；并给出对照/消融/用户盲评
+  三个实验的完整设计（待采集数据后补充结果章节）。
+
 ## 2026-08-10（发布版 0.23.0 · 比赛材料）
 
 - **版本对齐**：package.json / MCP serverInfo / CLI help 统一到 0.23.0。
