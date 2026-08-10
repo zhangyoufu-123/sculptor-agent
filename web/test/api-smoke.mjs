@@ -152,6 +152,37 @@ await step('上下文面板与概览接口', async () => {
   assert(typeof ov.byCat === 'object', 'overview 分类统计');
 });
 
+await step('文件上传（多模态摄入）', async () => {
+  const b64 = Buffer.from(
+    '这是一段从文档里提取的素材：窗台积灰与百年前的脚步声。\n',
+  ).toString('base64');
+  const up = await call('/api/upload', 'POST', {
+    sessionId: sid,
+    filename: '素材.txt',
+    dataBase64: b64,
+  });
+  const d = JSON.parse(up._body());
+  assert(up.statusCode === 200 && d.ok && d.kind === 'text', '上传并提取为文本素材');
+  const ctx = JSON.parse((await call(`/api/context?sessionId=${sid}`))._body());
+  assert(
+    ctx.materials.some((m) => String(m).includes('素材.txt')),
+    '上传文件进入会话素材',
+  );
+});
+
+await step('RAG 待检索查询与资料回灌', async () => {
+  const needs = JSON.parse((await call(`/api/rag/needs?sessionId=${sid}`))._body());
+  assert(Array.isArray(needs.pending), 'rag/needs 返回数组');
+  const ing = await call('/api/rag/ingest', 'POST', {
+    sessionId: sid,
+    text: '某研究指出：数字教育转型的实证数据（来源：教育学报 2025）。',
+  });
+  const d = JSON.parse(ing._body());
+  assert(d.ok && d.ingested >= 1, '粘贴资料回灌成功');
+  const ctx = JSON.parse((await call(`/api/context?sessionId=${sid}`))._body());
+  assert(typeof ctx.rag?.pendingRequests === 'number', 'context 携带 RAG 状态');
+});
+
 await step('导出（先落一份草稿）', async () => {
   const draft = '# 百年历久，北大红楼\n\n## 一、站在门口\n\n石阶被磨亮了一百年。\n\n## 二、百年之后\n\n历史从不缺席，只等人走进去。\n';
   const save = await call('/api/save-draft', 'POST', { sessionId: sid, text: draft });
@@ -164,6 +195,20 @@ await step('导出（先落一份草稿）', async () => {
   assert(pptx.statusCode === 200 && pptx._body().startsWith('PK'), 'pptx 导出（zip 魔数）');
   const rep = await call(`/api/report?sessionId=${sid}`);
   assert(rep.statusCode === 200 && JSON.parse(rep._body()).metrics, '审计报告接口');
+});
+
+await step('句子级点改', async () => {
+  const pe = await call('/api/point-edit', 'POST', {
+    sessionId: sid,
+    quote: '石阶被磨亮了一百年。',
+    instruction: '更口语一点',
+  });
+  const d = JSON.parse(pe._body());
+  assert(pe.statusCode === 200 && d.ok && d.replacement, `point-edit 返回改写结果 (${pe.statusCode})`);
+  const draft = JSON.parse((await call(`/api/draft?sessionId=${sid}`))._body());
+  assert(draft.text.includes('那扇窗没有开口'), '文件已被改写（mock 修订生效）');
+  const ctx = JSON.parse((await call(`/api/context?sessionId=${sid}`))._body());
+  assert(typeof ctx.styleProgress === 'object', '点改后上下文面板仍正常');
 });
 
 await step('删除会话', async () => {

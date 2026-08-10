@@ -42,6 +42,8 @@ export function loadConfig(env = process.env) {
     whisperTimeoutMs: Number(env.SCULPTOR_WHISPER_TIMEOUT_MS || 300000),
     ragEndpoint: env.SCULPTOR_RAG_ENDPOINT || '',
     ragApiKey: env.SCULPTOR_RAG_API_KEY || '',
+    searchProvider: env.SCULPTOR_SEARCH_PROVIDER || '',
+    searchApiKey: env.SCULPTOR_SEARCH_API_KEY || '',
     embedBaseUrl: env.SCULPTOR_EMBED_BASE_URL || '',
     embedApiKey: env.SCULPTOR_EMBED_API_KEY || '',
     embedModel: env.SCULPTOR_EMBED_MODEL || '',

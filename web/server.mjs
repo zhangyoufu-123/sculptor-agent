@@ -65,6 +65,18 @@ const { outlineProgress, nextOutlineGap } = await import(
 const { exportDocx, docxAvailable } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'io.js')).href
 );
+const { extractInput } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'io.js')).href
+);
+const { pointEdit } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'point-edit.js')).href
+);
+const {
+  searchOnline,
+  ingestSearchResults,
+  pendingDataNeeds,
+  ragStatus,
+} = await import(pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'rag.js')).href);
 
 const cfg = loadConfig();
 const IO_SCRIPTS = path.resolve(HERE, '..', 'agent', 'scripts', 'io');
@@ -406,6 +418,7 @@ const server = http.createServer(async (req, res) => {
       liveOutline: lo || null,
       outlineComplete: Boolean(lo?.complete),
       outlineConfirmed: Boolean(state.confirmed?.outlineConfirmed),
+      rag: ragStatus(dir, cfg),
     });
   }
   if (req.method === 'POST' && p === '/api/outline') {
@@ -447,6 +460,134 @@ const server = http.createServer(async (req, res) => {
     ws.writeState(dir, state);
     ws.logContext(dir, 'outline', `用户手动编辑实时大纲（${state.liveOutline.sections.length} 节）`);
     return json(res, 200, { ok: true, liveOutline: state.liveOutline });
+  }
+
+  // ── RAG：待检索查询 / 联网检索 / 资料回灌（补齐 Web 与 agent+codex 的检索闭环）──
+  if (req.method === 'GET' && p === '/api/rag/needs') {
+    const id = String(url.searchParams.get('sessionId') || '');
+    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    return json(res, 200, { pending: pendingDataNeeds(sessionDir(id)) });
+  }
+  if (req.method === 'POST' && p === '/api/rag/search') {
+    const { sessionId, query } = await body(req);
+    const id = String(sessionId || '');
+    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    const dir = sessionDir(id);
+    const pending = pendingDataNeeds(dir);
+    const queries = (
+      query
+        ? [String(query).slice(0, 120)]
+        : pending.flatMap((r) => r.queries || [])
+    )
+      .filter(Boolean)
+      .slice(0, 6);
+    if (!queries.length) {
+      return json(res, 400, {
+        error: '没有待检索的查询，也没有提供 query',
+        hint: '可以直接把资料粘贴进"资料回灌"输入框。',
+      });
+    }
+    const out = await searchOnline(cfg, queries);
+    if (!out.searched) {
+      return json(res, 400, { error: '未配置检索端点或检索失败', hint: out.hint || '', queries });
+    }
+    try {
+      const ing = ingestSearchResults(dir, out.results);
+      return json(res, 200, { ok: true, ingested: ing.ingested, queries });
+    } catch (err) {
+      return json(res, 400, { error: String(err.message || err).slice(0, 200) });
+    }
+  }
+  if (req.method === 'POST' && p === '/api/rag/ingest') {
+    const { sessionId, results, text } = await body(req);
+    const id = String(sessionId || '');
+    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    const dir = sessionDir(id);
+    let items = Array.isArray(results) ? results : [];
+    if (!items.length && typeof text === 'string' && text.trim()) {
+      const pending = pendingDataNeeds(dir);
+      items = [
+        {
+          query: pending[0]?.queries?.[0] || '资料回灌',
+          results: [
+            { title: '用户粘贴资料', source: '手动回灌', snippet: text.slice(0, 8000) },
+          ],
+        },
+      ];
+    }
+    if (!items.length) return json(res, 400, { error: '缺少 results 或 text' });
+    try {
+      const r = ingestSearchResults(dir, items);
+      return json(res, 200, { ok: true, ingested: r.ingested, cached: r.cached });
+    } catch (err) {
+      return json(res, 400, { error: String(err.message || err).slice(0, 200) });
+    }
+  }
+
+  // ── 多模态输入：文件上传（base64 → 会话 uploads → 提取成素材）──
+  if (req.method === 'POST' && p === '/api/upload') {
+    const { sessionId, filename, dataBase64 } = await body(req);
+    const id = String(sessionId || '');
+    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    if (typeof dataBase64 !== 'string' || !dataBase64) {
+      return json(res, 400, { error: '缺少 dataBase64' });
+    }
+    const b64 = dataBase64.includes(',') ? dataBase64.slice(dataBase64.indexOf(',') + 1) : dataBase64;
+    const buf = Buffer.from(b64, 'base64');
+    if (!buf.length || buf.length > 20 * 1024 * 1024) {
+      return json(res, 400, { error: '文件为空或超过 20MB' });
+    }
+    const dir = sessionDir(id);
+    const upDir = path.join(dir, 'uploads');
+    fs.mkdirSync(upDir, { recursive: true });
+    const safe =
+      path
+        .basename(String(filename || 'upload.bin'))
+        .replace(/[^\w.\u4e00-\u9fa5-]/g, '_')
+        .slice(0, 80) || 'upload.bin';
+    const file = path.join(upDir, `${Date.now()}-${safe}`);
+    fs.writeFileSync(file, buf);
+    const state = ws.readState(dir);
+    const ing = await extractInput(file, cfg);
+    if (ing.kind === 'text' && ing.text) {
+      state.materials = state.materials || [];
+      state.materials.push(`[文件 ${safe}] ${ing.text.slice(0, 2000)}`);
+      ws.writeState(dir, state);
+      ws.logContext(dir, 'ingest', `Web 上传 ${safe}（${ing.source || 'text'}，${ing.text.length} 字）→ 素材`);
+    } else {
+      ws.logContext(dir, 'ingest', `Web 上传 ${safe}：${ing.hint || '未提取'}`);
+    }
+    return json(res, 200, {
+      ok: true,
+      file: safe,
+      kind: ing.kind,
+      text: ing.kind === 'text' ? (ing.text || '').slice(0, 500) : '',
+      hint: ing.hint || '',
+      source: ing.source || '',
+    });
+  }
+
+  // ── 句子级点改：选中原文 → AI 只改这一句 → 吸收进风格档案 ──
+  if (req.method === 'POST' && p === '/api/point-edit') {
+    const { sessionId, quote, instruction } = await body(req);
+    const id = String(sessionId || '');
+    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    if (!String(quote || '').trim()) return json(res, 400, { error: '请先选中要改写的原文' });
+    if (!String(instruction || '').trim()) return json(res, 400, { error: '缺少修改指令' });
+    const dir = sessionDir(id);
+    const draftFile = path.join(dir, 'draft.md');
+    if (!fs.existsSync(draftFile)) return json(res, 400, { error: '还没有成稿，无法定点修改' });
+    try {
+      const out = await pointEdit(cfg, dir, {
+        quote: String(quote),
+        instruction: String(instruction),
+        dir,
+        file: draftFile,
+      });
+      return json(res, 200, { ok: true, ...out });
+    } catch (err) {
+      return json(res, 400, { error: String(err.message || err).slice(0, 300) });
+    }
   }
   if (req.method === 'GET' && p === '/api/overview') {
     const sessions = listSessions();

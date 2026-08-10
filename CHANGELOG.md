@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-08-10（v0.31：Web 补齐三能力——RAG 闭环 / 多模态上传 / 句子级点改）
+
+Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同一引擎：
+
+- **联网 RAG 闭环**：新增 `GET /api/rag/needs`（待检索队列）、`POST /api/rag/search`
+  （直连检索 + 自动回灌）、`POST /api/rag/ingest`（粘贴资料/结构化 results 回灌）。
+  回灌即写进素材并标记 `ragIngestedAt`，导演在下一轮自动重写缺口节。
+- **联网检索开箱即用**：引擎 `searchOnline` 支持主流服务商——`SCULPTOR_SEARCH_PROVIDER=tavily|serper`
+  + `SCULPTOR_SEARCH_API_KEY`（或沿用自建 `SCULPTOR_RAG_ENDPOINT`）；未配置时优雅降级
+  （提示手动粘贴回灌），绝不阻塞写作。
+- **多模态上传**：`POST /api/upload`（base64，≤20MB）→ 落会话 uploads → `extractInput`
+  提取 docx/xlsx/md/txt/图片/音频 → 直接进素材；前端"素材上传"按钮即传即用。
+- **句子级点改**：`POST /api/point-edit`（选中原文 + 修改指令）→ 引擎 `pointEdit`
+  只改目标区间（并发守卫，冲突即退让）→ 吸收进风格档案与风格向量；前端写作面板
+  「AI 改写选中」：自动先保存草稿 → 改写 → 刷新草稿并提示风格档案更新。
+- **上下文面板**：新增"素材上传"与"资料检索（RAG）"区块，显示待检索数 / 检索配置状态；
+  `/api/context` 增加 `rag` 状态（缓存/待办/直连/服务商）。
+- 测试：Web 冒烟扩展至 12 组（上传提取、RAG 回灌、点改生效、文件改写、面板正常），全套通过。
+
 ## 2026-08-10（v0.30：大纲完成度确定性结算 + 缺口驱动提问 + 大纲可视化）
 
 针对"实时大纲仍不实时、完成度靠模型口头宣称、大纲成了唯一裁判"的三层升级：

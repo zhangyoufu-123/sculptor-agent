@@ -314,6 +314,7 @@ function renderPaneDraft(c) {
        <button class="icon-btn" id="paneDraftMd">导出 md</button>
        <button class="icon-btn" id="paneDraftDocx">导出 docx</button>
        <button class="icon-btn" id="paneDraftPptx">导出 pptx</button>
+       <button class="btn btn-gold btn-sm" id="paneDraftPointEdit">AI 改写选中</button>
      </div>`,
   );
   if (c.outline?.sections?.length) {
@@ -346,6 +347,35 @@ function renderPaneDraft(c) {
   $('paneDraftMd')?.addEventListener('click', () => downloadExport(sessionId, 'md'));
   $('paneDraftDocx')?.addEventListener('click', () => downloadExport(sessionId, 'docx'));
   $('paneDraftPptx')?.addEventListener('click', () => downloadExport(sessionId, 'pptx'));
+  $('paneDraftPointEdit')?.addEventListener('click', async () => {
+    const ta = $('paneDraftText');
+    if (!ta) return;
+    const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd).trim();
+    if (!sel) {
+      toast('先在草稿里选中要改写的句子，再点「AI 改写选中」');
+      return;
+    }
+    const inst = window.prompt('怎么改？例如：更口语化一点 / 再克制一点 / 加一个具体细节', '更口语化一点');
+    if (!inst) return;
+    try {
+      // 先落盘当前草稿，保证选中原文与文件一致，再让 AI 只改这一句
+      await apiPost('/api/save-draft', { sessionId, text: ta.value });
+      const r = await apiPost('/api/point-edit', { sessionId, quote: sel, instruction: inst });
+      toast(`已改写「${sel.slice(0, 12)}…」并吸收进风格档案`);
+      const d = await apiGet(`/api/draft?sessionId=${sessionId}`);
+      if (d.text) {
+        ta.value = d.text;
+        $('paneDraftChars').textContent = `${d.text.replace(/\s/g, '').length} 字`;
+      }
+      refreshPanel();
+      if (r.writeUpdated || r.readUpdated) {
+        const w = await apiGet(`/api/style?sessionId=${sessionId}`);
+        toast(`风格档案已更新（write +${r.writeUpdated || 0} · read +${r.readUpdated || 0}）`);
+      }
+    } catch (e) {
+      toast(e.message);
+    }
+  });
 }
 
 function renderPaneContext(c) {
@@ -377,6 +407,27 @@ function renderPaneContext(c) {
   if (c.materials?.length) {
     parts.push(ctxSection(`素材 ×${c.materials.length}`, c.materials.map((m) => `<div class="ctx-material">${esc(m.slice(0, 90))}</div>`).join('')));
   }
+  // 多模态输入：上传 md/txt/docx/xlsx/图片 → 提取成素材
+  parts.push(ctxSection(
+    '素材上传',
+    `<div class="ctx-line">支持 md / txt / docx / xlsx / 图片 / 音频（本机可解析时）。上传后自动进入素材。</div>
+     <input type="file" id="ctxUploadInput" hidden />
+     <button class="btn btn-gold btn-sm" id="ctxUploadBtn">上传素材文件</button>`,
+  ));
+  // RAG：待检索 / 联网检索 / 资料回灌（补齐检索闭环）
+  const ragPending = c.rag?.pendingRequests || 0;
+  const ragDirect = c.rag?.direct
+    ? `已配置联网检索（${c.rag.provider || '自定义端点'}）`
+    : '未配置检索端点，可手动粘贴资料回灌';
+  parts.push(ctxSection(
+    `资料检索（RAG）${ragPending ? ` · ${ragPending} 项待检索` : ''}`,
+    `<div class="ctx-line">${esc(ragDirect)}</div>
+     <textarea class="suggest" id="ragText" rows="3" placeholder="把搜到的资料/引文/数据粘贴到这里，AI 会回灌进素材并自动补进缺口节…"></textarea>
+     <div style="display:flex;gap:8px;margin-top:6px">
+       <button class="btn btn-gold btn-sm" id="ragIngest">回灌资料</button>
+       <button class="icon-btn" id="ragSearch">联网检索（若已配置）</button>
+     </div>`,
+  ));
   const sp = c.styleProgress || {};
   let styleHtml = `<div class="ctx-line">write ${sp.write?.learned || 0}/${sp.write?.total || 14} 维 · read ${sp.read?.learned || 0}/${sp.read?.total || 7} 维</div>`;
   if (c.styleNote) styleHtml += `<div class="ctx-line">风格底稿 · ${esc(c.styleNote)}</div>`;
@@ -393,6 +444,55 @@ function renderPaneContext(c) {
     parts.push('<div class="empty">还没有上下文——开始对话后，这里会实时显示 Sculptor 的理解、素材与风格进度。</div>');
   }
   pane.innerHTML = parts.join('');
+  $('ctxUploadBtn')?.addEventListener('click', () => $('ctxUploadInput')?.click());
+  $('ctxUploadInput')?.addEventListener('change', async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const r = await apiPost('/api/upload', {
+          sessionId,
+          filename: f.name,
+          dataBase64: String(reader.result || ''),
+        });
+        toast(
+          r.kind === 'text'
+            ? `已提取 ${r.file}（${r.text?.length || 0} 字预览）`
+            : `已上传 ${r.file}：${r.hint || '未提取为文本'}`,
+        );
+        refreshPanel();
+      } catch (err) {
+        toast(err.message);
+      }
+    };
+    reader.readAsDataURL(f);
+  });
+  $('ragIngest')?.addEventListener('click', async () => {
+    const t = $('ragText')?.value.trim();
+    if (!t) {
+      toast('先粘贴要回灌的资料');
+      return;
+    }
+    try {
+      const r = await apiPost('/api/rag/ingest', { sessionId, text: t });
+      toast(`已回灌 ${r.ingested} 条资料，自动补进素材`);
+      $('ragText').value = '';
+      refreshPanel();
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+  $('ragSearch')?.addEventListener('click', async () => {
+    try {
+      const r = await apiPost('/api/rag/search', { sessionId });
+      toast(`联网检索完成，回灌 ${r.ingested} 组结果`);
+      refreshPanel();
+    } catch (err) {
+      toast(err.message);
+    }
+  });
 }
 
 async function refreshPanel() {

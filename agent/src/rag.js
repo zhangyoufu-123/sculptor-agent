@@ -192,27 +192,89 @@ export async function explicitSearchSuggestion(cfg, workspace, input, state = {}
 }
 
 /** 通路 2：直连检索端点（可选）。约定 POST {endpoint}/search {queries} → {results:[{query,results:[...]}]}。 */
-export async function searchOnline(cfg, queries) {
-  if (!cfg.ragEndpoint || !cfg.ragApiKey) {
-    return { searched: false, hint: '未配置 SCULPTOR_RAG_ENDPOINT/SCULPTOR_RAG_API_KEY——走宿主代检（已写入 requests.jsonl）。' };
-  }
-  if (!queries?.length) return { searched: false, hint: '没有查询' };
-  try {
-    const res = await fetch(`${cfg.ragEndpoint}/search`, {
+/**
+ * 联网检索（v0.31）：支持三种来源，按配置优先级取用——
+ * 1) SCULPTOR_SEARCH_PROVIDER=tavily + SCULPTOR_SEARCH_API_KEY（推荐，开箱即用）
+ * 2) SCULPTOR_SEARCH_PROVIDER=serper + SCULPTOR_SEARCH_API_KEY
+ * 3) 自建端点 SCULPTOR_RAG_ENDPOINT + SCULPTOR_RAG_API_KEY（POST {queries} → {results:[{query,results:[{title,url,snippet,source}]}]}）
+ * 都没配置 → 排队宿主代检（requests.jsonl），不阻塞写作。
+ */
+async function searchTavily(key, queries) {
+  const out = [];
+  for (const q of queries.slice(0, 3)) {
+    const res = await fetch('https://api.tavily.com/search', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${cfg.ragApiKey}`,
-      },
-      body: JSON.stringify({ queries }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: key, query: q, max_results: 5, search_depth: 'basic' }),
     });
-    if (!res.ok) throw new Error(`检索端点 ${res.status}`);
+    if (!res.ok) throw new Error(`Tavily ${res.status}`);
     const data = await res.json();
-    const results = Array.isArray(data.results) ? data.results : [];
-    if (!results.length) throw new Error('检索返回空 results');
-    return { searched: true, results };
+    out.push({
+      query: q,
+      results: (data.results || []).map((h) => ({
+        title: String(h.title || ''),
+        url: String(h.url || ''),
+        source: String(h.url || ''),
+        snippet: String(h.content || ''),
+      })),
+    });
+  }
+  if (!out.some((o) => o.results.length)) throw new Error('Tavily 返回空结果');
+  return { searched: true, results: out };
+}
+
+async function searchSerper(key, queries) {
+  const out = [];
+  for (const q of queries.slice(0, 3)) {
+    const res = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-KEY': key },
+      body: JSON.stringify({ q, num: 5 }),
+    });
+    if (!res.ok) throw new Error(`Serper ${res.status}`);
+    const data = await res.json();
+    out.push({
+      query: q,
+      results: (data.organic || []).map((h) => ({
+        title: String(h.title || ''),
+        url: String(h.link || ''),
+        source: String(h.link || ''),
+        snippet: String(h.snippet || ''),
+      })),
+    });
+  }
+  if (!out.some((o) => o.results.length)) throw new Error('Serper 返回空结果');
+  return { searched: true, results: out };
+}
+
+export async function searchOnline(cfg, queries) {
+  if (!queries?.length) return { searched: false, hint: '没有查询' };
+  const provider = String(cfg.searchProvider || '').toLowerCase();
+  const key = cfg.searchApiKey || cfg.ragApiKey || '';
+  try {
+    if (provider === 'tavily' && key) return await searchTavily(key, queries);
+    if (provider === 'serper' && key) return await searchSerper(key, queries);
+    if (cfg.ragEndpoint && cfg.ragApiKey) {
+      const res = await fetch(`${cfg.ragEndpoint}/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cfg.ragApiKey}`,
+        },
+        body: JSON.stringify({ queries }),
+      });
+      if (!res.ok) throw new Error(`检索端点 ${res.status}`);
+      const data = await res.json();
+      const results = Array.isArray(data.results) ? data.results : [];
+      if (!results.length) throw new Error('检索返回空 results');
+      return { searched: true, results };
+    }
+    return {
+      searched: false,
+      hint: '未配置检索（SCULPTOR_SEARCH_PROVIDER+KEY 或 SCULPTOR_RAG_ENDPOINT）——走宿主代检（已写入 requests.jsonl），也可手动粘贴资料回灌。',
+    };
   } catch (err) {
-    return { searched: false, hint: `直连检索失败：${String(err.message).slice(0, 120)}` };
+    return { searched: false, hint: `联网检索失败：${String(err.message).slice(0, 120)}` };
   }
 }
 
@@ -449,10 +511,15 @@ export function ingestSearchResults(workspace, results) {
 export function ragStatus(workspace, cfg = {}) {
   const pending = ws
     .countLines(path.join(workspace, 'protocol', 'requests.jsonl'));
+  const provider = String(cfg.searchProvider || '').toLowerCase();
+  const direct =
+    Boolean(cfg.ragEndpoint && cfg.ragApiKey) ||
+    Boolean(provider && (cfg.searchApiKey || cfg.ragApiKey));
   return {
     cached: readCache(workspace).length,
     pendingRequests: pending,
-    direct: Boolean(cfg.ragEndpoint && cfg.ragApiKey),
+    direct,
+    provider: provider || (cfg.ragEndpoint ? 'custom' : ''),
     endpoint: cfg.ragEndpoint || '',
     cacheFile: path.join(workspace, 'vault', CACHE_FILE),
   };
