@@ -12,7 +12,11 @@
   - `ablation --topic ... --author 样本`：消融实验——依次关闭 styleShot/persona/knowledge/styleAdapter，量化各模块边际贡献；
   - `survey [--out file]`：盲评 + 用户体验问卷模板（理解度/掌控感/满意度/AI 味/澄清轮数/修改次数/耗时）。
 - **降级原则**：无 LLM 密钥时对照/消融明确提示跳过，指标/采集/问卷等确定性功能照常可用。
-- **测试**：`agent/test/experiment.test.mjs`（15 项，离线 mock LLM）；全套 352 项断言全绿。
+- **盲评与汇总闭环**：`experiment blind <run目录>` 把盲评对导出成一页问卷（可直接分发）；
+  `experiment summarize <run目录> [--answers]` 输出论文表格（客观指标 + 盲评选择率 + 二项检验 z 值）。
+- **执行手册**：`docs/experiments/EXECUTION-GUIDE.md`（伦理声明/样本规范/三步实验流程/数据回填/时间建议）；
+  研究论文新增 5.4"结果（待回填）"与 5.5"讨论要点"占位章节。
+- **测试**：`agent/test/experiment.test.mjs`（18 项，离线 mock LLM）；全套 355 项断言全绿。
 
 ## 2026-08-10（比赛成果 · 研究论文）
 

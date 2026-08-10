@@ -103,6 +103,8 @@ import {
   runPairExperiment,
   runAblation,
   userSurveyTemplate,
+  renderBlindSurvey,
+  summarizeResults,
 } from './experiment.js';
 import { originalityScan } from './originality.js';
 import {
@@ -179,6 +181,9 @@ const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四�
                                      输出指标对比 + 随机顺序盲评对（vault/experiments/）
   sculptor experiment ablation --topic "题目" --author <样本文件> [工作区]  消融实验（逐模块关闭）
   sculptor experiment survey [--out file]  生成盲评 + 用户体验问卷模板
+  sculptor experiment blind <run目录> [--out file]  把盲评对导出成一页问卷（可直接分发）
+  sculptor experiment summarize <run目录> [--answers answers.json]
+                                     汇总论文表格：客观指标 + 盲评选择率 + 二项检验
   sculptor academic [工作区]         学术论证链：known→gap→tension→insight→method→evidence→limitation
                                      + 成稿论证完备性扫描（claim/evidence/warrant/limitation）
   sculptor persona [--refresh] [工作区]  人物风格肖像：从知识库/旧作/修改记录侧写你的写作人格
@@ -573,8 +578,27 @@ export async function runCli(argv, io = {}) {
           fs.mkdirSync(path.dirname(out), { recursive: true });
           fs.writeFileSync(out, JSON.stringify(userSurveyTemplate(), null, 2) + '\n', { mode: 0o600 });
           console.log(`问卷模板已生成 → ${out}（盲评 + 用户体验两部分）`);
+        } else if (sub === 'blind') {
+          if (positional.length < 2) throw new Error('用法: sculptor experiment blind <run目录> [--out file]');
+          const dir = path.resolve(positional[1]);
+          const blind = JSON.parse(fs.readFileSync(path.join(dir, 'blind.json'), 'utf8'));
+          const md = renderBlindSurvey(blind);
+          const out = flags.out ? path.resolve(String(flags.out)) : path.join(dir, 'blind-survey.md');
+          fs.writeFileSync(out, md + '\n', { mode: 0o600 });
+          console.log(`一页盲评问卷已导出 → ${out}`);
+        } else if (sub === 'summarize') {
+          if (positional.length < 2) throw new Error('用法: sculptor experiment summarize <run目录> [--answers answers.json]');
+          const dir = path.resolve(positional[1]);
+          const results = JSON.parse(fs.readFileSync(path.join(dir, 'results.json'), 'utf8'));
+          let answers = [];
+          if (flags.answers) answers = JSON.parse(fs.readFileSync(path.resolve(String(flags.answers)), 'utf8'));
+          const md = summarizeResults(results, answers);
+          const out = path.join(dir, 'summary.md');
+          fs.writeFileSync(out, md + '\n', { mode: 0o600 });
+          console.log(md);
+          console.log(`\n论文表格已写入 → ${out}`);
         } else {
-          throw new Error('用法: sculptor experiment metrics|collect|run|ablation|survey');
+          throw new Error('用法: sculptor experiment metrics|collect|run|ablation|survey|blind|summarize');
         }
         break;
       }

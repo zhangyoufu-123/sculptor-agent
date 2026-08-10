@@ -14,6 +14,8 @@ import {
   runAblation,
   userSurveyTemplate,
   buildExperimentReport,
+  renderBlindSurvey,
+  summarizeResults,
 } from '../src/experiment.js';
 
 let failures = 0;
@@ -99,6 +101,16 @@ check('消融各变体有指标', abl.variants.every((x) => x.metrics));
 // ── 问卷模板 ────────────────────────────────────────────
 const survey = userSurveyTemplate();
 check('问卷含盲评与用户体验', survey.sections.length === 2 && survey.sections[1].items.some((i) => i.key === 'ai_feel'));
+
+// ── 盲评问卷导出与结果汇总 ──────────────────────────────
+const blindMd = renderBlindSurvey(run.blind);
+check('盲评问卷一页导出', blindMd.includes('第 1 组') && blindMd.includes('更像作者本人') && blindMd.includes('盲评人'));
+const answers = run.blind.map((p, i) => ({ pairIndex: i, choice: 'A' }));
+const summary = summarizeResults(run.results, answers);
+check('汇总含客观指标表', summary.includes('客观人类化指标') && summary.includes('baseline 均值'));
+check('汇总含盲评统计', summary.includes('盲评结果') && summary.includes('二项检验'));
+const summaryNoAnswers = summarizeResults(run.results);
+check('无答案时给出占位说明', summaryNoAnswers.includes('尚未回填答案'));
 
 delete globalThis.fetch;
 console.log(`\n${failures === 0 ? '✓ 实验引擎测试全部通过' : `✗ ${failures} 项失败`}`);

@@ -340,4 +340,86 @@ export function userSurveyTemplate() {
   };
 }
 
+// ── 盲评问卷导出（一页纸，可直接分发到微信/问卷星）────────
+/**
+ * 把 blind.json 渲染成一页盲评问卷（Markdown）：每对 A/B 文本 + 单选 + 理由框。
+ * 问卷头部标注"请勿查看来源"，尾部留姓名/日期栏。
+ */
+export function renderBlindSurvey(blind, { title = 'Sculptor 风格保真度盲评' } = {}) {
+  const pairs = Array.isArray(blind) ? blind : [];
+  if (!pairs.length) return '（没有盲评对）';
+  const lines = [
+    `# ${title}`,
+    '',
+    '**说明**：下面每一组有两篇同题文章（A/B）。请独立阅读，选出"哪一篇更像该作者本人写的"。',
+    '**请不要查看任何生成来源**；两篇都不像或都像时，选"难以判断"。每篇约 200–800 字，请耐心读完再选。',
+    '',
+  ];
+  pairs.forEach((p, i) => {
+    lines.push(`## 第 ${i + 1} 组（作者 ${p.author || '匿名'}）`, '');
+    lines.push(`**A 篇**`, '', p.A?.text || '（缺失）', '');
+    lines.push(`**B 篇**`, '', p.B?.text || '（缺失）', '');
+    lines.push(
+      `- [ ] A 更像作者本人`,
+      `- [ ] B 更像作者本人`,
+      `- [ ] 难以判断`,
+      '',
+      `理由（可选，用词/句式/情感/细节任一点）：____________________`,
+      '',
+      '---',
+      '',
+    );
+  });
+  lines.push('盲评人：____________　日期：____________　（数据仅用于研究，匿名保存）');
+  return lines.join('\n');
+}
+
+/**
+ * 把盲评答案与指标合并成论文表格。
+ * @param results experiment run 的 results.json（含 baseline/variant 指标）
+ * @param answers [{pairIndex, choice: 'A'|'B'|'none'}] 盲评答案（A/B 指问卷上的位置）
+ * 输出：每作者指标表 + 盲评选择率 + 二项检验（H0: p=0.5 正态近似）。
+ */
+export function summarizeResults(results, answers = []) {
+  const rows = Array.isArray(results) ? results.filter((r) => !r.skipped) : [];
+  if (!rows.length) return '（无可汇总结果）';
+  const lines = ['# 实验结果汇总（论文用）', ''];
+  const keys = ['sentenceLengthStddev', 'paragraphCv', 'sentenceStartDedup', 'bigramTtr', 'perplexity'];
+  lines.push('## 一、客观人类化指标', '', '| 作者 | baseline | variant |', '| --- | --- | --- |');
+  for (const r of rows) {
+    const fmt = (m) => keys.map((k) => `${k}=${Number(m?.[k] || 0).toFixed(2)}`).join(' ');
+    lines.push(`| ${r.author} | ${fmt(r.baseline)} | ${fmt(r.variant)} |`);
+  }
+  // 均值
+  lines.push('', '| 指标 | baseline 均值 | variant 均值 | 变化 |', '| --- | --- | --- | --- |');
+  for (const k of keys) {
+    const mb = rows.reduce((s, r) => s + (r.baseline?.[k] || 0), 0) / rows.length;
+    const mv = rows.reduce((s, r) => s + (r.variant?.[k] || 0), 0) / rows.length;
+    lines.push(`| ${k} | ${mb.toFixed(2)} | ${mv.toFixed(2)} | ${(mv - mb >= 0 ? '+' : '')}${(mv - mb).toFixed(2)} |`);
+  }
+  // 盲评统计
+  if (answers.length) {
+    const chosen = answers.filter((a) => a && (a.choice === 'A' || a.choice === 'B'));
+    const n = chosen.length;
+    const k = chosen.filter((a) => a.choice === 'A').length; // 以 A 位置计（需结合盲评对顺序换算）
+    lines.push('', '## 二、盲评结果', '', `有效作答 ${n} 份（含"难以判断" ${answers.length - n} 份）`, '');
+    lines.push(
+      '> ⚠ 注意：A/B 位置是随机化的，论文统计时需按 blind.json 的 source 字段换算为"选 baseline 还是 variant"；',
+      '> 下面给出"选 variant 的比例"计算示例，请在换算后填入。',
+    );
+    if (n > 0) {
+      const z = (k - n / 2) / Math.sqrt(n / 4);
+      lines.push(
+        '',
+        `按问卷位置 A 的选中率：${((k / n) * 100).toFixed(1)}%（${k}/${n}）`,
+        `二项检验（H0: 位置 A 选中率=50%）：z ≈ ${z.toFixed(2)}（|z|>1.96 即 p<0.05，正态近似；建议用 scipy.stats.binomtest 复核）`,
+      );
+    }
+  } else {
+    lines.push('', '## 二、盲评结果', '', '（尚未回填答案——收集盲评人作答后，运行 summarize 并传入 --answers answers.json）');
+  }
+  lines.push('', '## 三、结论草稿', '', '（待数据回填后撰写：variant 在哪些指标上更接近真人、盲评选择率是否显著>50%。）');
+  return lines.join('\n');
+}
+
 export { BASELINE_PROMPT, VARIANT_PROMPT };
