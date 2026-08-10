@@ -14,8 +14,9 @@ import { unifiedBrief } from './rag.js';
 import { reviewOutline } from './outline-review.js';
 import { pulseAfterOutline, pushPulseToState } from './style-pulse.js';
 import { refreshStyleVector } from './style-vector.js';
-import { buildSearchQueries, requestHostSearch, pendingDataNeeds } from './rag.js';
+import { buildSearchQueries, requestHostSearch, pendingDataNeeds, queueAssetSearch } from './rag.js';
 import { academicNarrative } from './academic.js';
+import { personaBrief } from './persona.js';
 
 export function styleSummary(file) {
   try {
@@ -68,6 +69,14 @@ export async function generateOutline(cfg, wsDir) {
   if (!ok) {
     throw new Error(`素材门槛未过，缺少: ${missing.join('、')}。请先运行 sculptor clarify。`);
   }
+  // 内置资产命中不足时，联网补资产（once/会话、非阻塞；结果回灌后由 unifiedBrief 自动采用）
+  if (!state.assetSearchAsked && state.confirmed?.topic) {
+    state.assetSearchAsked = true;
+    queueAssetSearch(workspace, `${state.confirmed.topic} ${state.confirmed.genre || ''}`, {
+      purpose: 'asset-search',
+    });
+    ws.writeState(workspace, state);
+  }
   const ctx = {
     genre: state.confirmed.genre || '',
     topic: state.confirmed.topic,
@@ -109,6 +118,7 @@ export async function generateOutline(cfg, wsDir) {
     academicArc: /学术论文/.test(state.confirmed?.genre || '')
       ? academicNarrative(state)
       : '',
+    persona: personaBrief(workspace),
   };
   const content = await chatWithRetry(
     cfg,

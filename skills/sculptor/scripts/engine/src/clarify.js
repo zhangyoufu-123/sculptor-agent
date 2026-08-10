@@ -20,10 +20,12 @@ import {
   knowledgeSuggestion,
   captureKbMentions,
   recommendReadings,
+  listEntries,
   normTitle,
   markAsked,
+  wasAsked,
 } from './knowledge.js';
-import { dataSuggestion } from './rag.js';
+import { dataSuggestion, queueAssetSearch, webRecommendation } from './rag.js';
 import { academicGap } from './academic.js';
 
 const LOW_WILL = /没(有|什么)?更多|你决定|你自己决定|就这样|先这样|可以了|够了|你看着办/;
@@ -509,6 +511,26 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     if (bookMatch) markAsked(workspace, `recommend:${normTitle(bookMatch[1])}`);
   }
   state.recommendSuggestion = recSuggest || '';
+  // 内置思想库未命中 → 联网找相近作品（once/会话，去重；结果回灌后自动入知识库）。
+  if (!recSuggest) {
+    const topic = String(state.confirmed?.topic || '').trim();
+    if (topic) {
+      const webRec = webRecommendation(workspace, topic);
+      const webBook = webRec.match(/《([^》]{1,30})》/)?.[1] || '';
+      const kbHas = webBook
+        ? listEntries(workspace).some((e) => normTitle(e.title) === normTitle(webBook))
+        : false;
+      if (webRec && webBook && !kbHas && !wasAsked(workspace, `recommend:${normTitle(webBook)}`)) {
+        state.recommendSuggestion = webRec;
+        markAsked(workspace, `recommend:${normTitle(webBook)}`);
+      } else if (!state.thoughtSearchAsked) {
+        state.thoughtSearchAsked = true;
+        queueAssetSearch(workspace, `与「${topic}」主题相近的经典书籍与理论`, {
+          purpose: 'thought-search',
+        });
+      }
+    }
+  }
   // 学术论证链缺口提示（仅论文）：缺缺口/方法时提示补一次（不强制，写作时会按论证链补全）。
   const acGap = academicGap(state);
   state.academicHint = acGap.ok

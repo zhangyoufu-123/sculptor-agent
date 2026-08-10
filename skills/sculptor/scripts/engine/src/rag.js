@@ -10,10 +10,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as ws from './workspace.js';
 import { extractCitations, formatReferences } from './citation.js';
-import { knowledgeBrief } from './knowledge.js';
+import { knowledgeBrief, addEntry, normTitle } from './knowledge.js';
 import { assetBrief } from './asset.js';
 
 const CACHE_FILE = 'rag-cache.json';
+const ASSET_CACHE_FILE = 'asset-cache.json';
 const CACHE_MAX = 100;
 
 /** 从文稿与事实核查报告生成检索查询（确定性）。 */
@@ -196,11 +197,139 @@ export function unifiedBrief(workspace, query, { limit = 4 } = {}) {
   const parts = [];
   const kb = knowledgeBrief(workspace, query);
   if (kb) parts.push(`【你读过的/经历的（个人知识库，轮换使用）】\n${kb}`);
-  const assets = assetBrief(query, { limit: 3 });
+  const assets = webAssetBrief(workspace, query, { limit: 3 });
   if (assets.length) parts.push(`【写作资产（文法/诗词/论证骨架，按主题选取）】\n- ${assets.join('\n- ')}`);
   const cache = cacheBrief(workspace, query);
   if (cache) parts.push(`【检索回灌来源】\n${cache}`);
   return parts.slice(0, limit).join('\n\n');
+}
+
+// ── 内置库 RAG 化（v0.22）：联网检索优先，内置 JSON 只做离线兜底 ──────────
+function readAssetCache(workspace) {
+  try {
+    const obj = ws.readJson(path.join(workspace, 'vault', ASSET_CACHE_FILE));
+    return Array.isArray(obj.entries) ? obj.entries : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeAssetCache(workspace, entries) {
+  ws.writeJson(path.join(workspace, 'vault', ASSET_CACHE_FILE), {
+    schemaVersion: '1.0',
+    entries: entries.slice(-CACHE_MAX),
+  });
+}
+
+/**
+ * 联网资产/思想检索排队（非阻塞、去重）：
+ * 内置库命中不足时自动请求宿主代检（purpose: asset-search / thought-search）。
+ */
+export function queueAssetSearch(workspace, query, { purpose = 'asset-search' } = {}) {
+  const q = String(query || '').trim();
+  if (q.length < 4) return { queued: 0 };
+  const existing = pendingDataNeeds(workspace);
+  const dup = existing.some(
+    (p) => p.purpose === purpose && p.queries?.some((x) => x.includes(q.slice(0, 8))),
+  );
+  if (dup) return { queued: 0 };
+  return requestHostSearch(workspace, [q], { purpose });
+}
+
+/**
+ * 回灌联网资产/思想结果：写 asset-cache.json；
+ * 识别结果标题里的《书名》→ 一并收入个人知识库（数据互通，source: web-rag）。
+ */
+export function ingestAssetResults(workspace, results, { intoKb = true, purpose = 'asset-search' } = {}) {
+  if (!Array.isArray(results) || !results.length) throw new Error('results 必须是数组');
+  const entries = readAssetCache(workspace);
+  const state = ws.readState(workspace);
+  let added = 0;
+  let kbAdded = 0;
+  for (const item of results) {
+    const query = String(item.query || '').trim();
+    const hits = (item.results || []).slice(0, 6);
+    if (!query || !hits.length) continue;
+    entries.push({ ts: ws.nowIso(), query, purpose, results: hits });
+    added += 1;
+    if (intoKb) {
+      for (const h of hits) {
+        const m = String(h.title || '').match(/《([^》]{1,30})》/);
+        const title = m ? m[1] : '';
+        if (!title) continue;
+        try {
+          const r = addEntry(workspace, {
+            title: `《${title}》`,
+            type: 'book',
+            note: `${h.snippet || h.summary || ''}`.slice(0, 200),
+            source: 'web-rag',
+            relatedTo: [query.slice(0, 20)],
+          });
+          if (r.created) kbAdded += 1;
+        } catch {}
+      }
+    }
+  }
+  writeAssetCache(workspace, entries);
+  ws.logContext(workspace, 'asset-rag', `回灌 ${added} 组联网资产${kbAdded ? `，${kbAdded} 本书目入知识库` : ''}`);
+  return { ingested: added, kbAdded, cached: entries.length };
+}
+
+/** 联网荐书：从 thought-search 缓存里找与主题相近的作品，返回推荐语（无则空）。 */
+export function webRecommendation(workspace, topic) {
+  const clean = String(topic || '').toLowerCase().replace(/[\s\d]+/g, '');
+  const grams = new Set();
+  for (let i = 0; i < clean.length - 1; i++) {
+    const g = clean.slice(i, i + 2);
+    if (/[\u4e00-\u9fff]/.test(g)) grams.add(g);
+  }
+  let best = null;
+  let bestScore = 0;
+  for (const e of readAssetCache(workspace)) {
+    if (e.purpose !== 'thought-search') continue;
+    const text = `${e.query} ${(e.results || []).map((h) => `${h.title || ''} ${h.snippet || ''}`).join(' ')}`;
+    let score = 0;
+    for (const g of grams) if (text.includes(g)) score += 1;
+    if (score > bestScore) {
+      bestScore = score;
+      best = e;
+    }
+  }
+  if (!best || !bestScore) return '';
+  const first = (best.results || [])[0];
+  if (!first) return '';
+  const title = String(first.title || '').trim();
+  return `（联网搜到一本与你主题相关的作品：《${title.replace(/^《|》$/g, '')}》${first.source ? `（${first.source}）` : ''}${first.snippet ? `——${String(first.snippet).slice(0, 80)}` : ''}。需要我把它记进你的知识库吗？）`;
+}
+
+/** 联网资产缓存匹配（二元组），命中不足时退回内置库（离线兜底）。 */
+export function webAssetBrief(workspace, query, { limit = 3 } = {}) {
+  const clean = String(query || '').toLowerCase().replace(/[\s\d]+/g, '');
+  const grams = new Set();
+  for (let i = 0; i < clean.length - 1; i++) {
+    const g = clean.slice(i, i + 2);
+    if (/[\u4e00-\u9fff]/.test(g)) grams.add(g);
+  }
+  const scored = [];
+  for (const e of readAssetCache(workspace)) {
+    const text = `${e.query} ${(e.results || []).map((h) => `${h.title || ''}${h.snippet || ''}`).join(' ')}`;
+    let score = 0;
+    for (const g of grams) if (text.includes(g)) score += 1;
+    if (score > 0) scored.push({ e, score });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  const out = [];
+  for (const { e } of scored) {
+    for (const h of e.results || []) {
+      if (out.length >= limit) break;
+      const title = String(h.title || '').trim();
+      if (!title) continue;
+      out.push(`（联网资料）${title}${h.source ? `（${h.source}）` : ''}${h.snippet ? `：${String(h.snippet).slice(0, 60)}` : ''}`);
+    }
+    if (out.length >= limit) break;
+  }
+  if (out.length) return out;
+  return assetBrief(query, { limit }); // 离线兜底：确定性内置库
 }
 
 /** 回灌检索结果：缓存 + 把命中片段作为素材加入 state.materials（限量）。 */

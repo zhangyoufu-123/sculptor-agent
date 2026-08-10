@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.22.0 (2026-08-10)
+
+### Added（人物风格肖像 · 内置库 RAG 化 · 去硬编码）
+
+- **人物风格肖像（侧写）**：从个人知识库 + 个人写作库 + 修改记录 + 风格档案 + 复合向量，
+  生成可查询的写作人格肖像（`vault/persona.md`：叙述视角/词汇/句式/情感/价值观/套路与盲区/引用习惯）；
+  侧写注入大纲与写作（最高优先级），并映射回风格向量（`kind: persona`）。
+  `sculptor persona`（查询）/ `--refresh`（重新生成并映射）。
+- **内置库 RAG 化（不硬编码、联网优先）**：思想库（荐书）与资产库（文法/诗词/论证）改为
+  **联网检索优先、内置 JSON 离线兜底**——未命中自动排队宿主代检（thought-search / asset-search），
+  `sculptor rag ingest-assets <results.json>` 回灌 `vault/asset-cache.json`；
+  回灌结果中的《书名》自动入个人知识库（source: web-rag，数据互通）；
+  `unifiedBrief`/荐书联想缓存优先、内置库兜底；联网荐书可直接展示（`webRecommendation`）。
+- **灵活化**：保留确定性兜底（LLM 不可用时流程不崩），但默认路径是"知识库/检索/侧写"，不再只靠写死的列表。
+- **测试**：`agent/test/persona-rag.test.mjs`（18 项）；全套 318 项断言全绿。
+
 ## 0.21.0 (2026-08-10)
 
 ### Added（学术论证链 · 荐书联想 · 角色预演 · 统一素材体系）

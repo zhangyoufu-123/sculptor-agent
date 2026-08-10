@@ -22,7 +22,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node test/knowledge.test.mjs && node test/rag.test.mjs && node test/asset-academic-character.test.mjs && node test/e2e.mjs"
+    "test": "node test/knowledge.test.mjs && node test/rag.test.mjs && node test/asset-academic-character.test.mjs && node test/persona-rag.test.mjs && node test/e2e.mjs"
   },
   "license": "MIT",
   "keywords": [

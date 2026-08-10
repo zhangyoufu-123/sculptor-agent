@@ -85,10 +85,12 @@ import {
   buildSearchQueries,
   searchOnline,
   ingestSearchResults,
+  ingestAssetResults,
   requestHostSearch,
   pendingDataNeeds,
   ragStatus,
 } from './rag.js';
+import { buildPersona, personaStatus, personaBrief, personaToVector } from './persona.js';
 import { originalityScan } from './originality.js';
 import {
   discoverCredentials,
@@ -154,6 +156,8 @@ const HELP = `Sculptor Agent v0.17 — 完整写作 Agent（导演模式 · 四�
   sculptor recommend [工作区]        荐书联想：从思想库匹配与你主题相近的书/理论，说明为什么可用
   sculptor academic [工作区]         学术论证链：known→gap→tension→insight→method→evidence→limitation
                                      + 成稿论证完备性扫描（claim/evidence/warrant/limitation）
+  sculptor persona [--refresh] [工作区]  人物风格肖像：从知识库/旧作/修改记录侧写你的写作人格
+                                     （vault/persona.md 可查询）；--refresh 重新生成并映射回风格向量
   sculptor character list|add|view|remove|simulate <名字> [--scene 场景] [工作区]
                                      小说角色档案与预演：add 建档案（--want/--fear/--secret/--speech），
                                      simulate 让角色按档案预测情绪/言语/行为，供写作注入
@@ -165,7 +169,7 @@ const HELP = `Sculptor Agent v0.17 — 完整写作 Agent（导演模式 · 四�
   sculptor export --html out.html / --srt out.srt / --pdf out.pdf [工作区]  导出 HTML / 字幕 SRT / PDF
   sculptor cite "<json条目或数组>" [--style gbt7714|apa] [--file refs.json]  生成参考文献（期刊/图书/网页/报纸/论文/报告）
   sculptor citations [--file x.md] [--append refs.json] [--auto] [工作区]  提取文中《引文》清单；--append 追加参考文献到草稿；--auto 从检索回灌来源生成参考文献草稿
-  sculptor rag [status|search|ingest|needs] [工作区]  联网检索：search 生成查询并直连/排队宿主代检；ingest <results.json> 回灌缓存与素材；needs 查看待办资料请求
+  sculptor rag [status|search|ingest|ingest-assets|needs] [工作区]  联网检索：search 生成查询并直连/排队宿主代检；ingest <results.json> 回灌缓存与素材；ingest-assets 回灌联网资产/思想（书目自动入知识库）；needs 查看待办资料请求
   sculptor originality [--file x.md] [工作区]   原创性检查：文内重复句/与个人库自我复用/模板句（内置质量门，交付前自动执行）
   sculptor review [--fix] [--quick] [--file x.md] [工作区]  深度审阅：红队+校对+事实+原创+风格保真+读者交锋 → P0/P1/P2；--fix 一键修复 P0
   sculptor absorb <工作区> <edit.json>   吸收定点修改进风格档案
@@ -370,6 +374,14 @@ export async function runCli(argv, io = {}) {
           const results = Array.isArray(raw) ? raw : raw.results;
           const r = ingestSearchResults(w, results);
           console.log(`已回灌 ${r.ingested} 条检索结果（缓存 ${r.cached} 条，已加入素材）`);
+        } else if (sub === 'ingest-assets') {
+          if (positional.length < 2) throw new Error('用法: sculptor rag ingest-assets <results.json>');
+          const raw = JSON.parse(fs.readFileSync(path.resolve(positional[1]), 'utf8'));
+          const results = Array.isArray(raw) ? raw : raw.results;
+          const r = ingestAssetResults(w, results, { purpose: 'asset-search' });
+          console.log(
+            `已回灌 ${r.ingested} 组联网资产${r.kbAdded ? `，${r.kbAdded} 本书目入个人知识库` : ''}（缓存 ${r.cached} 条）`,
+          );
         } else if (sub === 'search') {
           const text = flags.text || positional.slice(1).join(' ');
           if (!text) throw new Error('用法: sculptor rag search "<要检索的文本>" [--topic 主题]');
@@ -410,6 +422,18 @@ export async function runCli(argv, io = {}) {
               `  通路: ${st.direct ? `直连 ${st.endpoint}` : '宿主代检（未配置 SCULPTOR_RAG_ENDPOINT）'}`,
           );
         }
+        break;
+      }
+      case 'persona': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const st = personaStatus(w);
+        if (flags.refresh || !st.built) {
+          const p = await buildPersona(cfg, w);
+          if (flags.refresh) await personaToVector(cfg, w);
+          console.log(`风格肖像已生成（${p.fallback ? '确定性兜底' : 'LLM 侧写'}）→ vault/persona.md`);
+        }
+        const brief = personaBrief(w, { limit: 10 });
+        console.log(brief || '（还没有风格肖像，先运行 sculptor persona --refresh）');
         break;
       }
       case 'style-adapter': {

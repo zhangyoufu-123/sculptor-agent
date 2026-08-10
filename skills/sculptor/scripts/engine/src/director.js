@@ -21,6 +21,7 @@ import { factScan } from './fact-check.js';
 import { proofScan } from './proofread.js';
 import { originalityScan } from './originality.js';
 import { buildSearchQueries, requestHostSearch, autoReferences } from './rag.js';
+import { buildPersona, personaToVector } from './persona.js';
 import { evaluateStyleFidelity } from './style-eval.js';
 import { archiveDraft, distillCategory } from './library.js';
 import { exportDocx } from './io.js';
@@ -70,6 +71,11 @@ function outlineView(outline) {
 async function advanceToOutline(cfg, workspace, state) {
   try {
     const r = await generateOutline(cfg, workspace);
+    // 人物风格肖像（静默）：从知识库+写作库+修改记录侧写，并映射回风格向量。
+    try {
+      await buildPersona(cfg, workspace);
+      await personaToVector(cfg, workspace);
+    } catch {}
     state.outline = r.outline;
     state.outlineConfirmed = false;
     state.phase = 'plan';

@@ -64,6 +64,7 @@ ${ctx.styleDirection ? `【最新风格方向】${ctx.styleDirection}` : ''}
 ${ctx.genreBrief ? `【文体范式（公式化内容按此产出）】\n${ctx.genreBrief}` : ''}
 ${ctx.personalSkill ? `【这类文体你个人的写法（蒸馏自你的旧作）】\n${ctx.personalSkill}` : ''}
 ${ctx.styleAdapter ? `【风格适配卡（压缩自你的全部样本，最高优先级）】\n${ctx.styleAdapter}` : ''}
+${ctx.persona ? `【人物风格肖像（侧写自你的知识库/旧作/修改记录）】\n${ctx.persona}` : ''}
 ${ctx.unifiedBrief ? `【统一素材·辅助参考】（你的知识库 + 检索来源 + 写作资产，只作联想引子；轮换使用，绝不反复引用同一本）\n${ctx.unifiedBrief}` : ''}
 ${ctx.academicArc ? `【学术论证链】（行文思路骨架：known → gap → tension → insight → method → evidence → limitation，每节按它在论证链上的位置推进，别跳步）\n${ctx.academicArc}` : ''}
 
@@ -105,6 +106,7 @@ ${ctx.styleDirection ? `【最新风格方向】${ctx.styleDirection}——按�
 ${ctx.genreBrief ? `【文体范式（公式化内容按此产出）】\n${ctx.genreBrief}` : ''}
 ${ctx.personalSkill ? `【这类文体你个人的写法（蒸馏自你的旧作）】\n${ctx.personalSkill}` : ''}
 ${ctx.styleAdapter ? `【风格适配卡（压缩自你的全部样本，最高优先级）】\n${ctx.styleAdapter}` : ''}
+${ctx.persona ? `【人物风格肖像（侧写自你的知识库/旧作/修改记录）】\n${ctx.persona}` : ''}
 ${ctx.unifiedBrief ? `【统一素材·辅助参考】（你的知识库 + 检索来源 + 写作资产，只作联想引子；轮换使用，绝不反复引用同一本）\n${ctx.unifiedBrief}` : ''}
 ${ctx.academicArc ? `【学术论证链】（本节在论证链上的位置与任务）\n${ctx.academicArc}` : ''}
 ${ctx.academicStyleNote ? `【学术表达规范】\n${ctx.academicStyleNote}` : ''}

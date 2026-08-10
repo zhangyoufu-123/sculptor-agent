@@ -14,9 +14,16 @@ import { loadStyleAdapter } from './style-adapter.js';
 import { pulseAfterWrite, pushPulseToState } from './style-pulse.js';
 import { refreshStyleVector } from './style-vector.js';
 import { snapshot } from './history.js';
-import { buildSearchQueries, requestHostSearch, parseDataNeed, unifiedBrief } from './rag.js';
+import {
+  buildSearchQueries,
+  requestHostSearch,
+  parseDataNeed,
+  unifiedBrief,
+  queueAssetSearch,
+} from './rag.js';
 import { simulateCharacter } from './character.js';
 import { academicNarrative, academicStyleNote } from './academic.js';
+import { personaBrief } from './persona.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -70,6 +77,15 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
   let prevPulse = null;
 
   state.phase = 'write';
+  // 联网资产补一次（once/会话、非阻塞）
+  if (!state.assetSearchAsked && (state.confirmed?.topic || outline.title)) {
+    state.assetSearchAsked = true;
+    queueAssetSearch(
+      workspace,
+      `${outline.title || state.confirmed.topic} ${state.confirmed.genre || ''}`,
+      { purpose: 'asset-search' },
+    );
+  }
   for (let i = start; i <= end; i++) {
     const section = sections[i];
     const words = section.words || Math.round(targetWords / sections.length);
@@ -128,6 +144,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       academicStyleNote: /学术论文/.test(state.confirmed?.genre || '')
         ? academicStyleNote()
         : '',
+      persona: personaBrief(workspace),
       characterShot,
       recentPulse: prevPulse
         ? `上一节「${prevPulse.section}」的风格脉搏建议：${prevPulse.suggestion || '（无）'}`
