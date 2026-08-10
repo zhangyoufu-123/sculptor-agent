@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.24.0 (2026-08-10)
+
+### Added（实验与数据采集引擎：把研究论文的实验设计落成工具）
+
+- **`sculptor experiment` 五个子命令**：
+  - `metrics <file>`：人类化指标（句长标准差/段落变异系数/句首去重率/二元 TTR/困惑度签名/黑名单/重复比喻/句式复用），复用红队审计 + L3 签名；
+  - `collect [工作区]`：采集作者语料包（旧稿样本/修改记录/对话话语/知识库/写作库/风格向量摘要）→ `vault/experiments/corpus.json`；
+  - `run --topic "题目" [--authors "名=文件;名2=文件2"]`：对照实验——每位作者跑通用 LLM baseline vs 风格注入 variant，
+    输出指标对比表 + 随机顺序 A/B 盲评对（`vault/experiments/run-*/`：results.json / blind.json / report.md）；
+  - `ablation --topic ... --author 样本`：消融实验——依次关闭 styleShot/persona/knowledge/styleAdapter，量化各模块边际贡献；
+  - `survey [--out file]`：盲评 + 用户体验问卷模板（理解度/掌控感/满意度/AI 味/澄清轮数/修改次数/耗时）。
+- **降级原则**：无 LLM 密钥时对照/消融明确提示跳过，指标/采集/问卷等确定性功能照常可用。
+- **测试**：`agent/test/experiment.test.mjs`（15 项，离线 mock LLM）；全套 352 项断言全绿。
+
 ## 2026-08-10（比赛成果 · 研究论文）
 
 - **新增 [docs/competition/RESEARCH-PAPER.md](docs/competition/RESEARCH-PAPER.md)**：

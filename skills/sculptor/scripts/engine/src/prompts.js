@@ -145,6 +145,34 @@ ${ctx.text}
 
 只输出扩写后的正文。`;
 
+/** 实验对照组：通用 LLM 直接生成（无任何风格/知识注入）。 */
+export const BASELINE_PROMPT = (ctx) => `你是一名写作者。请围绕下面的题目写一篇${ctx.genre || '文章'}。
+
+【题目】${ctx.topic}
+【目标字数】约 ${ctx.targetWords || 800} 字（中文字符）
+
+要求：结构完整、表达自然。
+
+只输出正文。`;
+
+/** 实验组：带作者风格注入（支持消融）。 */
+export const VARIANT_PROMPT = (ctx) => `你是"这个作者"的写作者。请围绕下面的题目，按这位作者的风格写一篇${ctx.genre || '文章'}。
+
+【题目】${ctx.topic}
+【目标字数】约 ${ctx.targetWords || 800} 字（中文字符）
+${ctx.writeStyle ? `【作者语言风格档案】\n${ctx.writeStyle}` : ''}
+${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
+${ctx.persona ? `【人物风格肖像】\n${ctx.persona}` : ''}
+${ctx.knowledgeBrief ? `【作者知识库·辅助参考】\n${ctx.knowledgeBrief}` : ''}
+
+要求：
+1. 黑名单禁用：在当今社会/随着/近年来/众所周知/值得注意的是/总而言之/赋能 等一律不用。
+2. 同一个比喻只允许出现一次；"虽然…但是…""不是…而是…"句式不重复使用。
+3. 段落长短错落，句式多样；连续成稿，不输出小标题。
+4. 数字与事实只用题目给定信息，绝不编造。
+
+只输出正文。`;
+
 export const RESTYLE_PROMPT = (
   ctx,
 ) => `你是 Sculptor 的改写者。把下面这一节按【新风格方向】整体重写：

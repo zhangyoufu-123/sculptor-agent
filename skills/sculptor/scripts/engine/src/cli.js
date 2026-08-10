@@ -95,6 +95,15 @@ import {
 import { buildPersona, personaStatus, personaBrief, personaToVector } from './persona.js';
 import { listBibles, readBible, saveBible, distillBible } from './bible.js';
 import { emotionCurve, renderEmotionCurve } from './revise.js';
+import {
+  humanMetrics,
+  renderHumanMetrics,
+  collectAuthorCorpus,
+  corpusStats,
+  runPairExperiment,
+  runAblation,
+  userSurveyTemplate,
+} from './experiment.js';
 import { originalityScan } from './originality.js';
 import {
   discoverCredentials,
@@ -163,6 +172,13 @@ const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四�
   sculptor bible list|view <标题>|save <标题>|distill [工作区]
                                      文章圣经：长文/系列文的跨篇一致性文档（交付自动沉淀）
   sculptor emotion [--file x.md] [工作区]  情绪曲线量化（按节输出强度与主导情绪，供节奏检查）
+  sculptor experiment metrics <file>        人类化指标：句长标准差/段落变异/TTR/困惑度签名等
+  sculptor experiment collect [工作区] [--out file]  采集作者语料包（旧稿/修改/话语/向量/知识）
+  sculptor experiment run --topic "题目" [--genre 散文] [--words 800] [--authors "名=文件;名2=文件2"] [工作区]
+                                     对照实验：每位作者跑 baseline vs 风格注入 variant，
+                                     输出指标对比 + 随机顺序盲评对（vault/experiments/）
+  sculptor experiment ablation --topic "题目" --author <样本文件> [工作区]  消融实验（逐模块关闭）
+  sculptor experiment survey [--out file]  生成盲评 + 用户体验问卷模板
   sculptor academic [工作区]         学术论证链：known→gap→tension→insight→method→evidence→limitation
                                      + 成稿论证完备性扫描（claim/evidence/warrant/limitation）
   sculptor persona [--refresh] [工作区]  人物风格肖像：从知识库/旧作/修改记录侧写你的写作人格
@@ -484,6 +500,82 @@ export async function runCli(argv, io = {}) {
         const file = flags.file ? path.resolve(String(flags.file)) : path.join(w, 'draft.md');
         if (!fs.existsSync(file)) throw new Error(`找不到文稿: ${file}`);
         console.log(renderEmotionCurve(emotionCurve(fs.readFileSync(file, 'utf8'))));
+        break;
+      }
+      case 'experiment': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const sub = positional[0] || 'help';
+        if (sub === 'metrics') {
+          if (positional.length < 2) throw new Error('用法: sculptor experiment metrics <file.md>');
+          const text = fs.readFileSync(path.resolve(positional[1]), 'utf8');
+          console.log(renderHumanMetrics(humanMetrics(text)));
+        } else if (sub === 'collect') {
+          const corpus = collectAuthorCorpus(w);
+          const stats = corpusStats(corpus);
+          const out = flags.out ? path.resolve(String(flags.out)) : path.join(w, 'vault', 'experiments', 'corpus.json');
+          fs.mkdirSync(path.dirname(out), { recursive: true });
+          fs.writeFileSync(out, JSON.stringify(corpus, null, 2) + '\n', { mode: 0o600 });
+          console.log(
+            `已采集作者语料包 → ${out}\n` +
+              `  旧稿样本 ${stats.samples} · 修改记录 ${stats.edits} · 对话话语 ${stats.utterances} · ` +
+              `知识库 ${stats.knowledge} · 作品 ${stats.libraryPieces} · ${stats.hasVector ? '风格向量 ✓' : '风格向量（无）'}`,
+          );
+        } else if (sub === 'run') {
+          if (!flags.topic) throw new Error('用法: sculptor experiment run --topic "题目" [--authors "名=文件;名2=文件2"]');
+          const authors = [];
+          if (flags.authors) {
+            for (const part of String(flags.authors).split(';')) {
+              const [name, file] = part.split('=');
+              if (!file) throw new Error(`作者格式应为 "名=文件"：${part}`);
+              const sample = fs.readFileSync(path.resolve(file.trim()), 'utf8');
+              authors.push({ name: (name || '').trim(), sample });
+            }
+          } else {
+            // 未指定作者：从本工作区的风格样本自动收集（每位样本一位"作者"）
+            const corpus = collectAuthorCorpus(w);
+            corpus.samples.forEach((s, i) => authors.push({ name: `样本${i + 1}`, sample: s }));
+          }
+          if (!authors.length) throw new Error('没有作者样本：请用 --authors 指定，或先在本工作区贴风格底稿');
+          const r = await runPairExperiment(cfg, {
+            topic: String(flags.topic),
+            genre: flags.genre ? String(flags.genre) : '散文',
+            targetWords: flags.words ? Number(flags.words) : 800,
+            authors,
+            workspace: w,
+          });
+          if (!r.ok) throw new Error(r.hint || '实验失败');
+          console.log(r.report);
+          console.log(`\n结果目录：${r.dir}（results.json / blind.json / report.md）`);
+        } else if (sub === 'ablation') {
+          if (!flags.topic || !flags.author) throw new Error('用法: sculptor experiment ablation --topic "题目" --author <样本文件>');
+          const sample = fs.readFileSync(path.resolve(String(flags.author)), 'utf8');
+          const r = await runAblation(cfg, {
+            topic: String(flags.topic),
+            genre: flags.genre ? String(flags.genre) : '散文',
+            targetWords: flags.words ? Number(flags.words) : 800,
+            sample,
+            workspace: w,
+          });
+          if (!r.ok) throw new Error(r.hint || '消融失败');
+          console.log('消融实验（指标越高越接近真人，对比各变体下降幅度）：');
+          for (const v of r.variants) {
+            if (!v.ok) {
+              console.log(`  ${v.label}：生成失败（无密钥）`);
+              continue;
+            }
+            console.log(
+              `  ${v.label}：句长σ ${v.metrics.sentenceLengthStddev} · 段落CV ${v.metrics.paragraphCv} · TTR ${v.metrics.bigramTtr} · 黑名单 ${v.metrics.blacklistHits}`,
+            );
+          }
+          console.log(`\n结果目录：${r.dir}`);
+        } else if (sub === 'survey') {
+          const out = flags.out ? path.resolve(String(flags.out)) : path.join(w, 'vault', 'experiments', 'survey.json');
+          fs.mkdirSync(path.dirname(out), { recursive: true });
+          fs.writeFileSync(out, JSON.stringify(userSurveyTemplate(), null, 2) + '\n', { mode: 0o600 });
+          console.log(`问卷模板已生成 → ${out}（盲评 + 用户体验两部分）`);
+        } else {
+          throw new Error('用法: sculptor experiment metrics|collect|run|ablation|survey');
+        }
         break;
       }
       case 'style-adapter': {

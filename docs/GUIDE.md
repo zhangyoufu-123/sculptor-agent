@@ -72,6 +72,8 @@ node $SCULPTOR init && node $SCULPTOR agent   # 导演模式：主导全程，�
 - `library`：个人写作库（分类 + 蒸馏个人写作 skill）。
 - `rag status|search|ingest|ingest-assets|needs`：联网检索/回灌/待办查看。
 - `emotion`：情绪曲线量化；`citations [--append refs.json] [--auto]`：引文与参考文献。
+- `experiment`：实证研究工具——`metrics` 人类化指标、`collect` 作者语料包、
+  `run` 对照实验（baseline vs 风格注入 + 盲评对）、`ablation` 消融、`survey` 问卷模板。
 
 ### 文体与导出
 
