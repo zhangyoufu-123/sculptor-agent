@@ -22,6 +22,7 @@ import { proofScan } from './proofread.js';
 import { originalityScan } from './originality.js';
 import { buildSearchQueries, requestHostSearch, autoReferences } from './rag.js';
 import { buildPersona, personaToVector } from './persona.js';
+import { understandIntent } from './intent.js';
 import { distillBible } from './bible.js';
 import { reviseScan } from './revise.js';
 import { evaluateStyleFidelity } from './style-eval.js';
@@ -153,6 +154,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     // 澄清收尾：把用户全部发言做一次"对话级整体风格提炼"（write/read 双风格），
     // 让没贴旧稿的用户也能在进入大纲前建立高层次风格档案；失败静默，不阻塞。
     try {
+      await understandIntent(cfg, workspace, state);
       await extractStyleFromConversation(cfg, workspace);
       await refreshStyleVector(cfg, workspace, { kind: 'conversation', evidence: '澄清收尾整体提炼' });
     } catch {}

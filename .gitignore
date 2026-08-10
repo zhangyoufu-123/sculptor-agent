@@ -2,6 +2,7 @@
 node_modules/
 .sculptor/
 .codex/
+web-data/
 *.bak.*
 .env.local
 .env

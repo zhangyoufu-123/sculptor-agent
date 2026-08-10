@@ -447,6 +447,12 @@ const CATEGORY_MAP = {
 /** 从用户话语/标题中检测文体，返回 GENRES 的键名或 null。 */
 export function detectGenre(text) {
   const t = String(text || '');
+  // 对话回复护栏：用户说"你决定/可以了/继续吧"这类口语回复时，绝不是文体声明。
+  // 例："你决定" 含 "决定"（公文文种）→ 不能误判成"写一份决定"。
+  const REPLY_PHRASES = ['你决定', '你自己决定', '你来决定', '可以了', '就这样', '先这样',
+    '没有更多', '没什么更多', '你看着办', '听你的', '继续吧', '继续问'];
+  const WRITE_VERB = /写|拟|起草|创作|生成|出一份|做一份|发一份|拟一份/;
+  if (REPLY_PHRASES.some((p) => t.includes(p)) && !WRITE_VERB.test(t)) return null;
   // 先匹配文体名本身（通知/合同/议论文…），避免被"公文"的别名抢先
   for (const [name] of Object.entries(GENRES)) {
     if (t.includes(name)) return name;

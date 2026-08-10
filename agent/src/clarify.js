@@ -16,6 +16,7 @@ import { refreshStyleVector } from './style-vector.js';
 import { detectGenre, genreBlueprint } from './genre.js';
 import { parseTargetWords, guessTargetWords } from './budget.js';
 import { extractInput } from './io.js';
+import { understandIntent, intentBrief } from './intent.js';
 import {
   knowledgeSuggestion,
   captureKbMentions,
@@ -292,9 +293,40 @@ function missingNeed(state) {
   return blueprintNeed(state);
 }
 
+/** 换一个角度问：优先挑"还没确认、也不是当前缺口"的维度，避免同一问题翻来覆去。 */
+function nextFallback(state, need) {
+  const done = new Set(
+    Object.entries(state.confirmed || {})
+      .filter(([, v]) => v)
+      .map(([k]) => k),
+  );
+  for (const f of FALLBACK_QUESTIONS) {
+    if (f.need === need) continue;
+    if (done.has(f.need)) continue;
+    if (f.need === 'styleSample' && state.confirmed?.styleSample) continue;
+    if (f.need === 'targetWords' && state.confirmed?.targetWords) continue;
+    return f;
+  }
+  return null;
+}
+
 async function askOnce(state, cfg, workspace) {
   const need = missingNeed(state);
   const coreReady = materialGate(state);
+  // 低意愿早退（确定性护栏，不依赖 LLM 判断）：连续两次"没有更多/你决定/可以了"且核心字段已齐
+  // → 直接进大纲。用户明确说"继续吧"是"你可以推进了"，不是"我还没说完"。
+  if ((state.lowWill || 0) >= 2 && coreReady) {
+    return { stop: true, ready: true, question: null, lowWill: true };
+  }
+  // 意图理解刷新：每轮有新输入时提炼"我的理解/核心诉求/风险"，喂给追问设计师对齐后再问。
+  // LLM 失败走确定性兜底，绝不阻塞、绝不让用户等。
+  if (state.lastInput) {
+    try {
+      await understandIntent(cfg, workspace, state);
+    } catch {
+      // understandIntent 内部已兜底，这里再包一层纯保险
+    }
+  }
   const style = workspace ? styleProgress(workspace) : null;
   // 蓝图回显：核心信息齐 + 风格底稿问过之后，把整篇文章回显给用户确认，再进大纲。
   if (need === 'blueprintConfirm') {
@@ -321,6 +353,7 @@ async function askOnce(state, cfg, workspace) {
     coreReady,
     styleNote: state.confirmed.styleNote || '',
     blueprintText: state.blueprint && renderBlueprint(state),
+    intentBrief: intentBrief(state),
     styleProgress: style
       ? `write ${style.write.learned}/${style.write.total} 维 · read ${style.read.learned}/${style.read.total} 维`
       : '',
@@ -342,6 +375,31 @@ async function askOnce(state, cfg, workspace) {
       return { stop: true, ready: materialGate(state), question: null };
     }
     const question = String(q.question || '').trim();
+    // 重复追问护栏（确定性）：LLM 与上一问同义/互相包含 → 换一个未确认维度问，绝不车轱辘。
+    const normQ = (s) => String(s || '').replace(/[，。！？、,.！\s]/g, '').toLowerCase();
+    const prevQ = normQ(state.lastQuestion);
+    const curQ = normQ(question);
+    const repeat =
+      prevQ &&
+      curQ &&
+      (prevQ === curQ ||
+        (prevQ.length >= 8 && prevQ.includes(curQ)) ||
+        (curQ.length >= 8 && curQ.includes(prevQ)));
+    if (repeat) {
+      state.repeatCount = (state.repeatCount || 0) + 1;
+      const f = nextFallback(state, need);
+      const fb = f || FALLBACK_QUESTIONS.find((x) => x.need === need) || FALLBACK_QUESTIONS[0];
+      return {
+        stop: false,
+        ready: materialGate(state),
+        question: fb.ask,
+        recommendation: fb.recommendation,
+        options: [],
+        fallback: true,
+        warn: '检测到重复追问，已换一个角度',
+      };
+    }
+    state.repeatCount = 0;
     // 硬校验：一次只允许一个问题。LLM 一旦输出"一次多问"（≥3 个问号，或带编号/其次/另外的列举），
     // 退回确定性单问题，绝不让用户面对多问、也绝不自答默认。
     const qMarks = (question.match(/[？?]/g) || []).length;
@@ -430,6 +488,9 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     // 答案归类到"上一个问题"的意图；提问时就推断并保存该意图。
     const field = state.lastField || 'material';
     applyAnswer(state, field, lastInput);
+    // 低意愿计数（确定性）："没有更多/你决定/可以了/就这样"→ 连续两次且核心字段齐就早退进大纲。
+    if (LOW_WILL.test(lastInput)) state.lowWill = (state.lowWill || 0) + 1;
+    else state.lowWill = 0;
     // 风格全程采集：用户每一句话（含修改理由、素材、语气）都是风格信号。
     const style = applyStyleSignals(workspace, lastInput);
     if (style.writeUpdated + style.readUpdated > 0) {
