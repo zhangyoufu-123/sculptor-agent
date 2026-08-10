@@ -71,6 +71,7 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/
 - [技术报告（论文式）](docs/competition/COMPETITION.md)
 - [产品设计文档](docs/PRODUCT.md)
 - [使用手册（命令大全）](docs/GUIDE.md)
+- [Web 演示版部署指南](docs/DEPLOY.md)（`web/`：把写作流程搬进浏览器的单会话演示）
 
 ## 质量与可信
 

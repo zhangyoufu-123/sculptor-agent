@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-10（Web 演示版：把写作流程搬进浏览器）
+
+- **`web/` 单会话演示版**：零依赖 Node HTTP 服务（`server.mjs`）把 Sculptor 导演状态机包成
+  REST API（start / step / draft），聊天式前端（深色侧栏 + 阶段进度 + 大纲卡片 + 成稿展示）
+  完整呈现 澄清→大纲→写作→审计→交付。
+- **离线 mock 模式**：`npm run mock`（`SCULPTOR_MOCK_LLM=1`）无需密钥即可本地跑通全流程，
+  适合先看效果与 CI 验证；真实模式 `npm start` 用 `SCULPTOR_LLM_API_KEY`。
+- **部署指南**：`docs/DEPLOY.md`——平台对比（Railway 最合适 / Render 备选 / Vercel 不推荐 /
+  Cloudflare Tunnel 应急）+ Railway/Render 一键部署步骤 + 安全限制说明。
+
 ## 2026-08-10（产品展示网站）
 
 - **GitHub Pages 静态展示站**（`site/index.html`，零依赖单页）：产品叙事 + 三大理念 + 能力 +

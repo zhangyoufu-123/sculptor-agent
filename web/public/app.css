@@ -1,0 +1,72 @@
+:root {
+  --bg: #f7f5f1;
+  --panel: #fffdfa;
+  --ink: #23201b;
+  --muted: #8a837a;
+  --accent: #b3472a;
+  --accent-soft: #f5e5dd;
+  --line: #e9e3da;
+  --ok: #3d7a52;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--bg); color: var(--ink); height: 100vh; overflow: hidden;
+}
+.app { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
+
+/* 侧栏 */
+.side { background: #2a2520; color: #f2ede5; padding: 28px 24px; display: flex; flex-direction: column; }
+.logo { font-size: 24px; font-weight: 800; letter-spacing: 0.5px; }
+.logo span { color: #e0785a; }
+.tag { margin-top: 6px; font-size: 13px; color: #b8afa3; }
+.phase-track { margin: 34px 0; display: flex; flex-direction: column; gap: 4px; }
+.pt-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; font-size: 14px; color: #9d9489; transition: all .2s; }
+.pt-item .dot { width: 8px; height: 8px; border-radius: 50%; background: #6a6156; transition: all .2s; }
+.pt-item.active { background: rgba(255,255,255,0.08); color: #fff; }
+.pt-item.active .dot { background: #e0785a; box-shadow: 0 0 0 4px rgba(224,120,90,0.18); }
+.pt-item.done { color: #b9b0a4; }
+.pt-item.done .dot { background: #7ba98b; }
+.tip { margin-top: auto; font-size: 12.5px; color: #a69c8f; line-height: 1.7; }
+.tip .meta { margin-top: 10px; font-size: 11.5px; color: #7d7468; }
+
+/* 主区 */
+.main { display: flex; flex-direction: column; min-width: 0; }
+.top { padding: 26px 34px 14px; }
+.top h1 { font-size: 24px; font-weight: 800; }
+.top .sub { color: var(--muted); font-size: 14px; margin-top: 4px; }
+.chat { flex: 1; overflow-y: auto; padding: 10px 34px 20px; display: flex; flex-direction: column; gap: 14px; }
+.msg { display: flex; }
+.msg.user { justify-content: flex-end; }
+.msg .bubble { max-width: 720px; padding: 13px 17px; border-radius: 16px; line-height: 1.75; font-size: 14.5px; white-space: pre-wrap; }
+.msg.bot .bubble { background: var(--panel); border: 1px solid var(--line); border-top-left-radius: 4px; }
+.msg.user .bubble { background: #2f2a25; color: #f6f1ea; border-top-right-radius: 4px; }
+.bubble .hint { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+.bubble .rec { margin-top: 8px; font-size: 13px; color: var(--muted); border-left: 3px solid var(--accent-soft); padding-left: 10px; }
+.options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.opt { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 999px; padding: 7px 15px; font-size: 13px; cursor: pointer; transition: all .15s; }
+.opt:hover { border-color: var(--accent); color: var(--accent); }
+.working { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13.5px; padding: 6px 0; }
+.spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.outline-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+.outline-card h4 { font-size: 16px; margin-bottom: 10px; }
+.outline-card .sec { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+.outline-card .sec:last-child { border-bottom: none; }
+.outline-card .fn { color: var(--accent); font-size: 12px; flex-shrink: 0; padding-top: 3px; }
+.draft { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px; line-height: 2; font-size: 15px; }
+.draft h2, .draft h3 { margin: 12px 0 6px; }
+.meta-line { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+
+/* 输入区 */
+.composer { display: flex; gap: 10px; padding: 14px 34px 18px; border-top: 1px solid var(--line); background: var(--bg); }
+.composer textarea { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; font-size: 14.5px; font-family: inherit; outline: none; background: #fff; }
+.composer textarea:focus { border-color: var(--accent); }
+.composer button { border: none; background: var(--ink); color: #fff; border-radius: 14px; padding: 0 24px; font-size: 14.5px; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+.composer button:disabled { opacity: 0.35; cursor: not-allowed; }
+.statusbar { padding: 0 34px 12px; font-size: 12px; color: var(--muted); }
+
+@media (max-width: 780px) {
+  .app { grid-template-columns: 1fr; }
+  .side { display: none; }
+}

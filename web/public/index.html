@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sculptor Studio — 深度协作写作演示</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="side">
+      <div class="brand">
+        <div class="logo">Sculptor<span>.</span></div>
+        <p class="tag">会先读懂你，再替你写好的写作 Agent</p>
+      </div>
+      <div class="phase-track" id="phaseTrack">
+        <div class="pt-item active" data-p="start"><span class="dot"></span>开始</div>
+        <div class="pt-item" data-p="clarify"><span class="dot"></span>澄清</div>
+        <div class="pt-item" data-p="outline"><span class="dot"></span>大纲</div>
+        <div class="pt-item" data-p="write"><span class="dot"></span>写作</div>
+        <div class="pt-item" data-p="review"><span class="dot"></span>审计</div>
+        <div class="pt-item" data-p="deliver"><span class="dot"></span>交付</div>
+      </div>
+      <div class="tip">
+        <p>提示：这是单会话演示版。说一个写作念头，Sculptor 会一步步陪你把它变成一篇完整的文章。</p>
+        <p class="meta">引擎 v0.24 · 开源 · MIT</p>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="top">
+        <h1>写作，从一句话开始</h1>
+        <p class="sub">下面是 Sculptor 的完整工作流：澄清 → 大纲 → 逐节写作 → 反 AI 审计 → 交付。</p>
+      </header>
+
+      <div class="chat" id="chat">
+        <div class="msg bot intro">
+          <div class="bubble">
+            <p>你好，我是 Sculptor。告诉我你想写什么——一个念头、一个题目、或者"像某某那种感觉"都行。</p>
+            <p class="hint">试试："写一篇关于夏天离别的散文，要有我的风格"</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer" id="composer">
+        <textarea id="input" rows="2" placeholder="说出你的写作念头…（回车发送，Shift+回车换行）"></textarea>
+        <button id="send" disabled>发送</button>
+      </div>
+      <div class="statusbar" id="statusbar">输入一个念头开始 · 演示模式：单会话</div>
+    </main>
+  </div>
+  <script src="/assets/app.js"></script>
+</body>
+</html>
