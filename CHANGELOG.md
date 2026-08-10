@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-10（产品展示网站）
+
+- **GitHub Pages 静态展示站**（`site/index.html`，零依赖单页）：产品叙事 + 三大理念 + 能力 +
+  工作流 + 研究/实验 + 安装；`.github/workflows/pages.yml` 推送即部署，
+  访问 https://zhangyoufu-123.github.io/sculptor-agent/ （需在仓库 Settings → Pages 选择 GitHub Actions 源）。
+
 ## 0.24.0 (2026-08-10)
 
 ### Added（实验与数据采集引擎：把研究论文的实验设计落成工具）

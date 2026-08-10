@@ -65,6 +65,7 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/
 
 ## 文档
 
+- [产品网站（GitHub Pages）](https://zhangyoufu-123.github.io/sculptor-agent/)（源码在 `site/`）
 - [产品介绍（比赛/评审用）](docs/competition/PRODUCT-README.md)
 - [研究论文（理论框架 + 实验设计）](docs/competition/RESEARCH-PAPER.md)
 - [技术报告（论文式）](docs/competition/COMPETITION.md)
