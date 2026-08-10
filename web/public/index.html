@@ -25,7 +25,7 @@
     </nav>
     <div class="side-foot">
       <span class="pill" id="modePill">离线演示</span>
-      <span class="ver">引擎 v0.26</span>
+      <span class="ver">引擎 v0.27</span>
     </div>
   </aside>
 
@@ -46,17 +46,18 @@
         <button class="stage-item" data-stage="deliver" data-title="成稿">成稿</button>
       </nav>
       <div class="top-right">
+        <button class="icon-btn" id="contextToggle">上下文</button>
         <span class="session-pill" id="sessionPill">未选择项目</span>
       </div>
     </header>
 
     <main class="views">
-      <!-- 启程 -->
+      <!-- 首页 Dashboard -->
       <section class="view is-active" id="view-home">
-        <div class="home">
-          <p class="kicker">A WRITING COMPANION · 深度协作写作</p>
-          <h1 class="hero-title">会先读懂你，<br />再替你写好的写作 Agent。</h1>
-          <p class="hero-sub">不是生成器，是写作合伙人。从一句话开始，它陪你走过澄清、大纲、写作、审计，直到一篇像你写的文章——并把你的风格、读过的书、写过的作品，都收进这座书房。</p>
+        <div class="dash">
+          <p class="kicker">SCULPTOR STUDIO · 深度协作写作</p>
+          <h1 class="dash-title">今天，想写点什么？</h1>
+          <p class="dash-sub">从一句话开始。它先读懂你——你的风格、你读过的书、你亲手改过的字——再陪你走完整篇。</p>
           <div class="home-prompt">
             <textarea id="seedInput" rows="2" placeholder="说出你的写作念头…（回车发送，Shift+回车换行）"></textarea>
             <button id="seedSend" class="btn btn-gold" disabled>开始写作</button>
@@ -67,11 +68,12 @@
             <button class="seed" data-t="写一篇关于AI教育公平的学术论文">AI 教育公平的学术论文</button>
             <button class="seed" data-t="写一个雨夜小镇的推理短篇">雨夜小镇推理短篇</button>
           </div>
-          <div class="recent" id="recentWrap" hidden>
-            <p class="recent-label">继续最近的项目</p>
+          <div class="dash-stats" id="dashStats"></div>
+          <div class="dash-recent" id="dashRecent">
+            <p class="recent-label">最近项目</p>
             <div class="recent-list" id="recentList"></div>
           </div>
-          <p class="home-note">多会话工作台 · 引擎 v0.26 · 写作数据保存在本机 web-data/</p>
+          <p class="home-note">多会话工作台 · 引擎 v0.27 · 写作数据保存在本机 web-data/</p>
         </div>
       </section>
 
@@ -125,6 +127,7 @@
             <h2 id="draftTitle">成稿</h2>
           </div>
           <div class="draft-tools">
+            <span class="char-count" id="draftChars"></span>
             <div class="seg" id="draftMode">
               <button class="seg-btn is-active" data-mode="preview">预览</button>
               <button class="seg-btn" data-mode="edit">编辑</button>
@@ -164,6 +167,11 @@
           </div>
           <button class="btn btn-ghost" id="personaRefresh">刷新</button>
         </div>
+        <div class="radar-wrap">
+          <h3>语言风格雷达 · write 14 维置信度</h3>
+          <canvas id="styleRadar" width="440" height="340"></canvas>
+          <p class="radar-note" id="radarNote"></p>
+        </div>
         <div class="persona-body" id="personaBody"></div>
         <div class="dims" id="styleDims"></div>
         <div class="vector-panel" id="vectorChips"></div>
@@ -180,6 +188,10 @@
           <button class="btn btn-ghost" id="knowledgeRefresh">刷新</button>
         </div>
         <p class="session-sub">对话中提到《书名》、去过的地方、认同的理论，会被归纳收录；只收你确认过的，不硬塞。</p>
+        <div class="filter-bar">
+          <input class="search" id="knowledgeSearch" placeholder="搜索标题或笔记…" />
+          <div class="filter-chips" id="knowledgeFilter"></div>
+        </div>
         <div class="knowledge-list" id="knowledgeList"></div>
       </section>
 
@@ -193,6 +205,10 @@
           <button class="btn btn-ghost" id="worksRefresh">刷新</button>
         </div>
         <p class="session-sub">成稿自动归档并按文体分类；每类还会蒸馏出你个人的写作 skill。</p>
+        <div class="filter-bar">
+          <input class="search" id="worksSearch" placeholder="搜索作品标题…" />
+          <div class="filter-chips" id="worksFilter"></div>
+        </div>
         <div class="works-body" id="worksBody"></div>
       </section>
     </main>
@@ -203,6 +219,18 @@
       <span>MIT License</span>
     </footer>
   </div>
+
+  <!-- 右侧 Agent 上下文面板 -->
+  <aside class="context-panel" id="contextPanel" hidden>
+    <div class="context-head">
+      <div>
+        <div class="ctx-title">Agent 工作台</div>
+        <div class="ctx-sub" id="contextStatus">未加载</div>
+      </div>
+      <button class="icon-btn" id="contextClose">收起</button>
+    </div>
+    <div class="context-body" id="contextBody"></div>
+  </aside>
 
   <!-- 作品阅读弹层 -->
   <div class="modal" id="workModal" hidden>

@@ -56,6 +56,9 @@ const { readPersona } = await import(
 const { listEntries, removeEntry } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'knowledge.js')).href
 );
+const { checklistOf } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'clarify.js')).href
+);
 const { exportDocx, docxAvailable } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'io.js')).href
 );
@@ -347,6 +350,57 @@ const server = http.createServer(async (req, res) => {
     const state = ws.readState(sessionDir(id));
     return json(res, 200, { meta: stateBrief(state, meta) });
   }
+  if (req.method === 'GET' && p === '/api/context') {
+    const id = String(url.searchParams.get('sessionId') || '');
+    const dir = sessionDir(id);
+    const meta = readMeta(id);
+    if (!meta) return json(res, 404, { error: '会话不存在' });
+    const state = ws.readState(dir);
+    const answerLevels = Array.isArray(state.answerLevels) ? state.answerLevels.slice(-10) : [];
+    const answerStats = { L0: 0, L1: 0, L2: 0, L3: 0, L4: 0, L5: 0 };
+    for (const a of state.answerLevels || []) answerStats['L' + a.level] = (answerStats['L' + a.level] || 0) + 1;
+    return json(res, 200, {
+      id,
+      phase: state.phase || 'clarify',
+      stage: state.director?.stage || '',
+      status: meta.status,
+      title: meta.title,
+      category: meta.category,
+      intent: state.intent || null,
+      blueprint: state.blueprint || null,
+      checklist: checklistOf(state),
+      confirmed: state.confirmed || {},
+      materials: (state.materials || []).slice(-8),
+      styleProgress: styleProgress(dir),
+      styleNote: state.confirmed?.styleNote || '',
+      answerLevels,
+      answerStats,
+      hasDraft: fs.existsSync(path.join(dir, 'draft.md')),
+      outline: state.outline
+        ? { title: state.outline.title, sections: state.outline.sections?.length || 0 }
+        : null,
+    });
+  }
+  if (req.method === 'GET' && p === '/api/overview') {
+    const sessions = listSessions();
+    let works = 0;
+    let drafts = 0;
+    let knowledge = 0;
+    const byCat = {};
+    for (const meta of sessions) {
+      const dir = sessionDir(meta.id);
+      const index = readJsonSafe(path.join(dir, 'vault', 'library', 'index.json'));
+      for (const piece of index?.pieces || []) {
+        works += 1;
+        byCat[piece.category] = (byCat[piece.category] || 0) + 1;
+      }
+      try {
+        knowledge += listEntries(dir).length;
+      } catch {}
+      if (fs.existsSync(path.join(dir, 'draft.md'))) drafts += 1;
+    }
+    return json(res, 200, { sessions: sessions.length, works, drafts, knowledge, byCat, recent: sessions.slice(0, 5) });
+  }
   if (req.method === 'PATCH' && p === '/api/session') {
     const { sessionId, title, category } = await body(req);
     const meta = readMeta(String(sessionId || ''));
@@ -426,6 +480,13 @@ const server = http.createServer(async (req, res) => {
       const dir = sessionDir(meta.id);
       const index = readJsonSafe(path.join(dir, 'vault', 'library', 'index.json'));
       for (const piece of index?.pieces || []) {
+        let chars = 0;
+        try {
+          chars = fs
+            .readFileSync(path.join(dir, piece.file), 'utf8')
+            .replace(/\s/g, '')
+            .length;
+        } catch {}
         works.push({
           sessionId: meta.id,
           sessionTitle: meta.title,
@@ -434,6 +495,7 @@ const server = http.createServer(async (req, res) => {
           category: piece.category,
           ts: piece.ts,
           source: piece.source || '',
+          chars,
           draftOnly: false,
         });
       }

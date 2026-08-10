@@ -1,6 +1,6 @@
-/* Sculptor Studio · 视图路由与写作工作台
-   设计标准：所有视图切换统一走 showView()（同一条 viewIn 动画），
-   阶段（stage）与视图（view）一一映射；会话/作品/风格/知识库由侧栏导航统一入口。 */
+/* Sculptor Studio · 视图路由与写作工作台（v0.27 大改）
+   三栏工作台：左侧导航 / 主区视图 / 右侧 Agent 上下文面板（实时理解、清单、素材、风格进度）。
+   设计标准：所有视图切换统一走 showView()（同一条 viewIn 动画）；阶段条状态规范不变。 */
 const $ = (id) => document.getElementById(id);
 
 const VIEWS = ['home', 'sessions', 'session', 'outline', 'draft', 'report', 'persona', 'knowledge', 'works'];
@@ -16,7 +16,12 @@ let sessionMeta = null;
 let busy = false;
 let currentView = 'home';
 let currentStage = 'home';
-let workCtx = null; // 作品弹层 { sessionId, file }
+let contextVisible = false;
+let worksCache = [];
+let worksCat = '';
+let kbCache = [];
+let kbType = '';
+let workCtx = null;
 
 const DIM_CN = {
   temperature: '语气温度', sentencePreference: '句式偏好', modifierDensity: '修饰密度',
@@ -44,6 +49,7 @@ function showView(name, { keepStage = false } = {}) {
   });
   $('crumb').textContent = CRUMB[name] || 'Sculptor';
   if (!keepStage && ['home', 'sessions', 'works', 'persona', 'knowledge'].includes(name)) setStage('home');
+  updateContextVisibility();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -122,6 +128,73 @@ function downloadExport(sid, fmt, file) {
   a.remove();
 }
 
+/* ── 右侧 Agent 上下文面板 ────────────────────────── */
+function updateContextVisibility() {
+  const show = ['session', 'outline', 'draft', 'report'].includes(currentView) && sessionId && contextVisible;
+  $('contextPanel').hidden = !show;
+  $('contextToggle').classList.toggle('is-active', show);
+}
+
+function ctxSection(title, body) {
+  return `<div class="ctx-sec"><h4>${esc(title)}</h4>${body}</div>`;
+}
+
+async function refreshContext() {
+  if (!sessionId) return;
+  try {
+    const c = await apiGet(`/api/context?sessionId=${sessionId}`);
+    $('contextStatus').textContent = `${c.status || ''}${c.outline ? ` · 大纲 ${c.outline.sections} 节` : ''}`;
+    const parts = [];
+    if (c.intent?.summary) {
+      let h = `<div class="ctx-intent">${esc(c.intent.summary)}</div>`;
+      if (c.intent.coreNeed) h += `<div class="ctx-core">核心诉求 · ${esc(c.intent.coreNeed)}</div>`;
+      if (c.intent.risks?.length) h += `<div class="ctx-risk">风险 · ${esc(c.intent.risks.join('；'))}</div>`;
+      parts.push(ctxSection('我的理解', h));
+    }
+    if (c.checklist?.length) {
+      const done = c.checklist.filter((x) => x.done).length;
+      parts.push(ctxSection(
+        `确认清单 ${done}/${c.checklist.length}`,
+        c.checklist.map((x) => `<div class="ctx-row ${x.done ? 'done' : ''}"><span>${x.done ? '✓' : '…'}</span>${esc(x.label)}</div>`).join(''),
+      ));
+    }
+    if (c.blueprint) {
+      const b = c.blueprint;
+      const lines = [];
+      if (b.article) lines.push(`整篇 · ${b.article}`);
+      if (b.tension) lines.push(`张力 · ${b.tension}`);
+      if (b.readerTakeaway) lines.push(`读者带走 · ${b.readerTakeaway}`);
+      if (b.skeleton?.length) lines.push(`结构 · ${b.skeleton.join(' → ')}`);
+      if (b.corrections?.length) lines.push(`待吸收修正 · ${b.corrections.slice(-3).join('；')}`);
+      if (lines.length) parts.push(ctxSection('整篇蓝图', lines.map((l) => `<div class="ctx-line">${esc(l)}</div>`).join('')));
+    }
+    if (c.materials?.length) {
+      parts.push(ctxSection(
+        `素材 ×${c.materials.length}`,
+        c.materials.map((m) => `<div class="ctx-material">${esc(m.slice(0, 90))}</div>`).join(''),
+      ));
+    }
+    const sp = c.styleProgress || {};
+    let styleHtml = `<div class="ctx-line">write ${sp.write?.learned || 0}/${sp.write?.total || 14} 维 · read ${sp.read?.learned || 0}/${sp.read?.total || 7} 维</div>`;
+    if (c.styleNote) styleHtml += `<div class="ctx-line">风格底稿 · ${esc(c.styleNote)}</div>`;
+    parts.push(ctxSection('风格进度', styleHtml));
+    if (c.answerLevels?.length) {
+      const stats = Object.entries(c.answerStats || {})
+        .filter(([, n]) => n)
+        .map(([k, n]) => `<span class="vchip">${k}×${n}</span>`)
+        .join('');
+      const recent = c.answerLevels
+        .map((a) => `<div class="ctx-row"><span>L${a.level}</span>${esc(a.sample)}</div>`)
+        .join('');
+      parts.push(ctxSection('回答层次（L0–L5）', `<div class="vector-chips">${stats}</div>${recent}`));
+    }
+    if (!parts.length) {
+      parts.push('<div class="empty">还没有上下文——开始对话后，这里会实时显示 Sculptor 的理解、清单与风格进度。</div>');
+    }
+    $('contextBody').innerHTML = parts.join('');
+  } catch { /* 面板非关键，失败静默 */ }
+}
+
 /* ── 聊天渲染 ─────────────────────────────────────── */
 function addMsg(role, html) {
   const div = document.createElement('div');
@@ -191,11 +264,17 @@ function mdToHtml(md) {
     .join('');
 }
 
+function updateDraftChars(text) {
+  const n = String(text || '').replace(/\s/g, '').length;
+  $('draftChars').textContent = n ? `${n} 字` : '';
+}
+
 function renderDraft(text, { title } = {}) {
   const titleMatch = text.match(/^# (.+)$/m);
   $('draftTitle').textContent = titleMatch ? titleMatch[1] : title || '成稿';
   $('draftPaper').innerHTML = mdToHtml(text);
   $('draftEditor').value = text;
+  updateDraftChars(text);
   setDraftMode('preview');
   showView('draft', { keepStage: true });
   setStage('deliver');
@@ -280,6 +359,7 @@ async function handleStep(r) {
   } else {
     addMsg('bot', esc(r.message || '（完成）'));
   }
+  refreshContext();
 }
 
 async function send() {
@@ -302,7 +382,7 @@ async function send() {
     }
     busy = false; $('send').disabled = false; $('seedSend').disabled = false;
     $('input').value = ''; $('seedInput').value = '';
-    refreshRecent();
+    renderDash();
     return;
   }
   addMsg('user', esc(text));
@@ -347,17 +427,40 @@ async function resumeSession(id) {
     }
     if (!sawDraft) {
       if (lastBotKind === 'confirm_outline') {
-        setStage('outline'); // 大纲视图已在 replay 时渲染，不要覆盖
+        setStage('outline');
       } else {
         showView('session', { keepStage: true });
         const stageMap = { clarify: 'clarify', plan: 'outline', write: 'write', redteam: 'audit', deliver: 'deliver' };
         setStage(stageMap[metaData.meta.phase] || 'clarify');
       }
     }
-    refreshRecent();
+    refreshContext();
+    renderDash();
   } catch (e) {
     toast('恢复会话失败：' + e.message);
   }
+}
+
+/* ── 首页 Dashboard ───────────────────────────────── */
+async function renderDash() {
+  try {
+    const o = await apiGet('/api/overview');
+    let html = [
+      ['项目', o.sessions], ['作品', o.works], ['草稿', o.drafts], ['知识条目', o.knowledge],
+    ].map(([label, n]) => `<div class="stat-card"><div class="stat-num">${n}</div><div class="stat-label">${label}</div></div>`).join('');
+    const cats = Object.entries(o.byCat || {});
+    if (cats.length) {
+      html += `<div class="stat-card wide"><div class="stat-num small">${cats.map(([c, n]) => `${esc(c)} ${n}`).join(' · ')}</div><div class="stat-label">作品分类</div></div>`;
+    }
+    $('dashStats').innerHTML = html;
+    const recent = o.recent || [];
+    $('dashRecent').hidden = !recent.length;
+    $('recentList').innerHTML = recent.map((s) => `
+      <button class="recent-chip" data-id="${esc(s.id)}">${esc(s.title)}<span class="chip">${esc(s.status || '')}</span></button>`).join('');
+    $('recentList').querySelectorAll('.recent-chip').forEach((b) => {
+      b.addEventListener('click', () => resumeSession(b.dataset.id));
+    });
+  } catch { /* 静默 */ }
 }
 
 /* ── 项目列表 ─────────────────────────────────────── */
@@ -388,7 +491,7 @@ async function renderSessions() {
           const title = prompt('新标题：', card.querySelector('h3').textContent);
           if (title && title.trim()) {
             apiPost('/api/session', { sessionId: id, title: title.trim() })
-              .then(() => { toast('已改名'); renderSessions(); })
+              .then(() => { toast('已改名'); renderSessions(); renderDash(); })
               .catch((e) => toast(e.message));
           }
           return;
@@ -396,7 +499,7 @@ async function renderSessions() {
         if (act === 'del') {
           if (confirm(`删除项目「${card.querySelector('h3').textContent}」？该操作不可恢复。`)) {
             apiDelete('/api/session', { sessionId: id })
-              .then(() => { toast('已删除'); if (sessionId === id) sessionId = null; renderSessions(); refreshRecent(); })
+              .then(() => { toast('已删除'); if (sessionId === id) { sessionId = null; sessionMeta = null; } renderSessions(); renderDash(); })
               .catch((e) => toast(e.message));
           }
           return;
@@ -407,19 +510,6 @@ async function renderSessions() {
   } catch (e) {
     wrap.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
   }
-}
-
-async function refreshRecent() {
-  try {
-    const { sessions } = await apiGet('/api/sessions');
-    const recent = sessions.slice(0, 4);
-    $('recentWrap').hidden = !recent.length;
-    $('recentList').innerHTML = recent.map((s) => `
-      <button class="recent-chip" data-id="${esc(s.id)}">${esc(s.title)}</button>`).join('');
-    $('recentList').querySelectorAll('.recent-chip').forEach((b) => {
-      b.addEventListener('click', () => resumeSession(b.dataset.id));
-    });
-  } catch { /* 静默：非关键 */ }
 }
 
 /* ── 风格肖像 ─────────────────────────────────────── */
@@ -434,6 +524,83 @@ function dimCard(k, d) {
       <div class="bar ${conf < 0.6 ? 'low' : ''}"><i style="width:${Math.max(conf * 100, 4)}%"></i></div>
       ${ev ? `<div class="dim-ev">${esc(ev)}</div>` : ''}
     </div>`;
+}
+
+function drawRadar(dims) {
+  const canvas = $('styleRadar');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  const cx = w / 2;
+  const cy = h / 2 + 8;
+  const R = Math.min(w, h) / 2 - 46;
+  const entries = Object.entries(dims || {}).filter(([, d]) => d && (d.confidence || 0) > 0);
+  ctx.clearRect(0, 0, w, h);
+  if (entries.length < 3) {
+    ctx.fillStyle = '#8a7a62';
+    ctx.font = '13px "PingFang SC", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('信号不足——多聊几轮、多写几篇后再画雷达', cx, cy);
+    $('radarNote').textContent = '';
+    return;
+  }
+  const n = entries.length;
+  const angle = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+  for (let ring = 1; ring <= 4; ring++) {
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const a = angle(i % n);
+      const r = (R * ring) / 4;
+      const x = cx + r * Math.cos(a);
+      const y = cy + r * Math.sin(a);
+      if (i) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    }
+    ctx.strokeStyle = '#e4d8c2';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  ctx.font = '11px "PingFang SC", sans-serif';
+  ctx.fillStyle = '#8a7a62';
+  ctx.textAlign = 'center';
+  entries.forEach(([, d], i) => {
+    const a = angle(i);
+    const x = cx + R * Math.cos(a);
+    const y = cy + R * Math.sin(a);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = '#e4d8c2';
+    ctx.stroke();
+    const label = (DIM_CN[entries[i][0]] || entries[i][0]).slice(0, 4);
+    ctx.fillText(label, cx + (R + 18) * Math.cos(a), cy + (R + 18) * Math.sin(a) + 3);
+  });
+  ctx.beginPath();
+  entries.forEach(([, d], i) => {
+    const a = angle(i);
+    const r = R * Math.max(0, Math.min(1, d.confidence || 0));
+    const x = cx + r * Math.cos(a);
+    const y = cy + r * Math.sin(a);
+    if (i) ctx.lineTo(x, y);
+    else ctx.moveTo(x, y);
+  });
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(192,91,45,0.16)';
+  ctx.fill();
+  ctx.strokeStyle = '#c05b2d';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  entries.forEach(([, d], i) => {
+    const a = angle(i);
+    const r = R * Math.max(0, Math.min(1, d.confidence || 0));
+    ctx.beginPath();
+    ctx.arc(cx + r * Math.cos(a), cy + r * Math.sin(a), 3, 0, 2 * Math.PI);
+    ctx.fillStyle = '#c05b2d';
+    ctx.fill();
+  });
+  const learned = entries.filter(([, d]) => (d.confidence || 0) >= 0.6).length;
+  $('radarNote').textContent = `${entries.length} 个维度有信号 · ${learned} 个置信 ≥ 60% · 越接近外圈越确定`;
 }
 
 async function renderPersona() {
@@ -466,8 +633,8 @@ async function renderPersona() {
       html = `<div class="empty">风格肖像尚未生成。<br>完成一次写作（澄清 → 大纲 → 成稿）后，它会从你的旧稿、修改记录、知识库里侧写出来。</div>`;
     }
     body.innerHTML = html;
+    drawRadar(s.write?.dimensions);
 
-    // 风格维度（write 14 + read 7）
     const dims = [];
     for (const [k, d] of Object.entries(s.write?.dimensions || {})) dims.push({ k, d, group: 'write' });
     for (const [k, d] of Object.entries(s.read?.structure || {})) dims.push({ k, d, group: 'read' });
@@ -476,7 +643,6 @@ async function renderPersona() {
       ? dims.map((x) => dimCard(x.k, x.d)).join('')
       : '<div class="empty">还没有维度信号——对话越多，维度越清晰。</div>';
 
-    // 复合风格向量
     const vs = s.vectorSummary || {};
     const topDims = Array.isArray(vs.topDims) ? vs.topDims : [];
     const px = s.vector?.perplexity || {};
@@ -506,6 +672,46 @@ async function renderPersona() {
 }
 
 /* ── 知识库 ───────────────────────────────────────── */
+function applyKnowledgeFilter() {
+  const q = ($('knowledgeSearch').value || '').trim().toLowerCase();
+  const list = kbCache.filter((e) => {
+    const hitQ = !q || (e.title || '').toLowerCase().includes(q) || (e.note || '').toLowerCase().includes(q);
+    const hitT = !kbType || e.type === kbType;
+    return hitQ && hitT;
+  });
+  const types = [...new Set(kbCache.map((e) => e.type || 'book'))];
+  $('knowledgeFilter').innerHTML =
+    `<button class="chip-btn ${!kbType ? 'is-active' : ''}" data-t="">全部</button>` +
+    types.map((t) => `<button class="chip-btn ${kbType === t ? 'is-active' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('');
+  $('knowledgeFilter').querySelectorAll('[data-t]').forEach((b) => {
+    b.addEventListener('click', () => { kbType = b.dataset.t; applyKnowledgeFilter(); });
+  });
+  if (!list.length) {
+    $('knowledgeList').innerHTML = '<div class="empty">没有匹配的条目。</div>';
+    return;
+  }
+  $('knowledgeList').innerHTML = list.map((e) => `
+    <div class="kb-card">
+      <h3>${esc(e.title)}</h3>
+      <div class="kb-tags">
+        <span class="chip">${esc(e.type || 'book')}</span>
+        ${(e.tags || []).slice(0, 3).map((t) => `<span class="chip">${esc(t)}</span>`).join('')}
+      </div>
+      ${e.note ? `<div class="kb-note">${esc(e.note.slice(0, 160))}</div>` : ''}
+      <div class="kb-meta">来源 ${esc(e.source || 'user-stated')} · 置信 ${Math.round((e.confidence || 0) * 100)}% · 用过 ${e.usageCount || 0} 次 · ${fmtDate(e.createdAt)}</div>
+      <div class="ops" style="margin-top:10px"><button class="icon-btn danger" data-id="${esc(e.id)}" data-title="${esc(e.title)}">删除</button></div>
+    </div>`).join('');
+  $('knowledgeList').querySelectorAll('[data-id]').forEach((b) => {
+    b.addEventListener('click', () => {
+      if (confirm(`从知识库删除「${b.dataset.title}」？`)) {
+        apiDelete('/api/knowledge', { sessionId, id: b.dataset.id })
+          .then(() => { toast('已删除'); renderKnowledge(); renderDash(); })
+          .catch((e) => toast(e.message));
+      }
+    });
+  });
+}
+
 async function renderKnowledge() {
   if (!sessionId) {
     toast('请先打开或创建一个项目');
@@ -513,69 +719,71 @@ async function renderKnowledge() {
     renderSessions();
     return;
   }
-  const wrap = $('knowledgeList');
-  wrap.innerHTML = '<div class="working"><span class="spinner"></span>读取知识库…</div>';
+  $('knowledgeList').innerHTML = '<div class="working"><span class="spinner"></span>读取知识库…</div>';
   try {
     const { entries } = await apiGet(`/api/knowledge?sessionId=${sessionId}`);
+    kbCache = entries;
     if (!entries.length) {
-      wrap.innerHTML = '<div class="empty">知识库还是空的。<br>在对话里提到《书名》、去过的地方、认同的理论，它会归纳收录——只收你确认过的。</div>';
+      $('knowledgeFilter').innerHTML = '';
+      $('knowledgeList').innerHTML = '<div class="empty">知识库还是空的。<br>在对话里提到《书名》、去过的地方、认同的理论，它会归纳收录——只收你确认过的。</div>';
       return;
     }
-    wrap.innerHTML = entries.map((e) => `
-      <div class="kb-card">
-        <h3>${esc(e.title)}</h3>
-        <div class="kb-tags">
-          <span class="chip">${esc(e.type || 'book')}</span>
-          ${(e.tags || []).slice(0, 3).map((t) => `<span class="chip">${esc(t)}</span>`).join('')}
-        </div>
-        ${e.note ? `<div class="kb-note">${esc(e.note.slice(0, 160))}</div>` : ''}
-        <div class="kb-meta">来源 ${esc(e.source || 'user-stated')} · 置信 ${Math.round((e.confidence || 0) * 100)}% · 用过 ${e.usageCount || 0} 次 · ${fmtDate(e.createdAt)}</div>
-        <div class="ops" style="margin-top:10px"><button class="icon-btn danger" data-id="${esc(e.id)}" data-title="${esc(e.title)}">删除</button></div>
-      </div>`).join('');
-    wrap.querySelectorAll('[data-id]').forEach((b) => {
-      b.addEventListener('click', () => {
-        if (confirm(`从知识库删除「${b.dataset.title}」？`)) {
-          apiDelete('/api/knowledge', { sessionId, id: b.dataset.id })
-            .then(() => { toast('已删除'); renderKnowledge(); })
-            .catch((e) => toast(e.message));
-        }
-      });
-    });
+    applyKnowledgeFilter();
   } catch (e) {
-    wrap.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+    $('knowledgeList').innerHTML = `<div class="empty">${esc(e.message)}</div>`;
   }
 }
 
 /* ── 作品库 ───────────────────────────────────────── */
+function applyWorksFilter() {
+  const q = ($('worksSearch').value || '').trim().toLowerCase();
+  const list = worksCache.filter((w) => {
+    const hitQ = !q || (w.title || '').toLowerCase().includes(q) || (w.sessionTitle || '').toLowerCase().includes(q);
+    const hitC = !worksCat || w.category === worksCat;
+    return hitQ && hitC;
+  });
+  const cats = [...new Set(worksCache.map((w) => w.category || '未分类'))];
+  $('worksFilter').innerHTML =
+    `<button class="chip-btn ${!worksCat ? 'is-active' : ''}" data-c="">全部</button>` +
+    cats.map((c) => `<button class="chip-btn ${worksCat === c ? 'is-active' : ''}" data-c="${esc(c)}">${esc(c)}</button>`).join('');
+  $('worksFilter').querySelectorAll('[data-c]').forEach((b) => {
+    b.addEventListener('click', () => { worksCat = b.dataset.c; applyWorksFilter(); });
+  });
+  if (!list.length) {
+    $('worksBody').innerHTML = '<div class="empty">没有匹配的作品。</div>';
+    return;
+  }
+  const groups = {};
+  for (const w of list) (groups[w.category || '未分类'] = groups[w.category || '未分类'] || []).push(w);
+  $('worksBody').innerHTML = Object.entries(groups).map(([cat, items]) => `
+    <div class="work-group">
+      <h3>${esc(cat)} · ${items.length} 篇</h3>
+      <div class="work-list">
+        ${items.map((w) => `
+          <div class="work-card" data-sid="${esc(w.sessionId)}" data-file="${esc(w.file)}">
+            <h4>${esc(w.title)}</h4>
+            <div class="meta">${esc(w.sessionTitle || '')} · ${w.chars ? `${w.chars} 字 · ` : ''}${fmtDate(w.ts)}${w.draftOnly ? ' · 进行中' : ''}</div>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+  $('worksBody').querySelectorAll('.work-card').forEach((card) => {
+    card.addEventListener('click', () => openWork(card.dataset.sid, card.dataset.file));
+  });
+}
+
 async function renderWorks() {
-  const wrap = $('worksBody');
-  wrap.innerHTML = '<div class="working"><span class="spinner"></span>读取作品库…</div>';
+  $('worksBody').innerHTML = '<div class="working"><span class="spinner"></span>读取作品库…</div>';
   try {
     const { works } = await apiGet('/api/works');
+    worksCache = works;
     if (!works.length) {
-      wrap.innerHTML = '<div class="empty">作品库还是空的。<br>完成一篇写作后，成稿会自动归档并按文体分类。</div>';
+      $('worksFilter').innerHTML = '';
+      $('worksBody').innerHTML = '<div class="empty">作品库还是空的。<br>完成一篇写作后，成稿会自动归档并按文体分类。</div>';
       return;
     }
-    const groups = {};
-    for (const w of works) {
-      (groups[w.category || '未分类'] = groups[w.category || '未分类'] || []).push(w);
-    }
-    wrap.innerHTML = Object.entries(groups).map(([cat, list]) => `
-      <div class="work-group">
-        <h3>${esc(cat)} · ${list.length} 篇</h3>
-        <div class="work-list">
-          ${list.map((w) => `
-            <div class="work-card" data-sid="${esc(w.sessionId)}" data-file="${esc(w.file)}">
-              <h4>${esc(w.title)}</h4>
-              <div class="meta">${esc(w.sessionTitle || '')} · ${fmtDate(w.ts)}${w.draftOnly ? ' · 进行中' : ''}</div>
-            </div>`).join('')}
-        </div>
-      </div>`).join('');
-    wrap.querySelectorAll('.work-card').forEach((card) => {
-      card.addEventListener('click', () => openWork(card.dataset.sid, card.dataset.file));
-    });
+    applyWorksFilter();
   } catch (e) {
-    wrap.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+    $('worksBody').innerHTML = `<div class="empty">${esc(e.message)}</div>`;
   }
 }
 
@@ -606,6 +814,9 @@ $('seedInput').addEventListener('input', () => {
 $('input').addEventListener('input', () => {
   $('send').disabled = busy || !$('input').value.trim();
 });
+$('draftEditor').addEventListener('input', () => {
+  updateDraftChars($('draftEditor').value);
+});
 document.querySelectorAll('.seed').forEach((b) => {
   b.addEventListener('click', () => {
     $('seedInput').value = b.dataset.t;
@@ -624,6 +835,18 @@ document.querySelectorAll('.nav-item').forEach((b) => {
   });
 });
 $('newSessionBtn').addEventListener('click', () => showView('home'));
+
+$('contextToggle').addEventListener('click', () => {
+  contextVisible = !contextVisible;
+  updateContextVisibility();
+  if (contextVisible) refreshContext();
+});
+$('contextClose').addEventListener('click', () => {
+  contextVisible = false;
+  updateContextVisibility();
+});
+$('worksSearch').addEventListener('input', applyWorksFilter);
+$('knowledgeSearch').addEventListener('input', applyKnowledgeFilter);
 
 $('outlineConfirm').addEventListener('click', () => {
   $('input').value = '可以，就是这样';
@@ -648,6 +871,7 @@ $('draftSave').addEventListener('click', async () => {
     await apiPost('/api/save-draft', { sessionId, text: $('draftEditor').value });
     toast('已保存修改');
     $('draftPaper').innerHTML = mdToHtml($('draftEditor').value);
+    updateDraftChars($('draftEditor').value);
     setDraftMode('preview');
   } catch (e) { toast(e.message); }
 });
@@ -683,8 +907,14 @@ document.querySelectorAll('.stage-item').forEach((b) => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') $('workModal').hidden = true;
+  if (e.key === 'Escape') {
+    $('workModal').hidden = true;
+    if (contextVisible && ['session', 'outline', 'draft', 'report'].includes(currentView)) {
+      contextVisible = false;
+      updateContextVisibility();
+    }
+  }
 });
 
 /* ── 初始化 ───────────────────────────────────────── */
-refreshRecent();
+renderDash();

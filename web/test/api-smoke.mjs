@@ -126,6 +126,16 @@ await step('风格肖像/知识库/作品库接口', async () => {
   assert(Array.isArray(works.works), 'works 返回数组');
 });
 
+await step('上下文面板与概览接口', async () => {
+  const ctx = JSON.parse((await call(`/api/context?sessionId=${sid}`))._body());
+  assert(Array.isArray(ctx.checklist) && ctx.checklist.length > 0, 'context 返回确认清单');
+  assert(typeof ctx.answerStats === 'object' && 'L0' in ctx.answerStats, 'context 回答层次统计');
+  assert(typeof ctx.materials === 'object', 'context 素材字段');
+  const ov = JSON.parse((await call('/api/overview'))._body());
+  assert(typeof ov.sessions === 'number' && ov.sessions >= 1, 'overview 会话统计');
+  assert(typeof ov.byCat === 'object', 'overview 分类统计');
+});
+
 await step('导出（先落一份草稿）', async () => {
   const draft = '# 百年历久，北大红楼\n\n## 一、站在门口\n\n石阶被磨亮了一百年。\n\n## 二、百年之后\n\n历史从不缺席，只等人走进去。\n';
   const save = await call('/api/save-draft', 'POST', { sessionId: sid, text: draft });
