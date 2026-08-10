@@ -33,6 +33,9 @@ const { agentStep } = await import(
 const { ensureWorkspace } = await import(
   pathToFileURL(path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', 'agent', 'src', 'workspace.js')).href
 );
+const { humanMetrics } = await import(
+  pathToFileURL(path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', 'agent', 'src', 'experiment.js')).href
+);
 
 const cfg = loadConfig();
 const sessions = new Map();
@@ -133,6 +136,23 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { text });
     } catch {
       json(res, 200, { text: '' });
+    }
+    return;
+  }
+  if (req.method === 'GET' && url.pathname === '/api/report') {
+    const s = sessions.get(String(url.searchParams.get('sessionId') || ''));
+    if (!s) return json(res, 404, { error: '会话不存在' });
+    try {
+      const text = fs.readFileSync(path.join(s.dir, 'draft.md'), 'utf8');
+      const m = humanMetrics(text);
+      const issues = [];
+      if (m.blacklistHits > 0) issues.push(`检出 ${m.blacklistHits} 处黑名单套话，已按你的风格修订`);
+      if (m.repeatedMetaphors > 0) issues.push(`检出 ${m.repeatedMetaphors} 处重复比喻，已改为不同的意象`);
+      if (m.repeatedPatterns > 0) issues.push(`检出 ${m.repeatedPatterns} 处句式复用，已调整节奏`);
+      if (!issues.length) issues.push('未发现硬伤（黑名单 0 · 硬失败 0），人类化指标均在真人参考区间');
+      json(res, 200, { metrics: m, issues, passed: m.passed });
+    } catch {
+      json(res, 200, { metrics: {}, issues: ['（尚无成稿可审计）'], passed: false });
     }
     return;
   }

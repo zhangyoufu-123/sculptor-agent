@@ -3,52 +3,118 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sculptor Studio — 深度协作写作演示</title>
+  <title>Sculptor — 深度协作写作</title>
+  <meta name="description" content="会先读懂你，再替你写好的写作 Agent。暗夜书斋里的写作旅程。" />
   <link rel="stylesheet" href="/assets/app.css" />
 </head>
-<body>
-  <div class="app">
-    <aside class="side">
-      <div class="brand">
-        <div class="logo">Sculptor<span>.</span></div>
-        <p class="tag">会先读懂你，再替你写好的写作 Agent</p>
-      </div>
-      <div class="phase-track" id="phaseTrack">
-        <div class="pt-item active" data-p="start"><span class="dot"></span>开始</div>
-        <div class="pt-item" data-p="clarify"><span class="dot"></span>澄清</div>
-        <div class="pt-item" data-p="outline"><span class="dot"></span>大纲</div>
-        <div class="pt-item" data-p="write"><span class="dot"></span>写作</div>
-        <div class="pt-item" data-p="review"><span class="dot"></span>审计</div>
-        <div class="pt-item" data-p="deliver"><span class="dot"></span>交付</div>
-      </div>
-      <div class="tip">
-        <p>提示：这是单会话演示版。说一个写作念头，Sculptor 会一步步陪你把它变成一篇完整的文章。</p>
-        <p class="meta">引擎 v0.24 · 开源 · MIT</p>
-      </div>
-    </aside>
+<body data-view="home">
+  <div class="grain"></div>
 
-    <main class="main">
-      <header class="top">
-        <h1>写作，从一句话开始</h1>
-        <p class="sub">下面是 Sculptor 的完整工作流：澄清 → 大纲 → 逐节写作 → 反 AI 审计 → 交付。</p>
-      </header>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">S</span>
+      <span class="brand-name">Sculptor</span>
+    </div>
 
-      <div class="chat" id="chat">
-        <div class="msg bot intro">
-          <div class="bubble">
-            <p>你好，我是 Sculptor。告诉我你想写什么——一个念头、一个题目、或者"像某某那种感觉"都行。</p>
-            <p class="hint">试试："写一篇关于夏天离别的散文，要有我的风格"</p>
-          </div>
+    <nav class="stage" id="stage" aria-label="写作阶段">
+      <button class="stage-item" data-stage="home" data-title="启程">启程</button>
+      <span class="stage-link"></span>
+      <button class="stage-item" data-stage="clarify" data-title="澄清">澄清</button>
+      <span class="stage-link"></span>
+      <button class="stage-item" data-stage="outline" data-title="大纲">大纲</button>
+      <span class="stage-link"></span>
+      <button class="stage-item" data-stage="write" data-title="写作">写作</button>
+      <span class="stage-link"></span>
+      <button class="stage-item" data-stage="audit" data-title="审计">审计</button>
+      <span class="stage-link"></span>
+      <button class="stage-item" data-stage="deliver" data-title="成稿">成稿</button>
+    </nav>
+
+    <div class="top-right">
+      <span class="pill" id="modePill">离线演示</span>
+    </div>
+  </header>
+
+  <main class="views">
+    <!-- 视图一：启程 -->
+    <section class="view is-active" id="view-home" data-title="启程">
+      <div class="home">
+        <p class="kicker">A WRITING COMPANION · 深度协作写作</p>
+        <h1 class="hero-title">会先读懂你，<br />再替你写好的写作 Agent。</h1>
+        <p class="hero-sub">不是生成器，是写作合伙人。从一句话开始，它陪你走过澄清、大纲、写作、审计，直到一篇像你写的文章。</p>
+        <div class="home-prompt">
+          <textarea id="seedInput" rows="2" placeholder="说出你的写作念头…（回车发送，Shift+回车换行）"></textarea>
+          <button id="seedSend" class="btn btn-gold" disabled>开始写作</button>
         </div>
+        <div class="seeds">
+          <button class="seed" data-t="写一篇关于夏天离别的散文，要有我的风格">夏天离别的散文</button>
+          <button class="seed" data-t="写一篇百年历久的北大红楼游记">北大红楼游记</button>
+          <button class="seed" data-t="写一篇关于AI教育公平的学术论文">AI 教育公平的学术论文</button>
+          <button class="seed" data-t="写一个雨夜小镇的推理短篇">雨夜小镇推理短篇</button>
+        </div>
+        <p class="home-note">单会话演示 · 引擎 v0.24 · 你的写作数据只在本会话内</p>
       </div>
+    </section>
 
-      <div class="composer" id="composer">
-        <textarea id="input" rows="2" placeholder="说出你的写作念头…（回车发送，Shift+回车换行）"></textarea>
-        <button id="send" disabled>发送</button>
+    <!-- 视图二：写作对话 -->
+    <section class="view" id="view-session" data-title="写作">
+      <div class="session-head">
+        <h2 id="sessionTitle">写作</h2>
+        <p class="session-sub" id="sessionSub">一次一个问题，答完自动推进。</p>
       </div>
-      <div class="statusbar" id="statusbar">输入一个念头开始 · 演示模式：单会话</div>
-    </main>
-  </div>
+      <div class="chat" id="chat"></div>
+      <div class="composer">
+        <textarea id="input" rows="2" placeholder="回答或继续输入…（回车发送）"></textarea>
+        <button id="send" class="btn btn-gold" disabled>发送</button>
+      </div>
+    </section>
+
+    <!-- 视图三：大纲 -->
+    <section class="view" id="view-outline" data-title="大纲">
+      <div class="outline-head">
+        <p class="kicker">OUTLINE · 结构蓝图</p>
+        <h2 id="outlineTitle">大纲</h2>
+        <p class="session-sub">这是整篇文章的结构。请确认，或告诉它要改哪里。</p>
+      </div>
+      <div class="outline-body" id="outlineBody"></div>
+      <div class="outline-actions">
+        <button class="btn btn-gold" id="outlineConfirm">确认，开始写作</button>
+        <button class="btn btn-ghost" id="outlineEdit">我要修改</button>
+      </div>
+    </section>
+
+    <!-- 视图四：成稿阅读 -->
+    <section class="view" id="view-draft" data-title="成稿">
+      <div class="draft-head">
+        <p class="kicker">DRAFT · 交付</p>
+        <h2 id="draftTitle">成稿</h2>
+      </div>
+      <article class="paper" id="draftPaper"></article>
+      <div class="draft-actions">
+        <button class="btn btn-ghost" id="draftBack">回到写作</button>
+        <button class="btn btn-gold" id="draftAudit">查看审计报告</button>
+      </div>
+    </section>
+
+    <!-- 视图五：审计报告 -->
+    <section class="view" id="view-report" data-title="审计">
+      <div class="report-head">
+        <p class="kicker">AUDIT · 反 AI 审计</p>
+        <h2>质量报告</h2>
+      </div>
+      <div class="report-body" id="reportBody"></div>
+      <div class="report-actions">
+        <button class="btn btn-ghost" id="reportBack">返回成稿</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>由你与 Sculptor 共同完成</span>
+    <span class="dot-sep">·</span>
+    <span>MIT License</span>
+  </footer>
+
   <script src="/assets/app.js"></script>
 </body>
 </html>
