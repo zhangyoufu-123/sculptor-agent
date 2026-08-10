@@ -135,6 +135,7 @@ function updateContextVisibility() {
   const show = ['session', 'outline', 'draft', 'report'].includes(currentView) && sessionId && contextVisible;
   $('contextPanel').hidden = !show;
   $('contextToggle').classList.toggle('is-active', show);
+  document.body.classList.toggle('panel-open', show);
 }
 
 function ctxSection(title, body) {
@@ -534,8 +535,12 @@ async function send() {
   const text = $('input').value.trim() || $('seedInput').value.trim();
   if (!text || busy) return;
   if (!sessionId) {
-    addMsg('user', esc(text));
     busy = true; $('send').disabled = true; $('seedSend').disabled = true;
+    // 先切到会话视图，让用户立刻看到进度（而不是在首页干等/无反馈）
+    showView('session', { keepStage: true });
+    setStage('clarify');
+    $('sessionTitle').textContent = '正在理解你的想法…';
+    addMsg('user', esc(text));
     const w = addWorking('正在理解你的想法…');
     try {
       const r = await apiPost('/api/start', { topic: text });
@@ -543,12 +548,11 @@ async function send() {
       if (r.meta) applyMeta(r.meta);
       contextVisible = true;
       updateContextVisibility();
-      showView('session', { keepStage: true });
-      setStage('clarify');
       w.remove();
       await handleStep(r);
     } catch (e) {
-      w.remove(); addMsg('bot', `<span style="color:var(--bad)">${esc(e.message)}</span>`);
+      w.remove();
+      addMsg('bot', `<span style="color:var(--bad)">${esc(e.message)}</span>`);
     }
     busy = false; $('send').disabled = false; $('seedSend').disabled = false;
     $('input').value = ''; $('seedInput').value = '';
