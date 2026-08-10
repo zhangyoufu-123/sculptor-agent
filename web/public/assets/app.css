@@ -924,6 +924,20 @@ body {
   margin: 0 0 8px;
 }
 
+.rt-report {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 12px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 8px;
+  max-height: 320px;
+  overflow: auto;
+  color: var(--ink-2);
+}
+
 .ol-edit .ol-head {
   width: 100%;
   border: 1px solid transparent;

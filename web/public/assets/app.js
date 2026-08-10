@@ -625,6 +625,14 @@ async function renderReport() {
         <div class="note">${note}</div>
       </div>`;
     const issues = (data.issues || []).map((x) => `<li><span class="tag">·</span>${esc(x)}</li>`).join('');
+    const rt = data.roundtrip || null;
+    let rtHtml = '';
+    if (rt?.skipped) {
+      rtHtml = `<div class="ctx-line">回译校验未运行：${esc(rt.reason || '已跳过')}</div>`;
+    } else if (rt) {
+      const mark = rt.verdict === 'pass' ? '✓ 信息完整' : '⚠ 需要修订';
+      rtHtml = `<div class="ctx-line">交付时已自动回译校验：${mark}（保留 ${rt.kept || 0} · 丢失 ${rt.lost || 0} · 漂移 ${rt.drifted || 0}）</div>`;
+    }
     body.innerHTML =
       `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">` +
       metric('句长标准差', m.sentenceLengthStddev ?? '—', '真人参考 ≥ 8', m.sentenceLengthStddev >= 8 ? 'ok' : 'warn') +
@@ -633,7 +641,29 @@ async function renderReport() {
       metric('词汇二元 TTR', m.bigramTtr ?? '—', '真人参考 ≥ 0.70', m.bigramTtr >= 0.7 ? 'ok' : 'warn') +
       metric('黑名单/重复', `${m.blacklistHits || 0} / ${m.repeatedMetaphors || 0} / ${m.repeatedPatterns || 0}`, '套话 / 重复比喻 / 句式复用') +
       `</div>` +
-      `<div class="report-list"><h3>审计结论</h3><ul>${issues || '<li>未发现硬伤（黑名单 0 · 硬失败 0）</li>'}</ul></div>`;
+      `<div class="report-list"><h3>审计结论</h3><ul>${issues || '<li>未发现硬伤（黑名单 0 · 硬失败 0）</li>'}</ul></div>` +
+      `<div class="report-list"><h3>内容保真 · 回译校验</h3>${rtHtml}<div id="rtResult"></div>
+       <button class="btn btn-gold btn-sm" id="rtRun">运行回译校验（中译英→回译→信息点核对）</button></div>`;
+    $('rtRun')?.addEventListener('click', async () => {
+      const btn = $('rtRun');
+      btn.disabled = true;
+      btn.textContent = '回译校验中…（约需 4 次模型调用）';
+      try {
+        const r = await apiPost('/api/roundtrip', { sessionId });
+        const verdictHtml =
+          r.verdict === 'pass'
+            ? '<div class="ctx-line" style="color:var(--ok)">✓ 信息完整、风格稳定</div>'
+            : '<div class="ctx-line" style="color:#9c4b24">⚠ 需要修订（信息有丢失或漂移）</div>';
+        $('rtResult').innerHTML =
+          verdictHtml +
+          `<pre class="rt-report">${esc(r.report || '')}</pre>`;
+      } catch (e) {
+        $('rtResult').innerHTML = `<div class="ctx-line">${esc(e.message)}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '运行回译校验（中译英→回译→信息点核对）';
+      }
+    });
   } catch (e) {
     body.innerHTML = `<div class="report-list"><h3>审计报告</h3><ul><li>${esc(e.message)}</li></ul></div>`;
   }

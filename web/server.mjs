@@ -71,6 +71,9 @@ const { extractInput } = await import(
 const { pointEdit } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'point-edit.js')).href
 );
+const { roundtripCheck, renderRoundtrip } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'roundtrip.js')).href
+);
 const {
   searchOnline,
   ingestSearchResults,
@@ -589,6 +592,29 @@ const server = http.createServer(async (req, res) => {
       return json(res, 400, { error: String(err.message || err).slice(0, 300) });
     }
   }
+
+  // ── 回译校验（内容保真 + 风格对比）：一键入口 ──
+  if (req.method === 'POST' && p === '/api/roundtrip') {
+    const { sessionId } = await body(req);
+    const id = String(sessionId || '');
+    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    const dir = sessionDir(id);
+    if (!fs.existsSync(path.join(dir, 'draft.md'))) {
+      return json(res, 400, { error: '还没有成稿，无法回译校验' });
+    }
+    try {
+      const r = await roundtripCheck(cfg, dir, {});
+      return json(res, 200, {
+        ok: true,
+        verdict: r.verdict,
+        content: r.content,
+        style: r.style,
+        report: renderRoundtrip(r),
+      });
+    } catch (err) {
+      return json(res, 500, { error: String(err.message || err).slice(0, 300) });
+    }
+  }
   if (req.method === 'GET' && p === '/api/overview') {
     const sessions = listSessions();
     let works = 0;
@@ -791,12 +817,18 @@ const server = http.createServer(async (req, res) => {
     try {
       const text = fs.readFileSync(path.join(dir, 'draft.md'), 'utf8');
       const m = humanMetrics(text);
+      const state = ws.readState(dir);
       const issues = [];
       if (m.blacklistHits > 0) issues.push(`检出 ${m.blacklistHits} 处黑名单套话，已按你的风格修订`);
       if (m.repeatedMetaphors > 0) issues.push(`检出 ${m.repeatedMetaphors} 处重复比喻，已改为不同的意象`);
       if (m.repeatedPatterns > 0) issues.push(`检出 ${m.repeatedPatterns} 处句式复用，已调整节奏`);
       if (!issues.length) issues.push('未发现硬伤（黑名单 0 · 硬失败 0），人类化指标均在真人参考区间');
-      return json(res, 200, { metrics: m, issues, passed: m.passed });
+      return json(res, 200, {
+        metrics: m,
+        issues,
+        passed: m.passed,
+        roundtrip: state.quality?.roundtrip || null,
+      });
     } catch {
       return json(res, 200, { metrics: {}, issues: ['（尚无成稿可审计）'], passed: false });
     }

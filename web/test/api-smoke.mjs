@@ -211,6 +211,15 @@ await step('句子级点改', async () => {
   assert(typeof ctx.styleProgress === 'object', '点改后上下文面板仍正常');
 });
 
+await step('回译校验（内容保真）', async () => {
+  const r = await call('/api/roundtrip', 'POST', { sessionId: sid });
+  const d = JSON.parse(r._body());
+  assert(r.statusCode === 200 && d.ok, `roundtrip 200 (got ${r.statusCode})`);
+  assert(d.verdict === 'pass' && d.report.includes('内容保真'), '回译校验返回报告与判定');
+  assert(typeof d.content?.lost?.length === 'number', '信息点核对字段完整');
+  assert(typeof d.style?.original?.sentenceLengthStddev === 'number', '风格对比指标齐全');
+});
+
 await step('删除会话', async () => {
   const r = JSON.parse((await call('/api/session', 'DELETE', { sessionId: sid }))._body());
   assert(r.ok, 'DELETE 会话成功');

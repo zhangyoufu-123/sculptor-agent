@@ -28,6 +28,7 @@ import { reviseScan } from './revise.js';
 import { evaluateStyleFidelity } from './style-eval.js';
 import { archiveDraft, distillCategory } from './library.js';
 import { exportDocx } from './io.js';
+import { roundtripCheck } from './roundtrip.js';
 
 const OUTLINE_CONFIRM_RE = /^(对|对的|可以|可以的|没问题|就是这样|好的?|同意|ok|嗯|是|就这样)$/i;
 const OUTLINE_CORRECT_RE =
@@ -386,6 +387,27 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     const ori = originalityScan(draftText, workspace);
     const pr = proofScan(draftText);
     const fc = factScan(draftText, state.materials || []);
+    // 回译校验（内容保真，静默，自动触发）：LLM 不可用自动降级，绝不阻塞交付。
+    state.quality.roundtrip = { skipped: false };
+    try {
+      if (cfg.roundtrip === false) {
+        state.quality.roundtrip = { skipped: true, reason: '已禁用（SCULPTOR_ROUNDTRIP=0）' };
+      } else if (draftText.replace(/\s/g, '').length > 3000) {
+        state.quality.roundtrip = { skipped: true, reason: '超过 3000 字单批上限，可手动运行 sculptor roundtrip' };
+      } else {
+        const rt = await roundtripCheck(cfg, workspace, { text: draftText });
+        state.quality.roundtrip = {
+          verdict: rt.verdict,
+          kept: rt.content.kept.length,
+          lost: rt.content.lost.length,
+          drifted: rt.content.drifted.length,
+          styleNotes: rt.style.notes.length,
+          hint: rt.content.hint || '',
+        };
+      }
+    } catch {
+      state.quality.roundtrip = { skipped: true, reason: '回译校验失败（静默跳过）' };
+    }
     state.quality.originality = ori;
     state.quality.proofread = pr.items.length;
     state.quality.factVerify = fc.items.filter((i) => i.supported === 'verify').length;
@@ -476,6 +498,11 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     const q = state.quality || {};
     const fcVerify = typeof q.factVerify === 'number' ? q.factVerify : 0;
     const prCount = typeof q.proofread === 'number' ? q.proofread : 0;
+    const rt = q.roundtrip || null;
+    let rtNote = '';
+    if (rt && rt.verdict === 'attention') {
+      rtNote = `⚠ 回译校验：${rt.lost + rt.drifted} 处信息点丢失/漂移（运行 \`sculptor roundtrip\` 看明细）。`;
+    }
     state.factCheck = { total: fcVerify, verify: fcVerify, ts: ws.nowIso() };
     state.proofread = { total: prCount, ts: ws.nowIso() };
     // 学术论文交付：提示引文整理（确定性检测《书名》，格式由 sculptor citations 生成）
@@ -503,8 +530,8 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       distilled: distilled || '',
       audience: rendered,
       debate: debateRendered,
-      message: `整篇文章已完成：逐节写作（每节风格脉搏已即时反馈）→ 反 AI 审计 → 读者群像 → 交锋。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}${adapterNote}。${docx ? `已导出 ${docx}。` : ''}${refFile ? `已自动生成参考文献草稿 ${refFile}（基于检索回灌来源；运行 \`sculptor citations\` 可校对格式）。` : ''}${prCount ? `⚠ 校对：${prCount} 处提示（错别字/标点，运行 sculptor proofread 看明细）。` : ''}${fcVerify ? `⚠ 事实核查：${fcVerify} 处数字/年代/引文需核对（运行 sculptor fact-check 看明细）。` : ''}${citeNote ? `\n${citeNote}` : ''}要改某一句用 point-edit，要整体换风格或表达直接说（如"更克制一点"），我会吸收进风格档案并重写。`,
-      next: 'sculptor redteam / sculptor audience / sculptor debate / sculptor fact-check / sculptor point-edit',
+      message: `整篇文章已完成：逐节写作（每节风格脉搏已即时反馈）→ 反 AI 审计 → 读者群像 → 交锋。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}${adapterNote}。${docx ? `已导出 ${docx}。` : ''}${refFile ? `已自动生成参考文献草稿 ${refFile}（基于检索回灌来源；运行 \`sculptor citations\` 可校对格式）。` : ''}${prCount ? `⚠ 校对：${prCount} 处提示（错别字/标点，运行 sculptor proofread 看明细）。` : ''}${fcVerify ? `⚠ 事实核查：${fcVerify} 处数字/年代/引文需核对（运行 sculptor fact-check 看明细）。` : ''}${rtNote}${citeNote ? `\n${citeNote}` : ''}要改某一句用 point-edit，要整体换风格或表达直接说（如"更克制一点"），我会吸收进风格档案并重写。`,
+      next: 'sculptor redteam / sculptor audience / sculptor debate / sculptor fact-check / sculptor roundtrip / sculptor point-edit',
     };
   }
 

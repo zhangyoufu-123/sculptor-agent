@@ -54,6 +54,7 @@ export function loadConfig(env = process.env) {
     timeoutMs: Number(env.SCULPTOR_LLM_TIMEOUT_MS || 300000),
     targetWords: Number(env.SCULPTOR_TARGET_WORDS || 1000),
     quick: env.SCULPTOR_QUICK === '1' || env.SCULPTOR_QUICK === 'true',
+    roundtrip: env.SCULPTOR_ROUNDTRIP !== '0',
     workspace: env.SCULPTOR_WORKSPACE || '',
   };
 }

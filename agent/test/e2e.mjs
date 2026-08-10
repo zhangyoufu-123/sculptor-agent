@@ -259,7 +259,8 @@ try {
     typeof ws3StateAfterDeliver.quality?.styleScore === 'number' &&
       typeof ws3StateAfterDeliver.quality?.originality === 'object' &&
       typeof ws3StateAfterDeliver.quality?.proofread === 'number' &&
-      typeof ws3StateAfterDeliver.quality?.factVerify === 'number',
+      typeof ws3StateAfterDeliver.quality?.factVerify === 'number' &&
+      typeof ws3StateAfterDeliver.quality?.roundtrip === 'object',
     JSON.stringify(ws3StateAfterDeliver.quality).slice(0, 160),
   );
   // 交付后：用户给风格方向 → 导演全文重写 → 审计 → 群像 → 再次交付
