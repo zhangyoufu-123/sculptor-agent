@@ -29,6 +29,17 @@ function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
 }
 
+/** 动态提示词预算：注入块超预算时优先保风格适配卡，裁剪侧写与统一素材（防提示膨胀）。 */
+function clipInjects(ctx, budget = 1500) {
+  const len = (s) => (s || '').length;
+  const total = len(ctx.styleAdapter) + len(ctx.persona) + len(ctx.unifiedBrief);
+  if (total <= budget) return ctx;
+  const over = total - budget;
+  ctx.persona = ctx.persona ? ctx.persona.slice(0, Math.max(0, 420 - over)) : '';
+  ctx.unifiedBrief = ctx.unifiedBrief ? ctx.unifiedBrief.slice(0, Math.max(0, 640 - over)) : '';
+  return ctx;
+}
+
 /**
  * 检测成稿中仍带【素材不足】标注的节（回灌后自动重写的依据）。
  * 返回 [{heading, index}]，index 为 outline.sections 中的位置；定位不到时 index=null。
@@ -154,7 +165,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       cfg,
       [
         { role: 'system', content: '你是人类风格的写作者，输出正文。' },
-        { role: 'user', content: WRITE_PROMPT(ctx) },
+        { role: 'user', content: WRITE_PROMPT(clipInjects(ctx)) },
       ],
       { temperature: 0.85, maxTokens: 3000 },
     );

@@ -35,6 +35,8 @@ import {
   matchKb,
   normTitle,
   recommendReadings,
+  exportKnowledge,
+  importKnowledge,
 } from './knowledge.js';
 import { academicNarrative, argumentScan, academicGap } from './academic.js';
 import {
@@ -91,6 +93,8 @@ import {
   ragStatus,
 } from './rag.js';
 import { buildPersona, personaStatus, personaBrief, personaToVector } from './persona.js';
+import { listBibles, readBible, saveBible, distillBible } from './bible.js';
+import { emotionCurve, renderEmotionCurve } from './revise.js';
 import { originalityScan } from './originality.js';
 import {
   discoverCredentials,
@@ -153,7 +157,12 @@ const HELP = `Sculptor Agent v0.17 — 完整写作 Agent（导演模式 · 四�
   sculptor knowledge list|search <关键词>|view <标题或id>|add <标题>|remove <标题或id> [工作区]
                                      列表/检索/查看/收录/移除个人知识（澄清中《书名》与"去过×"
                                      会自动归纳收录，只问一次、可随时在此管理）
+  sculptor knowledge export [--to file] [工作区]  导出个人知识库 bundle（可迁移到其他项目）
+  sculptor knowledge import <file> [工作区]       导入合并知识库（按标题去重；含个人阅读/经历，注意保管）
   sculptor recommend [工作区]        荐书联想：从思想库匹配与你主题相近的书/理论，说明为什么可用
+  sculptor bible list|view <标题>|save <标题>|distill [工作区]
+                                     文章圣经：长文/系列文的跨篇一致性文档（交付自动沉淀）
+  sculptor emotion [--file x.md] [工作区]  情绪曲线量化（按节输出强度与主导情绪，供节奏检查）
   sculptor academic [工作区]         学术论证链：known→gap→tension→insight→method→evidence→limitation
                                      + 成稿论证完备性扫描（claim/evidence/warrant/limitation）
   sculptor persona [--refresh] [工作区]  人物风格肖像：从知识库/旧作/修改记录侧写你的写作人格
@@ -434,6 +443,47 @@ export async function runCli(argv, io = {}) {
         }
         const brief = personaBrief(w, { limit: 10 });
         console.log(brief || '（还没有风格肖像，先运行 sculptor persona --refresh）');
+        break;
+      }
+      case 'bible': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const sub = positional[0] || 'list';
+        if (sub === 'list') {
+          const bs = listBibles(w);
+          if (!bs.length) {
+            console.log('（还没有文章圣经。长文/小说交付时会自动沉淀；也可 sculptor bible distill）');
+            break;
+          }
+          for (const b of bs) {
+            console.log(`• ${b.title}（更新 ${(b.updatedAt || '').slice(0, 10)}${b.fallback ? '，确定性' : ''}）`);
+          }
+        } else if (sub === 'view') {
+          if (positional.length < 2) throw new Error('用法: sculptor bible view <标题>');
+          const b = readBible(w, positional[1]);
+          if (!b) throw new Error(`没有「${positional[1]}」的圣经`);
+          console.log(JSON.stringify(b, null, 2));
+        } else if (sub === 'save') {
+          if (positional.length < 2) throw new Error('用法: sculptor bible save <标题> [--world 世界观] [--style 文风]');
+          const b = saveBible(w, {
+            title: positional[1],
+            world: flags.world || '',
+            styleNote: flags.style || '',
+            continuityNotes: '续写前先读本文档，保持世界观/角色/时间线一致。',
+          });
+          console.log(`圣经已保存 → ${b.title}`);
+        } else if (sub === 'distill') {
+          const r = await distillBible(cfg, w, { title: positional[1] || '' });
+          console.log(r.saved ? `圣经已沉淀 → ${r.title}` : '（没有可沉淀的成稿/大纲）');
+        } else {
+          throw new Error(`未知子命令「${sub}」。可用: list / view / save / distill`);
+        }
+        break;
+      }
+      case 'emotion': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        const file = flags.file ? path.resolve(String(flags.file)) : path.join(w, 'draft.md');
+        if (!fs.existsSync(file)) throw new Error(`找不到文稿: ${file}`);
+        console.log(renderEmotionCurve(emotionCurve(fs.readFileSync(file, 'utf8'))));
         break;
       }
       case 'style-adapter': {
@@ -765,7 +815,7 @@ export async function runCli(argv, io = {}) {
           }
           for (const e of es) {
             console.log(
-              `• ${e.title}${e.author ? `（${e.author}）` : ''} [${e.type}] 使用 ${e.usageCount || 0} 次 · ${
+              `• ${e.title}${e.author ? `（${e.author}）` : ''} [${e.type}] 使用 ${e.usageCount || 0} 次${(e.confidence || 0) < 0.7 ? ' ⚠待核实' : ''} · ${
                 (e.createdAt || '').slice(0, 10) || ''
               }`,
             );
@@ -810,11 +860,19 @@ export async function runCli(argv, io = {}) {
           if (!hit) throw new Error(`未找到「${positional[1]}」`);
           console.log(`# ${hit.title}（${hit.type}）`);
           console.log(
-            `作者: ${hit.author || '—'}  来源: ${hit.source}  使用: ${hit.usageCount || 0} 次`,
+            `作者: ${hit.author || '—'}  来源: ${hit.source}  置信度: ${hit.confidence || '—'}${(hit.confidence || 0) < 0.7 ? '（待核实）' : ''}  使用: ${hit.usageCount || 0} 次`,
           );
           if (hit.note) console.log(`\n${hit.note}\n`);
+        } else if (sub === 'export') {
+          const r = exportKnowledge(w, flags.to ? String(flags.to) : '');
+          console.log(`已导出 ${r.entries} 条知识 + ${r.asked} 条提问记录 → ${r.file}`);
+          console.log('⚠ 知识库含个人阅读/经历，注意保管，不要上传到公开仓库。');
+        } else if (sub === 'import') {
+          if (positional.length < 2) throw new Error('用法: sculptor knowledge import <file.json>');
+          const r = importKnowledge(w, positional[1]);
+          console.log(`已导入 ${r.added} 条新知识（重复项跳过），${r.askedAdded} 条提问记录`);
         } else {
-          throw new Error(`未知子命令「${sub}」。可用: list / add / remove / search / view`);
+          throw new Error(`未知子命令「${sub}」。可用: list / add / remove / search / view / export / import`);
         }
         break;
       }

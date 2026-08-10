@@ -264,6 +264,7 @@ export function ingestAssetResults(workspace, results, { intoKb = true, purpose 
             note: `${h.snippet || h.summary || ''}`.slice(0, 200),
             source: 'web-rag',
             relatedTo: [query.slice(0, 20)],
+            confidence: 0.5, // 网络来源未核实：低置信度，用户确认后再提升
           });
           if (r.created) kbAdded += 1;
         } catch {}
@@ -299,7 +300,7 @@ export function webRecommendation(workspace, topic) {
   const first = (best.results || [])[0];
   if (!first) return '';
   const title = String(first.title || '').trim();
-  return `（联网搜到一本与你主题相关的作品：《${title.replace(/^《|》$/g, '')}》${first.source ? `（${first.source}）` : ''}${first.snippet ? `——${String(first.snippet).slice(0, 80)}` : ''}。需要我把它记进你的知识库吗？）`;
+  return `（联网搜到一本与你主题相关的作品：《${title.replace(/^《|》$/g, '')}》${first.source ? `（${first.source}）` : ''}${first.snippet ? `——${String(first.snippet).slice(0, 80)}` : ''}。来源未核实，需要我记进知识库并标注待核实吗？）`;
 }
 
 /** 联网资产缓存匹配（二元组），命中不足时退回内置库（离线兜底）。 */
@@ -324,7 +325,7 @@ export function webAssetBrief(workspace, query, { limit = 3 } = {}) {
       if (out.length >= limit) break;
       const title = String(h.title || '').trim();
       if (!title) continue;
-      out.push(`（联网资料）${title}${h.source ? `（${h.source}）` : ''}${h.snippet ? `：${String(h.snippet).slice(0, 60)}` : ''}`);
+      out.push(`（联网资料·待核实）${title}${h.source ? `（${h.source}）` : ''}${h.snippet ? `：${String(h.snippet).slice(0, 60)}` : ''}`);
     }
     if (out.length >= limit) break;
   }

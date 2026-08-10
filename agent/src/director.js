@@ -22,6 +22,8 @@ import { proofScan } from './proofread.js';
 import { originalityScan } from './originality.js';
 import { buildSearchQueries, requestHostSearch, autoReferences } from './rag.js';
 import { buildPersona, personaToVector } from './persona.js';
+import { distillBible } from './bible.js';
+import { reviseScan } from './revise.js';
 import { evaluateStyleFidelity } from './style-eval.js';
 import { archiveDraft, distillCategory } from './library.js';
 import { exportDocx } from './io.js';
@@ -242,9 +244,42 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
         phase: 'write',
       };
     }
-    d.stage = 'redteam';
-    d.fixAttempts = 0;
+    // 初稿完成 → 先做复阅-修订（Flower & Hayes：规划→转译→复阅），再进红队
+    d.stage = 'revise';
+    d.reviseRounds = 0;
     ws.writeState(workspace, state);
+  }
+
+  // ── 复阅-修订：全文复查一轮，P0（偏题/素材未用/断裂）自动局部修订（静默）──
+  if (d.stage === 'revise') {
+    const sections = state.outline?.sections || [];
+    if (d.reviseRounds >= 1 || sections.length < 3 || !cfg.apiKey) {
+      d.stage = 'redteam';
+      d.fixAttempts = 0;
+      ws.writeState(workspace, state);
+    } else {
+      const rev = await reviseScan(cfg, workspace);
+      state.revise = { score: rev.score, issues: (rev.issues || []).slice(0, 6), ts: ws.nowIso() };
+      d.reviseRounds += 1;
+      if (rev.p0?.length) {
+        await restyle(cfg, workspace, { direction: rev.direction || '修复偏题与衔接，素材用足' });
+        ({ state, d } = load());
+        d.stage = 'redteam';
+        d.fixAttempts = 0;
+        ws.writeState(workspace, state);
+        return {
+          kind: 'working',
+          message: `复阅发现 ${rev.p0.length} 处需修（${rev.p0
+            .map((i) => i.section || '全文')
+            .slice(0, 3)
+            .join('、')}…），已按「${rev.direction || '修复'}」修订，重新反 AI 审计…`,
+          phase: 'revise',
+        };
+      }
+      d.stage = 'redteam';
+      d.fixAttempts = 0;
+      ws.writeState(workspace, state);
+    }
   }
 
   // ── 回灌后自动续写：检索结果晚于最后写作，且稿中仍有【素材不足】节 → 用新素材重写 ──
@@ -262,6 +297,25 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       }
     }
     ({ state, d } = load());
+    // 多轮数据补给：重写后仍有缺口且未满 2 轮 → 等待再次回灌自动续写；满 2 轮交付带警告
+    state.rewriteRounds = (state.rewriteRounds || 0) + 1;
+    const residual = detectDraftGaps(workspace).filter((g) => g.index !== null);
+    if (residual.length && state.rewriteRounds < 2) {
+      const still = residual.map((g) => g.heading);
+      const req = requestHostSearch(
+        workspace,
+        still.map((h) => `补充${h}所需资料`),
+        { purpose: 'write-gap' },
+      );
+      d.stage = 'deliver';
+      ws.writeState(workspace, state);
+      return {
+        kind: 'working',
+        message: `已重写 ${rewritten} 个缺口节，但「${still.join('、')}」仍缺资料（第 ${state.rewriteRounds} 轮，已再次排队 ${req.queued} 条检索；最多补 2 轮）…`,
+        phase: 'rewrite',
+      };
+    }
+    if (residual.length) state.summary = '仍有素材缺口未补齐，交付带警告';
     d.stage = 'redteam';
     d.fixAttempts = 0;
     ws.writeState(workspace, state);
@@ -269,7 +323,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       kind: 'working',
       message: `已用回灌资料重写 ${rewritten} 个缺口节${
         failed.length ? `，${failed.length} 节未能重写（${failed.join('、')}，可能被外部改过）` : ''
-      }，重新反 AI 审计…`,
+      }${residual.length ? '；仍有缺口未补齐，交付时将提示' : ''}，重新反 AI 审计…`,
       phase: 'redteam',
     };
   }
@@ -376,6 +430,10 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     // 归档进个人写作库（按文体自动分类），并尽力导出 docx
     const archived = archiveDraft(workspace, state);
     if (archived) state.confirmed.libraryCategory = archived.category; // 供后续同类写作注入个人 skill
+    // 文章圣经（静默沉淀）：长文/小说交付时自动落一份跨篇一致性文档
+    try {
+      await distillBible(cfg, workspace);
+    } catch {}
     let distilled = '';
     if (archived) {
       try {

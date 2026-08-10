@@ -332,3 +332,67 @@ export function recommendReadings(state, workspace, { sessionAsked = false } = {
     '读过或感兴趣的话告诉我一声，我记进你的个人知识库并作为写作参考；没读过也没关系。）'
   );
 }
+
+// ── 跨工作区迁移（v0.23）：个人知识库随人走，不锁在单个项目里 ──
+
+/** 导出知识库为可移植 bundle（含条目与"已问过"记录）。 */
+export function exportKnowledge(workspace, outFile = '') {
+  const entries = listEntries(workspace);
+  const asked = [];
+  try {
+    asked = fs
+      .readFileSync(askedFile(workspace), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => {
+        try {
+          return JSON.parse(l);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  } catch {}
+  const bundle = {
+    schemaVersion: '1.0',
+    exportedAt: ws.nowIso(),
+    entries,
+    asked,
+  };
+  const dest = outFile ? path.resolve(outFile) : path.join(workspace, 'vault', 'knowledge-export.json');
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, JSON.stringify(bundle, null, 2) + '\n', { mode: 0o600 });
+  return { file: dest, entries: entries.length, asked: asked.length };
+}
+
+/** 导入知识库 bundle（按标题去重合并；本地已有则不动）。 */
+export function importKnowledge(workspace, file) {
+  const bundle = JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'));
+  const entries = Array.isArray(bundle.entries) ? bundle.entries : [];
+  let added = 0;
+  for (const e of entries) {
+    if (!e?.title) continue;
+    const r = addEntry(workspace, {
+      title: e.title,
+      type: e.type || 'book',
+      author: e.author || '',
+      note: e.note || '',
+      tags: e.tags || [],
+      relatedTo: e.relatedTo || [],
+      source: e.source || 'imported',
+      confidence: Number(e.confidence) || 0.9,
+    });
+    if (r.created) added += 1;
+  }
+  let askedAdded = 0;
+  if (Array.isArray(bundle.asked)) {
+    for (const a of bundle.asked) {
+      if (a?.key && !wasAsked(workspace, a.key)) {
+        markAsked(workspace, a.key, { declined: Boolean(a.declined) });
+        askedAdded += 1;
+      }
+    }
+  }
+  ws.logContext(workspace, 'knowledge', `导入 ${added} 条知识 + ${askedAdded} 条提问记录`);
+  return { added, askedAdded };
+}

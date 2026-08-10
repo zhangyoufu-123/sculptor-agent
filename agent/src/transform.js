@@ -53,6 +53,18 @@ export const PRESETS = {
     ratio: 1,
     mode: 'rewrite',
   },
+  classical: {
+    label: '古文风',
+    hint: '把现代文改写为文言/半文白风格：典雅凝练，保留原意与细节，不生造晦涩字词',
+    ratio: 1,
+    mode: 'rewrite',
+  },
+  desensitize: {
+    label: '脱敏改写',
+    hint: '把真实经历/真实人名地名机构改写为虚构，保留情感内核与细节质感，适合公开发布',
+    ratio: 1,
+    mode: 'rewrite',
+  },
 };
 
 export const TONES = ['formal', 'casual', 'warm', 'authoritative'];

@@ -63,6 +63,17 @@ export function gate(workspace) {
   return { ok: missing.length === 0, missing, state };
 }
 
+/** 动态提示词预算（大纲版）：裁剪统一素材与侧写，保核心字段。 */
+function clipOutlineCtx(ctx, budget = 1200) {
+  const len = (s) => (s || '').length;
+  const total = len(ctx.styleAdapter) + len(ctx.persona) + len(ctx.unifiedBrief);
+  if (total <= budget) return ctx;
+  const over = total - budget;
+  ctx.persona = ctx.persona ? ctx.persona.slice(0, Math.max(0, 360 - over)) : '';
+  ctx.unifiedBrief = ctx.unifiedBrief ? ctx.unifiedBrief.slice(0, Math.max(0, 520 - over)) : '';
+  return ctx;
+}
+
 export async function generateOutline(cfg, wsDir) {
   const workspace = ws.ensureWorkspace(wsDir);
   const { ok, missing, state } = gate(workspace);
@@ -124,7 +135,7 @@ export async function generateOutline(cfg, wsDir) {
     cfg,
     [
       { role: 'system', content: '你是提纲设计师。输出严格 JSON。' },
-      { role: 'user', content: OUTLINE_PROMPT(ctx) },
+      { role: 'user', content: OUTLINE_PROMPT(clipOutlineCtx(ctx)) },
     ],
     { json: true, temperature: 0.7, maxTokens: 3000 },
   );

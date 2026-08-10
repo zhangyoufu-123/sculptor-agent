@@ -110,7 +110,7 @@ export const PERSONA_PROMPT = (ctx) => `你是文体学家。请基于这位作�
 ${ctx.evidence || '（尚无足够素材：请如实说明样本不足，只给能推断的）'}
 
 输出严格 JSON：
-{"summary":"一句话风格总结","perspective":"叙述视角习惯（第几人称、亲历感还是旁观感，举例）","lexicon":"词汇偏好（常用词域、爱用的比喻域、口头禅类，举例）","syntax":"句式习惯（长短句、排比/反问/破折号等使用，举例）","emotion":"情感表达方式（直抒/克制/反讽/留白，举例）","values":"价值观倾向（关心什么、对什么敏感、立场习惯）","patterns":"惯用套路与盲区（反复出现的结构、易犯的毛病，诚实指出）","reference":"引用与素材习惯（爱用哪类书/典故/数据/场景）"}`;
+{"summary":"一句话风格总结","perspective":"叙述视角习惯（第几人称、亲历感还是旁观感，举例）","lexicon":"词汇偏好（常用词域、爱用的比喻域、口头禅类，举例）","syntax":"句式习惯（长短句、排比/反问/破折号等使用，举例）","emotion":"情感表达方式（直抒/克制/反讽/留白，举例）","values":"价值观倾向（关心什么、对什么敏感、立场习惯）","patterns":"惯用套路与盲区（反复出现的结构、易犯的毛病，诚实指出）","reference":"引用与素材习惯（爱用哪类书/典故/数据/场景）","identification":"与读者建立共鸣的方式（靠共同经历/共同立场/悬念/幽默等，TA 习惯打动哪类读者）"}`;
 
 /**
  * 生成人物风格肖像（LLM 归纳；失败/无密钥 → 确定性兜底，绝不阻塞）。
@@ -145,6 +145,7 @@ export async function buildPersona(cfg, workspace) {
       values: '',
       patterns: '',
       reference: '',
+      identification: '',
       fallback: true,
     };
   }
@@ -173,6 +174,7 @@ export async function buildPersona(cfg, workspace) {
       values: '价值观倾向',
       patterns: '惯用套路与盲区',
       reference: '引用与素材习惯',
+      identification: '与读者的共鸣方式',
     })
       .filter(([, v]) => v)
       .map(([k, label]) => `## ${label}\n\n${persona[k]}`),
@@ -196,10 +198,14 @@ export function personaBrief(workspace, { limit = 2 } = {}) {
     ['values', '价值观倾向'],
     ['patterns', '套路与盲区'],
     ['reference', '引用习惯'],
+    ['identification', '与读者的共鸣'],
   ]) {
     if (p[k]) lines.push(`${label}：${p[k]}`);
   }
-  return lines.slice(0, limit * 3).join('\n');
+  const body = lines.slice(0, limit * 3).join('\n');
+  if (!body) return '';
+  // 过拟合护栏：提醒作者这些是习惯而非牢笼，必要时可突破
+  return `${body}\n（以上是你的习惯画像，遇到更有力的表达可以突破，别被侧写钉死。）`;
 }
 
 /** 侧写映射回风格向量（辅助：让向量从累积知识里长出来）。 */
@@ -215,6 +221,7 @@ export async function personaToVector(cfg, workspace) {
     p.values,
     p.patterns,
     p.reference,
+    p.identification,
   ]
     .filter(Boolean)
     .join('\n');
