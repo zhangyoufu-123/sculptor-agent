@@ -80,4 +80,4 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/
 
 ---
 
-技术细节见 [COMPETITION.md](COMPETITION.md)（比赛论文/技术报告）与 [PRODUCT.md](PRODUCT.md)（产品设计文档）。
+技术细节见 [COMPETITION.md](COMPETITION.md)（比赛论文/技术报告）与 [../PRODUCT.md](../PRODUCT.md)（产品设计文档）。

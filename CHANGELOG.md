@@ -3,8 +3,9 @@
 ## 2026-08-10（发布版 0.23.0 · 比赛材料）
 
 - **版本对齐**：package.json / MCP serverInfo / CLI help 统一到 0.23.0。
-- **比赛材料**：新增 [docs/PRODUCT-README.md](docs/PRODUCT-README.md)（面向评审/用户的产品 README）
-  与 [docs/COMPETITION.md](docs/COMPETITION.md)（论文式技术报告：摘要/相关工作/系统设计/核心方法/评估/参考文献）；
+- **比赛材料**：新增 [docs/competition/PRODUCT-README.md](docs/competition/PRODUCT-README.md)
+  （面向评审/用户的产品 README）与 [docs/competition/COMPETITION.md](docs/competition/COMPETITION.md)
+  （论文式技术报告：摘要/相关工作/系统设计/核心方法/评估/参考文献）；
   根 README 增加产品总览与比赛文档入口。
 
 ## 0.23.0 (2026-08-10)

@@ -1,214 +1,87 @@
-# Sculptor Agent
+# Sculptor
 
-深度协作写作 Agent：可装入 **Codex / Claude Code / OpenCode / Cursor** 的跨平台 skill 包，承上启下——观察主对话、动态澄清、建立大纲、按你的双风格写作、红队审计，产出交给下游 Agent（剪辑、发布、PPT）。
+一个会先读懂你、再替你写好的写作 Agent。装上它之后，你不需要会写提示词——说出一个念头，剩下的澄清、大纲、成稿、修改，它陪你走完。
 
-> 🏆 **比赛材料**：[产品 README（面向评审）](docs/PRODUCT-README.md) · [论文/技术报告](docs/COMPETITION.md)
+> 装进 Codex / Claude Code / OpenCode，就是你的写作合伙人。
 
-> 📄 产品文档（功能 / 工作流 / 设计思路 / 设计亮点 / 路线图）：[docs/PRODUCT.md](docs/PRODUCT.md)
+## 为什么会有它
 
-> 🎯 **定位**：本仓库就是产品本身——一个深度协作写作 Agent（引擎 / CLI / skill / MCP），
-> 开源分发，不做闭源应用壳。历史上一度探索过独立 Web 应用与桌面 App 路线，已全部移除，
-> 精力集中在这里。
+大多数 AI 写作工具只做一件事：你把题目丢给它，它把文章吐给你。结果往往"像模像样，但一眼假"——结构工整、辞藻平滑，却没有人味。
 
-## 开箱即用（无需重复填 key）
+我们追问了很久，问题不在模型，在于**它不认识你**。它不知道你读过什么、在意什么、句子习惯怎么断、情绪习惯怎么收。它写的是"一篇好文章"，而不是"你写的文章"。
 
-未配置 `SCULPTOR_LLM_API_KEY` 时自动读取宿主已配置的 API（Codex / Claude Code / OpenCode /
-常见 `*_API_KEY`），只显示来源与末 4 位、绝不打印密钥；`sculptor credentials --ask` 可交互选择。
+所以我们换了个思路：**先花时间了解作者，再动笔。**
 
-> 🔐 **安全**：密钥只放在本地 `.env.local`（已被 `.gitignore` 忽略，权限 0600），
-> **绝不要把 token 写进 git 远程 URL 或任何会提交的文件**。提交前跑
-> `bash scripts/scan-secrets.sh --all-refs`（CI 已内置该检查）；一旦 token 疑似泄露，
-> 立即到 GitHub Settings → Tokens 吊销并重建，再把远程改回干净地址。
+## 我们相信的三件事
 
-> Agent 还是 Skill？——**Skill 优先，Agent 级协议**。分发靠 skill 包（目录即产品），深度靠协议（state.json / requests.jsonl / 风格金库）。
+**一、风格不是模仿，是提取。**
+我们把风格理解为：人天然的不规范表达，与完美表达之间的差异弥补。这种差异不可预测、带着个人知识库里的无限联想，正是"人味"的来源。Sculptor 用四层复合风格向量持续追踪它——从你写过的文、读过的书、反复改过的地方里提取，而不是套用某个名人的模板。
 
-## 快速开始（一键安装）
+**二、读过的书，是写作的土壤。**
+一个人的联想和理论，都来自他读过什么、经历过什么。Sculptor 会归纳式地收集你的知识：你提到一本读过的书，它问一句"要我记进你的知识库吗"；你说想去某处，它记下来。写作用到时，它按主题调取、轮换使用，绝不反复引用同一本让你起疑。你心里有个模糊的想法，它甚至会主动递上一本与你想法相近的书，说清"这个理论是什么、为什么适合你"。
+
+**三、AI 该有自己的生态位，而不是抢走整张桌子。**
+Sculptor 只负责"写作"这一件事，但在这件事里它主导：问什么、何时写、缺什么数据，它自己决定。需要查资料时它自动排队请求，宿主或学术 Agent 检索回灌后，它会用新数据自动补写缺口。在编程、答疑、翻译这些事上，它完全让位，不和其他 Agent 打架。
+
+## 用它写一篇东西，会发生什么
+
+```
+你说：想写一篇关于××的散文
+  ↓  它开始问你，一次只问一个，从你的话里长出新问题
+  ↓  你的风格、知识、素材，在对话中同步被采集
+  ↓  大纲成型（论文有论证链，小说有故事骨架），你确认后才写
+  ↓  逐节写作，每一节都带着"你的"风格肖像
+  ↓  初稿自查：有没有偏题、衔接断没断、素材用够没
+  ↓  反 AI 审计：套话、重复比喻、句式复用，自动修掉
+  ↓  8 个"第一读者"第一次读它的真实反应，反馈给你
+  ↓  交付：归档进你的个人写作库，导出 Word
+```
+
+全程你只回答该你决定的问题，其余它自己推进。
+
+## 它能写什么
+
+- **议论文、散文、演讲稿**：澄清 → 大纲 → 双风格写作 → 审计 → 读者群像，全流程自动。
+- **学术论文**：自带论证链（已知 → 缺口 → 张力 → 洞见 → 方法 → 证据 → 局限），写完逐节检查"论点有没有证据、证据有没有推理桥"，还能自动生成参考文献草稿。
+- **公文、投标书、申报书**：25 多种文体范式，党政机关公文按国标排版导出。
+- **小说、推理小说**：给角色建档案（最想要什么、最怕什么、有什么秘密），写每一节前先"角色预演"——让角色自己决定这个场景里会怎么想、怎么说、怎么做，故事像是自己长出来的。
+- **长文、系列文**：交付时沉淀一份"文章圣经"（世界观、角色、时间线、伏笔），续写时自动保持一致。
+- **任何文体**：扩写、缩写、润色、古文风、脱敏改写；历史版本可回滚；导出 docx / pdf / html / 字幕。
+
+## 它怎么做到"写得像我"
+
+1. **四层风格向量**：从你的语料里提取方向差，从你的修改里学偏好（"太文艺了""结尾收一点"都会被吸收）。
+2. **双风格模型**：你想写的风格，和你想听的风格，是两回事——分开采集、分开注入。
+3. **人物风格肖像**：把你的知识库、旧作、修改记录侧写成一幅"写作人格画像"，你可以随时查看（`sculptor persona`）。
+4. **反 AI 痕迹硬规则**：黑名单套话、重复比喻、句式复用，红队审计自动修订，交付前还有人类化指标把关。
+
+## 安装
 
 ```bash
-# 方式一：一行命令，一次装好三个安装点（全局 skill + 当前项目 skill + 开发镜像 ~/sculptor）
 curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/install.sh | bash -s -- --all
-
-# 方式二：git clone
-git clone https://github.com/zhangyoufu-123/sculptor-agent
-cd sculptor-agent && ./install.sh --all --project ~/我的写作项目
 ```
 
-三个安装点各有用途：`~/.codex/skills/sculptor`（全局：所有 Codex 对话可用）、
-`<项目>/.codex/skills/sculptor`（项目级：只在当前项目生效）、`~/sculptor`（开发镜像：
-选择性同步 agent/skills/scripts 等，保留你自己的 `.git`、`node_modules`、`.env.local`）。
-只要其中一个点（或仓库）更新了，随时一键刷新全部：
+装完在新对话里直接说"写一篇关于××的散文，要有我的风格"即可。详细使用手册见 [docs/GUIDE.md](docs/GUIDE.md)。
 
-```bash
-# 推荐：skill 自带更新器，随处可跑
-bash ~/.codex/skills/sculptor/scripts/update.sh [项目目录]
+## 文档
 
-# 或在仓库目录里
-./install.sh --all --update
-```
+- [产品介绍（比赛/评审用）](docs/competition/PRODUCT-README.md)
+- [技术报告（论文式）](docs/competition/COMPETITION.md)
+- [产品设计文档](docs/PRODUCT.md)
+- [使用手册（命令大全）](docs/GUIDE.md)
 
-安装完成后**自动注册当前项目**（Codex MCP + skill + 凭据，零手动、零全局副作用）：
-新开一个 Codex 对话，直接描述写作任务即可，Sculptor 自动启动。
-`--no-setup` 跳过自动注册；`--setup-all` 同时注册 Claude Code / OpenCode。
+## 质量与可信
 
-skill 内嵌**完整 agent 引擎**，装完即用，无需单独安装 CLI。在你的写作项目里：
-
-```bash
-export SCULPTOR_LLM_API_KEY=sk-xxx    # 必配：默认 DeepSeek 端点
-SCULPTOR=.codex/skills/sculptor/scripts/sculptor.mjs
-node $SCULPTOR init && node $SCULPTOR agent         # 导演模式：主导全程，自动推进到交付
-```
-
-导演模式（**自主决策 · 主导对话**）：每次收到你的消息，Sculptor 自己决定下一步并执行——
-澄清问完就生成大纲、大纲确认就逐节写作、写完就反 AI 审计、审完就请 8 位"第一读者"群像反馈、
-最后交付；你不需要催"继续"，只在真正的决策点（主题/立场/素材/立意/论点/大纲确认）回答。
-交付后说"整篇更克制一点"这类风格方向 → 全文自动按新方向重写并再走一轮审计与群像。
-深度定点修改：选中一句话 → `node $SCULPTOR point-edit "原句" "指令" --dir 项目`（macOS 可装右键服务，见 extras/）。
-宿主 agent（Codex / Claude Code / OpenCode）安装后可直接按 `SKILL.md` 自动调用全部流程。
-公式化内容（公文/合同/通知/纪要/报告）：对话里说"写一份关于××的通知/合同"即自动按文体范式产出；
-`node $SCULPTOR genre 合同` 可查看每种文体的结构规范；党政机关公文 15 文种
-（请示/批复/函/通报/公告/通告/意见/决定/决议/命令/公报/议案…）按 GB/T 9704-2012 排版导出：
-`node $SCULPTOR export --official [--redhead]` → A4 公文 docx（红头可选）。
-另有学术论文/新闻稿/邮件/视频脚本 4 种新文体（`--academic` 导出学术 docx），
-参考文献 `node $SCULPTOR cite "<条目>" --style gbt7714|apa`。
-语音口述：`node $SCULPTOR dictate <音频> [--to-draft]`（whisper 转录，`SCULPTOR_WHISPER_CMD`
-可指定命令）。校对：`node $SCULPTOR proofread`（错别字/标点确定性 + LLM 语病）。
-导出多格式：`--html` / `--pdf` / `--srt`（视频脚本转字幕）。
-一键改写：`node $SCULPTOR transform polish|expand|condense|imitate|tone:formal`；
-版本快照 `node $SCULPTOR history` / `rollback [N]`（每次写作前自动存）；
-全局风格档案 `node $SCULPTOR profile export/import`（跨工作区携带你的风格）；
-引文管理 `node $SCULPTOR citations [--append refs.json]`。
-联网 RAG：事实核查自动生成检索查询，配置 `SCULPTOR_RAG_ENDPOINT` 直连，否则写入
-`requests.jsonl` 由宿主代检、`node $SCULPTOR rag ingest <results.json>` 回灌；
-交付前静默质量门（风格保真/原创性/校对/事实核查）真实执行但不刷屏，`node $SCULPTOR originality` 可手动查看。
-风格脉搏：不再做交付前的一次性大考——澄清每轮、大纲生成、每节写作后都即时采集/评估风格
-（`node $SCULPTOR style --pulses` 查看），每节脉搏建议自动带入下一节；你说的每句修改
-（"太文艺了/太啰嗦/结尾收一点"）都会被吸收进风格档案并自动重写。深度全稿评估保留为
-手动 `node $SCULPTOR style-eval`。大纲评审：生成后自动按六条标准评审并自动微调（仍由你确认）。
-快速模式：`SCULPTOR_QUICK=1`（读者 3 人、跳过交锋与适配卡重蒸馏，交付更快）。
-读者交锋：8 位"第一读者"反馈后，分歧最大的 3 位互看意见、收敛出共识/争议/优先级
-（`node $SCULPTOR debate`）。事实核查：把数字/年代/引文/人名/机构分级为
-material/common/verify，交付前必看（`node $SCULPTOR fact-check`）。
-风格持续微调：`node $SCULPTOR style-adapter --distill` 蒸馏风格适配卡（写作时最高优先级注入）、
-`--dataset` 生成偏好对 JSONL、`--lora` 提交微调（或本地 `scripts/finetune/style_lora.py`，
-Panza 式 <100 样本 + LoRA）。
-个人写作库：交付后作品自动分类归档并蒸馏出"这类文体你的写法"，同类文章越写越像你；
-`node $SCULPTOR library` 查看分类，`node $SCULPTOR library view 议论文` 查看蒸馏 skill。
-多模态：对话里直接给 docx/xlsx/图片 文件路径即可自动提取素材；`node $SCULPTOR export` 把成稿导出为 docx。
-
-## 双形态
-
-- **Skill 形态（默认，完整引擎内嵌）**（本包 `skills/sculptor/`）：`scripts/engine/` 是
-  agent 的完整快照（由 `scripts/sync-skill-engine.sh` 同步、CI 校验防漂移），
-  `node scripts/sculptor.mjs <cmd>` 直接运行全部工作流——**装 skill 即装完整 agent，
-  不依赖外部 CLI**。宿主 agent 按 SKILL.md 自动调用，或手动跑命令。
-- **独立 CLI 形态（可选）**（[agent/](agent/README.md)）：`./install.sh --cli` 软链
-  `sculptor` 到 `~/.local/bin`，方便命令行直用；同一引擎，另提供 **MCP stdio 服务器**
-  （`node scripts/sculptor.mjs mcp`）——Codex、Claude Code、OpenCode 通过标准 MCP 调用，
-  对话由宿主主导，Sculptor 只负责写作与风格。**只写自己的工作区，绝不碰宿主配置。**
-
-## 共存与退让（不与其他 agent 打架）
-
-- **主权顺序**：用户指令 > 宿主当前动作 > Sculptor。宿主在做任何事时，Sculptor 不插入、不抢话。
-- **写前校验**：改用户文件前重读文件；目标原文已被外部改动 → 中止退让，绝不覆盖（point-edit / write 均已实现并发守卫）。
-- **地盘隔离**：只用 `.sculptor/` 与用户明确指定的文件，不碰其他 agent 的配置/存储/锁文件。
-- **MCP 被动**：不观察、不自动运行、不主动出现；宿主不调用就不执行。
-
-## 生态位与主动合作（退让不等于边缘化）
-
-- **主动感知**：任务落到写作生态位（长文/风格/结构/定点修改）时，宿主用 `sculptor probe "<任务>"` 判断，主动提议 Sculptor 介入——不必等用户点名。
-- **提议一次、可拒绝**：一句话说清能做什么，被拒即完全退让，不纠缠。
-- **合作不接管**：Sculptor 只负责写作工作流与风格，对话仍由宿主主导；缺信息时反向请宿主代问。
-
-安装完整 Agent（可选 CLI / MCP）：
-
-```bash
-./install.sh --project ~/项目                # skill（含引擎）→ 项目 .codex/skills/sculptor
-./install.sh --global                        # 或全局 → ~/.codex/skills/sculptor
-./install.sh --all                           # 三处一次装：全局 + 项目 + 开发镜像 ~/sculptor
-./install.sh --all --update                  # 更新：先 git pull 最新，再刷新三处
-./install.sh --cli                           # 额外软链独立 CLI
-./install.sh --mcp-codex                     # 打印 Codex 的 MCP 注册片段（不写文件）
-```
-
-## 独特资产
-
-- **需求访谈（Interview）**：多轮一问、带建议与选项，回答后实时刷新确认清单与进度，
-  收尾打包"需求 + 风格档案 + 剩余步骤"，让"AI 在认真理解我"这件事可见。
-- **风格向量引擎**：3D 向量（个人数据集 512 维 / 写作偏离 128 维 / 注意力焦点）+ 14 维度画像 + 从每次修改中在线学习。详见 [skills/sculptor/references/style-vectors.md](skills/sculptor/references/style-vectors.md)。
-- **双风格模型**：人想写的（write-style）≠ 人想听的（read-style），分开采集、分开注入。
-- **读者群像（Audience）**：交付前模拟 8 个第一读者（老教师/挑剔编辑/中学生/挑剔评论家/
-  焦虑家长/历史爱好者/随性读者/年轻作家）第一次阅读的心理反应——在哪里停下来、哪里走神、
-  哪句记住了、最想对作者说什么。详见 [agent/README.md](agent/README.md)。
-- **文体库（Genre）**：公文/合同/通知/会议纪要/报告等公式化内容的"结构骨架 + 行文规范"，
-  自动识别文体并按范式产出；与个人写作库叠加，公式化内容既规范又像你。
-- **个人写作库（Library）**：作品自动分类归档 + 蒸馏成个人写作 skill（限量注入，不污染上下文），
-  用户可随时查看自己的作品与整理出的 skill；Web 端将以 session 为单元组织。
-- **多模态 IO**：docx/xlsx/图片输入自动提取为素材；成稿一键导出 docx（python-docx）。
-- **感性解剖**：5 维度（立场导向 / 局限边界 / 困惑混乱 / 多视角代入 / 风格兑现度），把文本隐藏的感性结构照亮给作者。详见 [skills/sculptor/references/sensibility.md](skills/sculptor/references/sensibility.md)。
-- **反 AI 痕迹硬规则**：零容忍黑名单、重复比喻/句式禁令、人类化统计指标。详见 [skills/sculptor/references/anti-ai.md](skills/sculptor/references/anti-ai.md)。
-- **压缩守卫**：上下文压缩前把风格指纹写回 vault，记忆会丢、风格不丢。
-
-## 引擎同步与维护（给开发者）
-
-`agent/` 是唯一事实源；skill 内嵌引擎由同步脚本生成：
-
-```bash
-scripts/sync-skill-engine.sh           # agent → skills/sculptor/scripts/engine
-scripts/sync-skill-engine.sh --check   # 校验是否漂移（CI 在跑）
-node agent/test/e2e.mjs                # 全链路离线测试（mock LLM，88 项断言）
-```
-
-skill 是自包含的（SKILL.md + references + scripts + hooks + 模板都在一个目录里），
-装到任何宿主都是一整份，路径不会断。
-
-## 工具链（零依赖 Node CLI）
-
-`skills/sculptor/scripts/sculptor.mjs`，四个常用子命令：
-
-```bash
-node scripts/sculptor.mjs panel .sculptor/protocol/state.json   # 玻璃面板：白话进度
-node scripts/sculptor.mjs absorb .sculptor/vault edit.json      # 定点修改 → 吸收进风格档案
-node scripts/sculptor.mjs fingerprint .sculptor/vault           # 压缩守卫：刷新风格指纹
-node scripts/sculptor.mjs status .sculptor                      # 工作区摘要
-```
-
-观察者 hooks 自动把会话事件写入 `.sculptor/protocol/context.jsonl`，
-压缩恢复时凭 context + state + 风格指纹续写，风格不丢。
-
-## 使用示例
-
-- "帮我写一篇演讲稿，要有我的风格" → 观察 → 动态澄清 → 大纲 → 双风格写作 → 红队 → 交付
-- "把这段改成更像我的语气" → 定点修改协议，改完吸收进风格档案
-- "我贴一段我的旧稿" → 自动落盘 + 14 维风格提取，后续写作全程带着你的风格
-- "写完了，读者第一次读会怎么想？" → 读者群像：8 个第一读者的即时心理反馈
-- "分析这篇文章的立场和情感结构" → 感性解剖报告
-
-## 架构
-
-```
-Observer（观察） → Orchestrator（编排） → Requester（反求） → Producer（生产）
-      │                    │                    │                  │
-  读对话上下文      澄清/大纲/写作/红队      反向让宿主提问/      双风格成稿
-  提取素材与风格       状态机                  读图/转录          交下游 Agent
-```
-
-## 分发渠道
-
-1. **GitHub 开源仓库**：目录即产品，clone 即装。
-2. **Skill 市场**：Codex 个人插件、Claude Code marketplace、OpenCode registry、agentskillsindex。
-3. **一键安装**：`curl -fsSL <url>/install.sh | bash`（npm 包仅含 CLI 形态，skill/安装器走仓库）。
-4. **宿主生态**：WorkBuddy 数字员工（企业场景）、Cursor 规则。
-5. **增值层**（后续）：风格金库模板市场、团队风格分析、感性解剖报告订阅。
+- **337 项自动化断言**覆盖澄清到交付全链路、风格向量、知识库、实时取数、MCP、安全。
+- **确定性兜底**：任何 LLM 或网络不可用时，流程降级但不崩溃。
+- **密钥安全**：自动发现宿主配置的 API，但绝不打印；提交前自动扫描密钥。
+- **不覆盖你的稿子**：任何文件被外部改过，它都会停下让路，绝不悄悄覆盖。
 
 ## 路线图
 
-- P0：跨平台 skill 包 + 协议层 + 安装器 ✅
-- P1（当前）：玻璃面板渲染、定点修改吸收、压缩守卫、观察者日志 ✅
-- P1 收尾：Observer 接入宿主 hooks ✅（已修复为 app 安全：默认注释，CLI 用 --hermes）
-- P2：完整 Agent 运行时 + MCP 协作 ✅（agent/，74 项离线 e2e 全绿）
-- P3（本轮）：需求访谈 + 读者群像 + 引用块 + 全程风格采集 ✅（agent/ 17 个 MCP 工具）
-- P4：多 Agent 交付协议、风格市场、团队风格分析
+已走到 0.23：风格系统、个人知识库、实时取数、学术论证链、角色预演、文章圣经、复阅循环、多 Agent 协作。
+接下来：平台适配（小红书/公众号/知乎）、双人合写风格融合、推理小说线索引擎。
 
-## License
+---
 
-MIT
+由一群相信"AI 应该更懂人"的人做的开源项目。如果你也觉得 AI 写作差了一口气，欢迎来一起把它补上。
