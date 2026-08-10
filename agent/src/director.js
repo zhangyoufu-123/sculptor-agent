@@ -154,7 +154,9 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
         stylePulse: r.stylePulse || null,
       };
     }
-    if (missingNeed(state) !== '') {
+    // 低意愿早退/全部维度走完（r.stop）→ 直接进大纲生成。此时 missingNeed 可能
+    // 因"大纲缺口"非空，但那不是缺失的关键信息，跳过检查以免用户被死循环追问。
+    if (!r.stop && missingNeed(state) !== '') {
       return {
         kind: 'ask',
         question: '还需要补充一些关键信息才能继续，先回答上一条问题好吗？',

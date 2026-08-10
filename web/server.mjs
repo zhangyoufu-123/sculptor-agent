@@ -458,8 +458,7 @@ const server = http.createServer(async (req, res) => {
       nextGap: progress.complete ? null : nextOutlineGap(progress),
       updatedAt: ws.nowIso(),
     };
-    // 用户手动编辑 → 下一问围绕"按用户大纲打磨"，大纲确认题暂缓
-    state.justRefined = true;
+    // 编辑已即时生效，不扰动确认流程：完成度判定会自然决定下一问（缺口/确认）。
     ws.writeState(dir, state);
     ws.logContext(dir, 'outline', `用户手动编辑实时大纲（${state.liveOutline.sections.length} 节）`);
     return json(res, 200, { ok: true, liveOutline: state.liveOutline });

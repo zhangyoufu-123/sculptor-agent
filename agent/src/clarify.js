@@ -728,13 +728,34 @@ async function askOnce(state, cfg, workspace) {
       };
     }
     state.repeatCount = 0;
-    // 硬校验：一次只允许一个问题。LLM 一旦输出"一次多问"（≥3 个问号，或带编号/其次/另外的列举），
-    // 退回确定性单问题，绝不让用户面对多问、也绝不自答默认。
+    // 硬校验：一次只允许一个问题。判定"一次多问"：
+    //   a) ≥3 个问号；b) ≥2 个问号且两个分句指向不同维度（如"写多长？读者是谁？"）；
+    //   c) 带编号/其次/另外/还有 的列举。同维度复述（"写多长？大概多少字？"）不算多问。
     const qMarks = (question.match(/[？?]/g) || []).length;
+    const DIM_CLASSES = [
+      /主题|写什么|想写/,
+      /读者|给谁|听众/,
+      /字数|多长|篇幅|多少字/,
+      /风格|写过|文风|旧稿/,
+      /素材|经历|画面|数据|引文|细节/,
+      /立意|中心意思|核心意思/,
+      /结尾|收尾|姿态/,
+      /情感|情绪|曲线|氛围/,
+      /论点|支撑|论证|观点/,
+      /大纲|开始写作|打磨/,
+    ];
+    const clauses = question.split(/[？?]/).map((s) => s.trim()).filter(Boolean);
+    const hitDims = new Set();
+    for (const c of clauses) {
+      for (let i = 0; i < DIM_CLASSES.length; i++) {
+        if (DIM_CLASSES[i].test(c)) hitDims.add(i);
+      }
+    }
     const multi =
       qMarks >= 3 ||
+      (qMarks >= 2 && hitDims.size >= 2) ||
       /(^|\n)\s*([1-9一二三四五六]、?\.?)\s*/.test(question) ||
-      /另外|还有|其次|最后，/.test(question);
+      /另外|其次|最后，|同时|以及/.test(question);
     if (!question || multi) {
       const f =
         FALLBACK_QUESTIONS.find((x) => x.need === need) ||
@@ -759,9 +780,7 @@ async function askOnce(state, cfg, workspace) {
     };
   } catch (err) {
     // LLM 不可用时的确定性兜底：按缺口依次问，绝不死循环。
-    const f =
-      FALLBACK_QUESTIONS.find((x) => x.need === need) ||
-      FALLBACK_QUESTIONS[FALLBACK_QUESTIONS.length - 1];
+    const f = pickFallback(state, need);
     return {
       stop: false,
       ready: materialGate(state),
@@ -772,6 +791,24 @@ async function askOnce(state, cfg, workspace) {
       warn: String(err.message).slice(0, 120),
     };
   }
+}
+
+/** 确定性兜底问题：与上一问完全相同时追加变体，避免用户觉得"同一个问题又问一遍"。 */
+function pickFallback(state, need) {
+  const base =
+    FALLBACK_QUESTIONS.find((x) => x.need === need) ||
+    FALLBACK_QUESTIONS[FALLBACK_QUESTIONS.length - 1];
+  const norm = (s) => String(s || '').replace(/[，。！？、,.！\s]/g, '').toLowerCase();
+  const prev = norm(state.lastQuestion);
+  const cur = norm(base.ask);
+  if (prev && cur && prev === cur) {
+    return {
+      ...base,
+      ask: `${base.ask.replace(/[？?]$/, '')}？还有别的吗？`,
+      recommendation: base.recommendation,
+    };
+  }
+  return base;
 }
 
 // 单步澄清：host（MCP）或脚本一次调用 = 应用一条用户消息 + 返回下一个问题。

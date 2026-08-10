@@ -7,17 +7,17 @@ const CLARIFY_QUESTIONS = [
     options: [],
   },
   {
-    question: '这篇打算写多长？大概多少字？',
+    question: '这篇打算写多长？',
     recommendation: '比如"大约一千字"或"三千字左右"——篇幅决定素材要备多少、大纲要拆几节',
     options: [],
   },
   {
-    question: '写完这篇发言稿，你想让读者相信什么？立场是什么？',
+    question: '写完这篇发言稿，你想让读者相信什么？',
     recommendation: '比如"历史不是橱窗里的展品，而是可以站进去的现场"',
     options: [],
   },
   {
-    question: '这篇文章主要给谁看？读者是谁？',
+    question: '这篇文章主要给谁看？',
     recommendation: '老师、同学还是家长？这决定信息密度和语气',
     options: [],
   },
