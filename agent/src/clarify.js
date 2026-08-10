@@ -284,6 +284,8 @@ function classifyAnswer(question, _answer) {
   const q = question || '';
   // 蓝图回显优先识别：问题以"整篇文章"开头，不能被里面的"支撑论点"字样带偏。
   if (/整篇文章|蓝图确认|我理解的整篇/.test(q)) return { field: 'blueprint' };
+  // 打磨问题优先识别：问题文本里含"大纲/结尾"字样，否则会被误判成 outlineConfirm。
+  if (/打磨|按你的大纲|大纲重新呈现/.test(q)) return { field: 'outlineRefine' };
   // 实时大纲确认/打磨：问题里带"大纲/开始写作"
   if (/大纲|开始写作/.test(q)) return { field: 'outlineConfirm' };
   if (/论点|支撑|理由|论证|观点/.test(q)) return { field: 'argument' };
@@ -310,6 +312,35 @@ function classifyAnswer(question, _answer) {
 function applyAnswer(state, field, answer) {
   state.confirmed = state.confirmed || {};
   const a = answer.trim();
+  // 可选维度"跳过"即标记完成，绝不反复追问（known/gap/method/limitation/emotion/ending 均为可选）。
+  if (
+    ['known', 'gap', 'method', 'limitation', 'emotion', 'ending'].includes(field) &&
+    /^(没有|不知道|跳过|算了|none|na|不确定|没想好|不清楚)$/i.test(a)
+  ) {
+    state.confirmed[field] = '（跳过）';
+    return state;
+  }
+  // 打磨问题：内容意见进修正档案；确认话术直接定稿。
+  if (field === 'outlineRefine') {
+    state.blueprint = state.blueprint || {};
+    state.blueprint.corrections = state.blueprint.corrections || [];
+    const norm = a.replace(/[，。！？、,.！\s]/g, '');
+    const confirm =
+      !a ||
+      LOW_WILL.test(a) ||
+      /^(对|对的|可以|可以的|同意|没问题|就是这样|是|是的|好的|好|嗯|没错|ok|开始|开始写作|写吧|确认|定稿|不用改了|不用了)/i.test(
+        norm,
+      );
+    if (confirm) {
+      state.confirmed.outlineConfirmed = true;
+      state.confirmed.blueprintConfirmed = true;
+      if (state.liveOutline) state.liveOutline.complete = true;
+    } else if (a) {
+      state.blueprint.corrections.push(a);
+      state.justRefined = true;
+    }
+    return state;
+  }
   // 实时大纲确认：说"开始写作/可以" → 大纲完成，进大纲生成；说"再打磨/改某节" → 记下修正继续问
   if (field === 'outlineConfirm') {
     state.blueprint = state.blueprint || {};
@@ -386,7 +417,11 @@ function applyAnswer(state, field, answer) {
   }
   else {
     state.materials = state.materials || [];
-    if (!state.materials.includes(a)) state.materials.push(a);
+    if (state.materials.includes(a)) state.materialRepeat = true;
+    else {
+      state.materials.push(a);
+      state.materialRepeat = false;
+    }
   }
   if (field === 'style') state.confirmed.styleSample = true;
   return state;
@@ -534,6 +569,27 @@ function materialGate(state) {
   return true;
 }
 
+/** 用户明确想结束时，把未满足的必填项用占位补齐（写作时再补），绝不困住用户。 */
+function waiveMissingRequired(state) {
+  const c = state.confirmed || (state.confirmed = {});
+  for (const f of activeBlueprint(state)) {
+    if (!f.required || f.key === 'styleSample' || fieldDone(state, f)) continue;
+    const need = f.count || 1;
+    if (f.list === 'materials') {
+      const arr = state.materials || (state.materials = []);
+      for (let i = arr.length; i < need; i++) arr.push('（素材不足，写作时再补）');
+    } else if (f.list === 'arguments') {
+      const arr = c.arguments || (c.arguments = []);
+      for (let i = arr.length; i < need; i++) arr.push('（论点不足，写作时按论证链补全）');
+    } else if (f.list === 'items') {
+      const arr = c.items || (c.items = []);
+      for (let i = arr.length; i < need; i++) arr.push('（事项待补）');
+    } else {
+      c[f.key] = c[f.key] || '（用户放弃，写作时补全）';
+    }
+  }
+}
+
 function missingNeed(state) {
   return blueprintNeed(state);
 }
@@ -585,9 +641,10 @@ function nextFallback(state, need) {
 async function askOnce(state, cfg, workspace) {
   const need = missingNeed(state);
   const coreReady = materialGate(state);
-  // 低意愿早退（确定性护栏，不依赖 LLM 判断）：连续两次"没有更多/你决定/可以了"且核心字段已齐
-  // → 直接进大纲。用户明确说"继续吧"是"你可以推进了"，不是"我还没说完"。
-  if ((state.lowWill || 0) >= 2 && coreReady) {
+  // 低意愿早退（确定性护栏，不依赖 LLM 判断）：连续两次"没有更多/你决定/可以了"
+  // → 直接进大纲。核心字段未齐也放行（缺失项占位，写作时再补），绝不困住用户。
+  if ((state.lowWill || 0) >= 2) {
+    if (!coreReady) waiveMissingRequired(state);
     return { stop: true, ready: true, question: null, lowWill: true };
   }
   // 意图理解刷新：每轮有新输入时提炼"我的理解/核心诉求/风险"，喂给追问设计师对齐后再问。
@@ -716,7 +773,7 @@ async function askOnce(state, cfg, workspace) {
     if (repeat) {
       state.repeatCount = (state.repeatCount || 0) + 1;
       const f = nextFallback(state, need);
-      const fb = f || FALLBACK_QUESTIONS.find((x) => x.need === need) || FALLBACK_QUESTIONS[0];
+      const fb = f || fallbackFor(need, state);
       return {
         stop: false,
         ready: materialGate(state),
@@ -757,9 +814,7 @@ async function askOnce(state, cfg, workspace) {
       /(^|\n)\s*([1-9一二三四五六]、?\.?)\s*/.test(question) ||
       /另外|其次|最后，|同时|以及/.test(question);
     if (!question || multi) {
-      const f =
-        FALLBACK_QUESTIONS.find((x) => x.need === need) ||
-        FALLBACK_QUESTIONS[FALLBACK_QUESTIONS.length - 1];
+      const f = fallbackFor(need, state);
       return {
         stop: false,
         ready: materialGate(state),
@@ -795,9 +850,7 @@ async function askOnce(state, cfg, workspace) {
 
 /** 确定性兜底问题：与上一问完全相同时追加变体，避免用户觉得"同一个问题又问一遍"。 */
 function pickFallback(state, need) {
-  const base =
-    FALLBACK_QUESTIONS.find((x) => x.need === need) ||
-    FALLBACK_QUESTIONS[FALLBACK_QUESTIONS.length - 1];
+  const base = fallbackFor(need, state);
   const norm = (s) => String(s || '').replace(/[，。！？、,.！\s]/g, '').toLowerCase();
   const prev = norm(state.lastQuestion);
   const cur = norm(base.ask);
@@ -809,6 +862,26 @@ function pickFallback(state, need) {
     };
   }
   return base;
+}
+
+/** 每个维度都有确定性问题：LLM 停摆/多问/重复时按需兜底，绝不问无关维度。 */
+function fallbackFor(need, state = {}) {
+  const f = FALLBACK_QUESTIONS.find((x) => x.need === need);
+  if (f) {
+    if (need === 'materials' && state.materialRepeat) {
+      return {
+        ...f,
+        ask: `${f.ask.replace(/[？?]$/, '')}？上一条已经记过了——换一条新的，或说"你决定"。`,
+      };
+    }
+    return f;
+  }
+  const label = NEED_LABELS[need] || need;
+  return {
+    need,
+    ask: `还差「${label}」——你有这方面的想法吗？直接说，或回"跳过"。`,
+    recommendation: '答不上来也没关系，说"跳过"我会按通用方式处理。',
+  };
 }
 
 // 单步澄清：host（MCP）或脚本一次调用 = 应用一条用户消息 + 返回下一个问题。
@@ -834,6 +907,25 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
       state.confirmed.genre = genre;
       ws.logContext(workspace, 'clarify', `识别文体：${genre}`);
     }
+    // 首轮主题预填（v0.35）：用户开局已说出主题，就不再重复问"你想写什么"。
+    // 只清理"帮我写一篇关于…"这类话术前缀，保留用户自己的说法；不匹配就不预填。
+    if (lastInput && !state.lastQuestion && !state.confirmed?.topic) {
+      const cleaned = String(lastInput)
+        .trim()
+        .replace(
+          /^(好|可以|行)?\s*(我)?(想|要|打算|希望)?\s*(帮我|麻烦|请)?\s*(写一?[篇份个]?|创作|起草|来[一篇份个]?|整[一篇份个]?)?\s*(关于|一篇|一份|一个|的)?\s*/,
+          '',
+        )
+        .replace(/[，。！？、\s]+$/, '')
+        .slice(0, 40);
+      const startsCommand = /^(开始|写吧|开写|你看着办|随便|帮我写$|写吧$)/.test(
+        String(lastInput).trim(),
+      );
+      if (cleaned && cleaned.length >= 4 && !startsCommand) {
+        state.confirmed.topic = cleaned;
+        ws.logContext(workspace, 'clarify', `首轮预填主题：${cleaned.slice(0, 30)}`);
+      }
+    }
     // 多模态输入：用户给出文件路径（docx/xlsx/图片/md）→ 提取成文本素材。
     if (fs.existsSync(String(lastInput).trim())) {
       const ing = await extractInput(String(lastInput).trim(), cfg);
@@ -857,11 +949,12 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     // 且不把拍板话术误当素材/要点收进大纲。
     const explicitStart =
       !state.confirmed.outlineConfirmed &&
-      materialGate(state) &&
       /^(好|可以|行|嗯|对|没问题|就这样|行吧|ok)?\s*(开始写作|开始吧|写吧|开写|进入写作|大纲完成[，,、\s]*开始写作|大纲可以了|大纲没问题|确认大纲|就按这个写|定稿)/.test(
         lastInput.trim(),
       );
     if (explicitStart) {
+      // 用户明确拍板开始写作 → 素材未齐也放行（缺失项占位，写作时再补）。
+      if (!materialGate(state)) waiveMissingRequired(state);
       state.confirmed.outlineConfirmed = true;
       state.confirmed.blueprintConfirmed = true;
       if (state.liveOutline) state.liveOutline.complete = true;

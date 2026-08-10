@@ -1,13 +1,13 @@
 {
   "name": "sculptor-web",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "private": true,
   "type": "module",
   "description": "Sculptor 单会话 Web 演示版：零依赖 Node HTTP 服务 + 聊天式前端",
   "scripts": {
     "start": "node server.mjs",
     "mock": "SCULPTOR_MOCK_LLM=1 node server.mjs",
-    "test": "node test/api-smoke.mjs && node test/fullflow-qa.mjs"
+    "test": "node test/api-smoke.mjs && node test/fullflow-qa.mjs && node test/persona-qa.mjs"
   },
   "engines": { "node": ">=18" }
 }

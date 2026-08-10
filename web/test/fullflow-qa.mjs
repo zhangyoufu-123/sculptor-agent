@@ -77,8 +77,8 @@ console.log('\n═══ 会话 1 · 认真用户主流程（北大红楼散文�
   const start = j(await call('/api/start', 'POST', { topic: '写一篇百年历久的北大红楼散文' }));
   let sid = start.sessionId;
   check('start → 第一问', start.kind === 'ask' && !!start.question, start.kind);
+  // 首轮主题已由 /api/start 预填，问序从"字数"开始；答案数组与之对齐。
   const answers = [
-    '我想写百年历久的北大红楼，第一人称走进去的现场感',
     '大约一千字',
     '让读者感到历史可以走进去，不是隔着玻璃看展品',
     '写给自己和同学，老师会看',
@@ -116,7 +116,7 @@ console.log('\n═══ 会话 1 · 认真用户主流程（北大红楼散文�
     }
     if (r.liveOutline?.progress) progressTrack.push(r.liveOutline.progress.percent);
     // 中途手动编辑一次大纲（模拟用户改大纲）
-    if (i === 13 && r.liveOutline?.sections?.length) {
+    if (i === 12 && r.liveOutline?.sections?.length) {
       const lo = r.liveOutline;
       const edited = {
         title: lo.title,
