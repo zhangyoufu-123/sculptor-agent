@@ -117,6 +117,7 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/
 - [使用手册（命令大全）](docs/GUIDE.md)
 - [产品介绍（比赛/评审用）](docs/competition/PRODUCT-README.md)
 - [参赛论文（按科技论文模板撰写，md + docx）](docs/competition/科技论文-SCULPTOR.md)
+- [参赛过程档案（选题/时间线/问题复盘/实验数据）](docs/competition/PROCESS.md)
 - [理论架构（Agent/AI/数学/工程四维）](docs/THEORY.md)
 - [风格向量与数学推导](docs/competition/STYLE-MATH.md)
 - [行业调研与超越方案](docs/competition/BEYOND-PLAN.md)
