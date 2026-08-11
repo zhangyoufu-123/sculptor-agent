@@ -17,6 +17,9 @@ ACL 2025 StyleVector——激活空间风格向量；GhostWriter——隐式学�
 - **隐式风格信号流水（对标 GhostWriter + EMNLP 2025 结论）**：`style.js` 新增
   `recordImplicitSignals`，每轮对话被动采集写 `vault/style-signals.jsonl/md`，
   压缩不丢风格；`sculptor style --signals` 可回看，风格档案导出包含流水。
+- **架构梳理（docs/ARCHITECTURE.md）**：全量梳理导演状态机、Agent 合作体系与
+  "LLM 优先 / 代码安全网"边界，附新增模块入场检查；修复 revise 阶段
+  `checkConsistency` 写盘后被旧 state 覆盖的一致性丢失 bug（校验后重读）。
 - 测试：新增 `agent/test/consistency.test.mjs`（节奏曲线/伏笔记账去重/跨章回收/悬空标出/
   隐式信号 15 项断言）；web api-smoke 增加 curve/consistency 端点检查。
 - 版本：agent/web 同步 0.41.0；引擎同步后一并提交。

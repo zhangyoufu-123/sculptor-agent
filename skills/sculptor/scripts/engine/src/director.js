@@ -304,6 +304,9 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     if (/小说|推理|故事/.test(state.confirmed?.genre || '')) {
       try {
         await checkConsistency(cfg, workspace);
+        // checkConsistency 会把 mystery.clues 与 quality.consistency 写盘，
+        // 必须重读，否则用旧 state 写盘会冲掉一致性结果。
+        ({ state, d } = load());
       } catch {}
     }
     if (d.reviseRounds >= 1 || sections.length < 3 || !cfg.apiKey) {
