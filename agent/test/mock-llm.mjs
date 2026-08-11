@@ -395,6 +395,25 @@ export function respond(messages) {
       pitfalls: ['"破晓的号角"类意象', '口语化的停顿语气'],
     });
   }
+  if (userMsg.includes('文本细读编辑')) {
+    return JSON.stringify({
+      score: 72,
+      issues: [
+        {
+          layer: 'voice',
+          quote: '我只是一台搬运的机器，搬运得还挺熟练。',
+          problem: '叙述者的语言能力与设定矛盾：一个失语少年说不出这种自反性比喻',
+          fix: '换成更笨拙、更像当事人即时感受的表达',
+        },
+        {
+          layer: 'ending',
+          quote: '话到嘴边，是话还在，是嘴还在，是我们还在。',
+          problem: '金句排比收束：同义反复做形式高潮',
+          fix: '拆成一句说一半的笨拙话',
+        },
+      ],
+    });
+  }
   if (userMsg.includes('【主题提炼】')) {
     const m = userMsg.match(/用户开局说了：(.+?)\n/);
     const startsCommand = /^(开始|写吧|开写|你看着办|随便|帮我写$|写吧$)/.test(String(m ? m[1] : ''));

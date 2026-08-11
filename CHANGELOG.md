@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-08-11（v0.53：假思考检测去硬编码——LLM 六层细读 + RAG 作者对照）
+
+用户要求"把硬编码改成 RAG/LLM，充分发挥模型能力"。v0.52 的确定性正则升级为主路径之外的兜底：
+
+- **新增 `agent/src/fake-thinking.js`**：LLM 六层细读——voice（叙述者语言与设定矛盾）/
+  transition（过渡公式化与元叙述）/ rhetoric（排比对仗语义空洞）/ citation（检索式引用）/
+  translate（"翻译过来就是"式解释代替呈现）/ ending（金句收尾空转），输出
+  score + 病灶（含 quote/problem/fix）；诊断前 **RAG 检索作者 persona / 个人写作 skill /
+  知识库来源**作"声音像不像设定里的人"的参照。
+- **确定性正则降级为兜底**：无 key 或 LLM 失败时自动降级（`deterministicFakeThinking`），不中断。
+- **redteam 主流程接入**：LLM 细读前置到红队修复（让修复看到姿态层问题并带上修法），
+  修复后复查；结果写 `state.quality.fakeThinking` 供 Web `/api/report` 展示。
+- **CLI**：新增 `sculptor diagnose [--file]`；Web `/api/report` 返回 fakeThinking。
+- 测试：fake-thinking.test.mjs 扩展至 7 组——LLM 六层细读（mock 返回 voice/ending 病灶）、
+  无 key 兜底、细读提示词 RAG 作者对照注入；agent 19 套 + web 7 套 QA 全绿。
+
+## 2026-08-11（v0.52：AI 假思考全面根治——前置禁令 + 姿态层检测 + 回归样例）
+
 ## 2026-08-11（v0.52：AI 假思考全面根治——前置禁令 + 姿态层检测 + 回归样例）
 
 用户实测反馈：《差生》是 v0.17 写的（简洁提示词 + 反假大空 + 具体细节），后来改差了。

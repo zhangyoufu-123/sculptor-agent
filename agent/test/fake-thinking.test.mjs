@@ -1,14 +1,24 @@
 // v0.52 单测：假思考检测——统计层抓不到的姿态层 AI 味
 // （金句排比收束 / 路标式转折 / 点题式顿悟）；用《语言匮乏》与《差生》真实句子做回归样例。
 import assert from 'node:assert';
-import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const { audit } = await import(path.join(HERE, '..', 'src', 'redteam.js'));
+const {
+  diagnoseFakeThinking,
+  renderFakeThinking,
+  DIAGNOSE_PROMPT,
+} = await import(path.join(HERE, '..', 'src', 'fake-thinking.js'));
 const { WRITE_PROMPT, EXPAND_PROMPT, REDTEAM_FIX_PROMPT } = await import(
   path.join(HERE, '..', 'src', 'prompts.js'),
 );
+const { loadConfig } = await import(path.join(HERE, '..', 'src', 'config.js'));
+const ws = await import(path.join(HERE, '..', 'src', 'workspace.js'));
+const { respond } = await import(path.join(HERE, 'mock-llm.mjs'));
 
 // 1) 金句排比收束：命中"话到嘴边，是话还在，是嘴还在，是我们还在"式同义反复
 {
@@ -53,6 +63,55 @@ const { WRITE_PROMPT, EXPAND_PROMPT, REDTEAM_FIX_PROMPT } = await import(
   assert(EXPAND_PROMPT(ectx).includes('反假思考'), 'EXPAND_PROMPT 前置反假思考');
   assert(REDTEAM_FIX_PROMPT({}).includes('假思考痕迹'), 'REDTEAM_FIX_PROMPT 修复假思考');
   console.log('PASS 提示词前置禁令（写作/扩写/修复三层）');
+}
+
+// 5) LLM 六层细读（v0.53 主路径）：mock LLM 返回 voice/ending 病灶
+{
+  globalThis.fetch = async (url, opts) => {
+    const body = JSON.parse(opts.body || '{}');
+    const content = respond(body.messages || []);
+    return { ok: true, status: 200, json: async () => ({ choices: [{ message: { role: 'assistant', content } }] }) };
+  };
+  const cfg = { ...loadConfig(), apiKey: 'mock' };
+  const w = ws.ensureWorkspace(fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-fake-llm-')), {
+    create: true,
+  });
+  const r = await diagnoseFakeThinking(cfg, w, {
+    text: '我只是一台搬运的机器，搬运得还挺熟练。话到嘴边，是话还在，是嘴还在，是我们还在。',
+    genre: '散文',
+    topic: '语言匮乏',
+  });
+  assert(r.mode === 'llm', `LLM 主路径（实际 ${r.mode}）`);
+  assert(Number(r.score) === 72, '返回细读得分');
+  assert(r.layers.includes('voice') && r.layers.includes('ending'), '六层细读层标记完整');
+  assert(r.issues.some((i) => i.layer === 'voice' && i.fix), '病灶带修法');
+  assert(renderFakeThinking(r).includes('LLM 六层细读'), '报告标注 LLM 模式');
+  console.log('PASS LLM 六层细读（声音/收尾病灶）');
+}
+
+// 6) 无 key → 确定性兜底（主路径不可用也不中断）
+{
+  const w = ws.ensureWorkspace(fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-fake-det-')), {
+    create: true,
+  });
+  const r = await diagnoseFakeThinking({ apiKey: '' }, w, {
+    text: '话到嘴边，是话还在，是嘴还在，是我们还在。后来我想了很久。',
+  });
+  assert(r.mode === 'deterministic', `无 key 走确定性兜底（实际 ${r.mode}）`);
+  assert(r.issues.length >= 1, '兜底仍能发现问题');
+  console.log('PASS 无密钥确定性兜底');
+}
+
+// 7) 细读提示词带 RAG 作者对照（persona/个人 skill/检索来源）
+{
+  const p = DIAGNOSE_PROMPT({ authorContext: '【作者设定】', refs: '【同类文本】', text: '正文' });
+  assert(p.includes('作者设定'), '细读注入作者设定');
+  assert(p.includes('同类真实文本参考'), '细读注入 RAG 参考');
+  assert(
+    p.includes('voice（声音）') && p.includes('translate（翻译体）') && p.includes('ending（收尾）'),
+    '六层维度齐全',
+  );
+  console.log('PASS 细读提示词 RAG 作者对照注入');
 }
 
 console.log('\n✓ fake-thinking.test.mjs 全部通过');

@@ -929,6 +929,7 @@ const server = http.createServer(async (req, res) => {
         issues,
         passed: m.passed,
         roundtrip: state.quality?.roundtrip || null,
+        fakeThinking: state.quality?.fakeThinking || null,
       });
     } catch {
       return json(res, 200, { metrics: {}, issues: ['（尚无成稿可审计）'], passed: false });

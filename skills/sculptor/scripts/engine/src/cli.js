@@ -83,6 +83,7 @@ import { recentPulses, renderPulse } from './style-pulse.js';
 import { rhythmCurve, renderRhythmCurve } from './style-pulse.js';
 import { vectorSummary, renderVectorSummary, refreshStyleVector } from './style-vector.js';
 import { checkConsistency, renderConsistency } from './consistency.js';
+import { diagnoseFakeThinking, renderFakeThinking } from './fake-thinking.js';
 import { proofread, proofScan, renderProofread } from './proofread.js';
 import { transform, PRESETS } from './transform.js';
 import { listHistory, rollback } from './history.js';
@@ -164,6 +165,8 @@ const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四�
   sculptor style --signals [工作区]   隐式风格信号流水：每轮对话被动采集到的风格证据
   sculptor curve [--file x.md] [工作区]  节奏曲线：每节 张力/信息密度/情绪强度/节奏变化 → vault/curve.md
   sculptor consistency [--file x.md] [工作区]  伏笔回收校验：跨章检查已记伏笔是否回收 → vault/consistency.md
+  sculptor diagnose [--file x.md] [工作区]  假思考细读：LLM 六层细读（声音/过渡/修辞/引用/翻译体/收尾）
+                                      + RAG 作者对照；无密钥时确定性兜底
   sculptor style-vector [--refresh] [工作区]  四层复合风格向量：连续向量(EMA) + 动态维度 + 困惑度签名 + 偏好对；--refresh 立即从档案重算
   sculptor style-adapter [--distill] [--dataset [out.jsonl]] [--lora] [工作区]
                                      风格持续微调：--distill 蒸馏风格适配卡（最高优先级注入）；--dataset 生成偏好对 JSONL；--lora 提交微调（未配置端点时给出本地 LoRA 指引）
@@ -536,6 +539,20 @@ export async function runCli(argv, io = {}) {
         const r = await checkConsistency(cfg, w, { file });
         console.log(renderConsistency(r));
         if (r.file) console.log(`\n伏笔回收报告已落盘 → ${r.file}`);
+        break;
+      }
+      case 'diagnose': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, workspace));
+        const file = flags.file ? path.resolve(String(flags.file)) : path.join(w, 'draft.md');
+        if (!fs.existsSync(file)) throw new Error(`找不到文稿: ${file}`);
+        const text = fs.readFileSync(file, 'utf8');
+        const st = ws.readState(w);
+        const r = await diagnoseFakeThinking(cfg, w, {
+          text,
+          genre: st.confirmed?.genre || '',
+          topic: st.confirmed?.topic || '',
+        });
+        console.log(renderFakeThinking(r));
         break;
       }
       case 'experiment': {

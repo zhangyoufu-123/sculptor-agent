@@ -7,6 +7,7 @@ import * as ws from './workspace.js';
 import { buildStyleShot } from './style-memory.js';
 import { readVector, perplexityProxy } from './style-vector.js';
 import { snapshot } from './history.js';
+import { diagnoseFakeThinking } from './fake-thinking.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -363,9 +364,32 @@ export async function redteam(cfg, wsDir, { fix = false } = {}) {
   });
   let text = fs.readFileSync(draftFile, 'utf8');
   let report = audit(text, { vectorSignature });
+  // v0.53：LLM 六层细读（RAG 作者对照）——v0.52 的确定性正则只作离线兜底。
+  // 前置到修复之前，让红队修复也能看到"姿态层"问题（声音分裂/修辞空转/引用挂靠等）。
+  let detail = null;
+  const runDiagnose = async () => {
+    if (!cfg.apiKey || text.replace(/\s/g, '').length < 600) return null;
+    try {
+      const d = await diagnoseFakeThinking(cfg, workspace, {
+        text,
+        genre: state.confirmed?.genre || '',
+        topic: state.confirmed?.topic || '',
+      });
+      report.fakeThinkingDetail = d;
+      return d;
+    } catch {
+      return null;
+    }
+  };
+  detail = await runDiagnose();
+  const llmIssues = detail?.issues || [];
 
-  if (fix && !report.passed) {
-    const issues = collectIssues(report);
+  if (fix && (!report.passed || llmIssues.length > 0)) {
+    const issues =
+      collectIssues(report) +
+      (llmIssues.length
+        ? '；' + llmIssues.map((i) => `[${i.layer}] ${i.problem}${i.fix ? `（修法：${i.fix}）` : ''}`).join('；')
+        : '');
     const fixed = await chatWithRetry(
       cfg,
       [
@@ -387,6 +411,19 @@ export async function redteam(cfg, wsDir, { fix = false } = {}) {
     ws.writeState(workspace, state);
     report = audit(text);
     report.fixedBy = 'llm';
+    detail = await runDiagnose(); // 修复后复查姿态层
+  }
+  // 供 Web /api/report 展示（存 state.quality.fakeThinking）
+  if (detail) {
+    state.quality = state.quality || {};
+    state.quality.fakeThinking = {
+      score: detail.score,
+      layers: detail.layers || [],
+      issues: (detail.issues || []).slice(0, 8),
+      mode: detail.mode,
+      ts: ws.nowIso(),
+    };
+    ws.writeState(workspace, state);
   }
   ws.logContext(
     workspace,
