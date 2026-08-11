@@ -30,6 +30,13 @@ function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
 }
 
+/** 分节写回安全网（v0.42 修复）：split(/\n(?=## )/) 会吃掉 ## 前的换行，
+ *  逐节写回（导演每步写一节）时若直接 join，后一节标题会粘在上一节正文末尾，
+ *  破坏分节结构（节奏曲线/伏笔校验/编辑全部受影响）。这里给每段补齐结尾换行。 */
+function joinParts(parts) {
+  return parts.map((p) => (p.endsWith('\n') ? p : `${p}\n`)).join('');
+}
+
 /** 动态提示词预算：注入块超预算时优先保风格适配卡，裁剪侧写与统一素材（防提示膨胀）。 */
 function clipInjects(ctx, budget = 1500) {
   const len = (s) => (s || '').length;
@@ -257,12 +264,13 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
     state.nextStep = i < end ? `继续写第 ${i + 2} 节` : '写完后运行 sculptor redteam';
     ws.writeState(workspace, state);
   }
-  fs.writeFileSync(draftFile, parts.join(''));
+  const joined = joinParts(parts);
+  fs.writeFileSync(draftFile, joined);
   // 字数按全文统计（导演逐节调用时，report 只覆盖本次写的节）。
   const total =
     (fs.readFileSync(draftFile, 'utf8').match(/[\u4e00-\u9fff]/g) || []).length;
   const wordsOk = total >= targetWords * 0.85;
-  state.lastDraftHash = fileHash(parts.join(''));
+  state.lastDraftHash = fileHash(joined);
   state.lastWriteAt = ws.nowIso(); // 供"回灌后自动重写缺口节"判断时序
   state.quality = state.quality || {};
   state.quality.words = { actual: total, target: targetWords, ok: wordsOk };

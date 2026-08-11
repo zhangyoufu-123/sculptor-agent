@@ -18,6 +18,11 @@ function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
 }
 
+// 与 write.js 同一安全网：split 会吃掉 ## 前的换行，写回前补齐，防止节标题粘连。
+function joinParts(parts) {
+  return parts.map((p) => (p.endsWith('\n') ? p : `${p}\n`)).join('');
+}
+
 /**
  * 按风格方向重写草稿。
  * @param direction 新方向一句话（如"更克制一点"）；缺省取档案里最近一条 styleDirections。
@@ -112,8 +117,9 @@ export async function restyle(cfg, wsDir, { direction = '', section = null, forc
     ws.writeState(workspace, state);
   }
 
-  fs.writeFileSync(draftFile, parts.join(''));
-  state.lastDraftHash = fileHash(parts.join(''));
+  const joined = joinParts(parts);
+  fs.writeFileSync(draftFile, joined);
+  state.lastDraftHash = fileHash(joined);
   state.needsRestyle = false;
   state.lastRestyleAt = ws.nowIso();
   state.summary = `全文已按新风格重写：${dirText}`;
