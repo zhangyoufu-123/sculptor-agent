@@ -276,6 +276,7 @@ function classifyAnswer(question, _answer) {
   // 实时大纲确认/打磨：问题里带"大纲/开始写作"
   if (/大纲|开始写作/.test(q)) return { field: 'outlineConfirm' };
   if (/论点|支撑|理由|论证|观点/.test(q)) return { field: 'argument' };
+  if (/情节|伏笔|反转|三幕|故事架构/.test(q)) return { field: 'plot' };
   if (/立意|中心意思|核心意思|想表达的最核心/.test(q)) return { field: 'theme' };
   if (/情绪|情感|曲线|氛围/.test(q)) return { field: 'emotion' };
   if (/结尾|收尾|收束|姿态/.test(q)) return { field: 'ending' };
@@ -296,15 +297,36 @@ function classifyAnswer(question, _answer) {
   return { field: 'material' };
 }
 
+/** 列表类回答拆分：顿号/逗号/分号/换行 → 多条。 */
+function splitList(text) {
+  return String(text || '')
+    .split(/[、，,；;\n]+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
 function applyAnswer(state, field, answer) {
   state.confirmed = state.confirmed || {};
   const a = answer.trim();
-  // 可选维度"跳过"即标记完成，绝不反复追问（known/gap/method/limitation/emotion/ending 均为可选）。
+  // 用户对风格题答"没有/不用" → 也算问过，标记完成，绝不反复追问。
   if (
-    ['known', 'gap', 'method', 'limitation', 'emotion', 'ending'].includes(field) &&
+    field === 'style' &&
+    /^(没有|不知道|算了|跳过|none|na|不用|没写过|没有旧稿)$/i.test(a)
+  ) {
+    state.confirmed.styleSample = true;
+    state.confirmed.styleNote = '（无同文体旧稿，边写边学）';
+    return state;
+  }
+  // 可选维度"跳过"即标记完成（按文体蓝图判断是否可选，绝不反复追问）。
+  const bpField = activeBlueprint(state).find((f) => f.key === field);
+  if (
+    bpField &&
+    !bpField.required &&
     /^(没有|不知道|跳过|算了|none|na|不确定|没想好|不清楚)$/i.test(a)
   ) {
-    state.confirmed[field] = '（跳过）';
+    const valueKey =
+      field === 'emotion' ? 'emotionalCurve' : field === 'ending' ? 'endingTaste' : field;
+    state.confirmed[valueKey] = '（跳过）';
     return state;
   }
   // 打磨问题：内容意见进修正档案；确认话术直接定稿。
@@ -388,12 +410,28 @@ function applyAnswer(state, field, answer) {
   else if (field === 'limitation') state.confirmed.limitation = a;
   else if (field === 'argument') {
     state.confirmed.arguments = state.confirmed.arguments || [];
-    if (!state.confirmed.arguments.includes(a)) state.confirmed.arguments.push(a);
+    // 一条回答可能含多个论点（顿号/逗号/分号分隔）→ 拆分入列，避免整条当一项。
+    let addedAny = false;
+    for (const part of splitList(a)) {
+      if (!state.confirmed.arguments.includes(part)) {
+        state.confirmed.arguments.push(part);
+        addedAny = true;
+      }
+    }
+    state.listRepeat = !addedAny;
   } else if (field === 'emotion') state.confirmed.emotionalCurve = a;
   else if (field === 'ending') state.confirmed.endingTaste = a;
   else if (field === 'items') {
     state.confirmed.items = state.confirmed.items || [];
-    if (!state.confirmed.items.includes(a)) state.confirmed.items.push(a);
+    // 公文/合同要点常用顿号分隔，拆成多条满足"事项 ≥N"门槛。
+    let addedAny = false;
+    for (const part of splitList(a)) {
+      if (!state.confirmed.items.includes(part)) {
+        state.confirmed.items.push(part);
+        addedAny = true;
+      }
+    }
+    state.listRepeat = !addedAny;
   } else if (field === 'recipient') state.confirmed.recipient = a;
   else if (field === 'basis') state.confirmed.basis = a;
   else if (field === 'plot') state.confirmed.plot = a;
@@ -404,10 +442,10 @@ function applyAnswer(state, field, answer) {
   }
   else {
     state.materials = state.materials || [];
-    if (state.materials.includes(a)) state.materialRepeat = true;
+    if (state.materials.includes(a)) state.listRepeat = true;
     else {
       state.materials.push(a);
-      state.materialRepeat = false;
+      state.listRepeat = false;
     }
   }
   if (field === 'style') state.confirmed.styleSample = true;
@@ -461,6 +499,16 @@ function materialGate(state) {
     if (!fieldDone(state, f)) return false;
   }
   return true;
+}
+
+/** 按文体蓝图返回缺失的必填项（大纲 gate 与澄清门槛共用同一套规则，避免文体错配）。 */
+export function requiredMissing(state) {
+  const missing = [];
+  for (const f of activeBlueprint(state)) {
+    if (!f.required || f.key === 'styleSample') continue;
+    if (!fieldDone(state, f)) missing.push(f.label);
+  }
+  return missing;
 }
 
 /** 用户明确想结束时：标记"用户放弃"，后续大纲按现有信息生成（缺的写作时标注），绝不困住用户。 */
@@ -625,6 +673,31 @@ async function askOnce(state, cfg, workspace) {
       }
     }
     const question = String(q.question || '').trim();
+    // 软性拉回（v0.38）：LLM 问了一个"已满足/蓝图外"的维度，而当前还有必填缺口时，
+    // 拉回当前缺口——防止"已答过的维度反复问"造成的死循环。只保底、不硬编码问法。
+    if (need && question) {
+      const qfRaw = classifyAnswer(question, '').field;
+      const qf = qfRaw === 'material' ? 'materials' : qfRaw; // 归类单数 → 蓝图字段复数
+      const bpF = activeBlueprint(state).find((x) => x.key === qf);
+      const qfSatisfied = bpF ? fieldDone(state, bpF) : true;
+      if (qf !== need && qfSatisfied) {
+        const fb = fallbackFor(need, state);
+        state.alignedBack = true;
+        ws.logContext?.(
+          workspace,
+          'clarify',
+          `软性拉回：LLM 问已满足的「${NEED_LABELS[qf] || qf}」，改问当前缺口「${NEED_LABELS[need] || need}」`,
+        );
+        return {
+          stop: false,
+          ready: materialGate(state),
+          question: fb.ask,
+          recommendation: fb.recommendation,
+          options: fb.options || [],
+          warn: '已问过「' + (NEED_LABELS[qf] || qf) + '」，先补「' + (NEED_LABELS[need] || need) + '」',
+        };
+      }
+    }
     // 重复追问护栏（确定性）：LLM 与上一问同义/互相包含 → 换一个未确认维度问，绝不车轱辘。
     const normQ = (s) => String(s || '').replace(/[，。！？、,.！\s]/g, '').toLowerCase();
     const prevQ = normQ(state.lastQuestion);
@@ -713,7 +786,7 @@ function pickFallback(state, need) {
 function fallbackFor(need, state = {}) {
   const f = FALLBACK_QUESTIONS.find((x) => x.need === need);
   if (f) {
-    if (need === 'materials' && state.materialRepeat) {
+    if (['materials', 'arguments', 'items'].includes(need) && state.listRepeat) {
       return {
         ...f,
         ask: `${f.ask.replace(/[？?]$/, '')}？上一条已经记过了——换一条新的，或说"你决定"。`,
@@ -746,9 +819,13 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
   let clarifyPulse = null;
   if (lastInput) {
     state.lastInput = lastInput;
-    // 文体识别：用户说"写一份关于××的通知/合同/请示…" → 记录文体，后续按范式写作。
+    // 文体识别：开局识别一次（后续答案里的"故事/通知"等词不得误改文体）；
+    // 只有用户显式说"改成/换一种文体"时才允许切换。
     const genre = detectGenre(lastInput);
-    if (genre) {
+    if (
+      genre &&
+      (!state.confirmed?.genre || /^(改成|换成|换|改为|不要)/.test(String(lastInput).trim()))
+    ) {
       state.confirmed.genre = genre;
       ws.logContext(workspace, 'clarify', `识别文体：${genre}`);
     }

@@ -123,8 +123,10 @@ function readJsonSafe(file) {
 // ── 会话持久化（web-data/sessions/<id>/：meta.json + transcript.jsonl + Sculptor 工作区）──
 function sessionDir(id) {
   const safe = String(id || '').replace(/[^a-z0-9-]/gi, '');
+  // 非法/空 id：返回必然不存在的路径（各端点随后走 404），绝不抛异常打崩服务。
+  if (!safe) return path.join(SESSIONS_DIR, '__invalid__');
   const dir = path.resolve(SESSIONS_DIR, safe);
-  if (!dir.startsWith(path.resolve(SESSIONS_DIR)) || !safe) throw new Error('非法会话 id');
+  if (!dir.startsWith(path.resolve(SESSIONS_DIR))) return path.join(SESSIONS_DIR, '__invalid__');
   return dir;
 }
 

@@ -46,6 +46,30 @@ function check(name, cond, extra = '') {
   if (!cond) failures += 1;
 }
 
+// 按问题动态作答的模拟用户（不让测试绑死在特定问序上；风格底稿给长样本触发 14 维提取）
+let qaMats = ['我在门口站了很久，想象百年前的脚步声', '纪念牌上写着：百年征程波澜壮阔，百年初心历久弥坚', '二楼西侧有一扇窗，窗台积着灰，灰上有细痕'];
+let qaArgs = ['现场感来自具体的人，而非抽象的时间', '每一个细节都是过去的证词'];
+let qaExtra = 0;
+let qaArgExtra = 0;
+function qaAnswer(q) {
+  if (/打磨|大纲重新呈现/.test(q)) return '不用改了，开始写作';
+  if (/大纲|开始写作/.test(q)) return '可以，就是这样';
+  if (/字数|多长|篇幅/.test(q)) return '大约一千字';
+  if (/主题|写什么|想写/.test(q)) return '我想写百年历久的北大红楼';
+  if (/相信|立场|目的/.test(q)) return '让读者感到历史可以走进去';
+  if (/读者|给谁|听众/.test(q)) return '老师和同学';
+  if (/素材|经历|画面|数据|细节|引文/.test(q)) return qaMats.shift() || `第 ${++qaExtra} 个场景：窗台积灰上有一道细痕。`;
+  if (/论点|支撑|论证|观点/.test(q)) return qaArgs.shift() || `第 ${++qaArgExtra} 个论点：细节是过去的证词。`;
+  if (/立意|中心|核心/.test(q)) return '历史不是展品，而是可以站进去的现场';
+  if (/情绪|情感|曲线/.test(q)) return '先好奇，再触动，最后安宁';
+  if (/结尾|收尾|姿态/.test(q)) return '停在"心安则上"';
+  if (/风格|旧稿|写过/.test(q)) {
+    return '史铁生在文中将地坛视为宿命的等待，于荒芜与辉煌的落日中体悟个体生命的流逝 [1.1]。他在生死边缘选择平静审视，将死亡视为必然降临的节日，以通透的智慧将苦难化为对美的沉思';
+  }
+  if (/还差「/.test(q)) return '跳过';
+  return '就按这个方向写吧';
+}
+
 // 离线 fetch stub：所有 LLM 调用走 mock
 globalThis.fetch = async (url, opts) => {
   const body = JSON.parse(opts.body);
@@ -94,31 +118,16 @@ try {
   check('init 成功', r.code === 0 && fs.existsSync(path.join(workspace, 'protocol', 'state.json')));
 
   // 2. clarify --once：首轮空输入拿第一个问题，然后逐轮回答上一个问题
-  const answers = [
-    '我想写百年历久的北大红楼',
-    '大约一千字',
-    '让读者感到历史可以走进去',
-    '老师和同学',
-    '我在门口站了很久，想象百年前的脚步声',
-    '纪念牌上写着：百年征程波澜壮阔，百年初心历久弥坚',
-    '二楼西侧有一扇窗，窗台积着灰，灰上有细痕',
-    '历史不是展品，而是可以站进去的现场',
-    '现场感来自具体的人，而非抽象的时间',
-    '每一个细节都是过去的证词',
-    '先好奇，再触动，最后安宁',
-    '停在"心安则上"',
-    '史铁生在文中将地坛视为宿命的等待，于荒芜与辉煌的落日中体悟个体生命的流逝 [1.1]。他在生死边缘选择平静审视，将死亡视为必然降临的节日，以通透的智慧将苦难化为对美的沉思',
-    // v0.37：大纲是 LLM 从对话总结的呈现物——字段齐后由 LLM 宣布成形并直接进入大纲确认，
-    // 不再有"缺口补要点"阶段；用户只需确认正式大纲。
-  ];
   let last;
   r = await run(['clarify', '--once'], { input: '\n' });
   check('clarify 首轮返回问题', r.code === 0 && JSON.parse(r.out).question);
-  for (const a of answers) {
-    r = await run(['clarify', '--once'], { input: a + '\n' });
+  let qCur = JSON.parse(r.out).question || '';
+  for (let i = 0; i < 30; i++) {
+    r = await run(['clarify', '--once'], { input: qaAnswer(qCur) + '\n' });
     check('clarify --once 正常', r.code === 0, r.out.slice(0, 100));
     last = JSON.parse(r.out);
     if (last.stop || last.question === null) break; // 字段齐 + LLM 判定成形 → 澄清收尾
+    qCur = last.question || qCur;
   }
   check(
     '澄清挖透立意与论点',
@@ -184,11 +193,13 @@ try {
     Boolean(i0.question) && Array.isArray(i0.checklist) && i0.checklist.length >= 5,
     JSON.stringify({ q: i0.question?.slice(0, 20), n: i0.checklist?.length }),
   );
-  for (const a of answers) {
-    r = await run(['interview', '--once'], { input: a + '\n' });
+  let iq = i0.question || '';
+  for (let i = 0; i < 30; i++) {
+    r = await run(['interview', '--once'], { input: qaAnswer(iq) + '\n' });
     check('interview --once 正常', r.code === 0, r.out.slice(0, 100));
     const cur = JSON.parse(r.out);
     if (cur.stop || cur.question === null) break;
+    iq = cur.question || iq;
   }
   const iLast = JSON.parse(r.out);
   check(
@@ -216,10 +227,12 @@ try {
     ar.kind === 'ask' && Boolean(ar.question),
     JSON.stringify(ar).slice(0, 100),
   );
-  for (const a of answers) {
-    r = await run(['agent', '--once'], { input: a + '\n' });
+  let aq = ar.question || '';
+  for (let i = 0; i < 30; i++) {
+    r = await run(['agent', '--once'], { input: qaAnswer(aq) + '\n' });
     ar = JSON.parse(r.out);
     if (['confirm_outline', 'working', 'deliver'].includes(ar.kind)) break;
+    aq = ar.question || aq;
   }
   check(
     '导演澄清完成后自动生成大纲并请求确认',
@@ -477,7 +490,7 @@ try {
   ensureWs(ws10, { create: true });
   writeWs(ws10, {
     phase: 'clarify',
-    confirmed: { genre: '散文', topic: 't', stance: 's', theme: 'm', targetWords: 1000 },
+    confirmed: { genre: '散文', topic: 't', stance: 's', theme: 'm', audience: 'a', targetWords: 1000 },
     materials: ['a', 'b', 'c'],
   });
   check('大纲门槛动态：散文不强制论点', gate(ws10).ok === true);

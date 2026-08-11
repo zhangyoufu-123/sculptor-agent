@@ -6,7 +6,7 @@ import { OUTLINE_PROMPT } from './prompts.js';
 import * as ws from './workspace.js';
 import { buildStyleShot } from './style-memory.js';
 import { latestStyleDirection } from './style.js';
-import { genreBrief, genreToCategory, isOfficialGenre } from './genre.js';
+import { genreBrief, genreToCategory } from './genre.js';
 import { contentBudget } from './budget.js';
 import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
@@ -18,6 +18,7 @@ import { buildSearchQueries, requestHostSearch, pendingDataNeeds, queueAssetSear
 import { academicNarrative } from './academic.js';
 import { personaBrief } from './persona.js';
 import { outlineProgress, nextOutlineGap } from './outline-state.js';
+import { requiredMissing } from './clarify.js';
 
 export function styleSummary(file) {
   try {
@@ -46,31 +47,10 @@ export function gate(workspace) {
       state,
     };
   }
-  const missing = [];
+  // v0.38：与澄清共用文体蓝图门槛（合同要事项/主送、小说要情节、论文要论点×N…），
+  // 不再按文体手写一套可能错配的检查。
+  const missing = requiredMissing(state);
   if (!state.confirmed?.topic) missing.push('主题');
-  const g = state.confirmed?.genre || '';
-  if (!state.confirmed?.targetWords) missing.push('目标字数');
-  const b = contentBudget({
-    genre: g,
-    targetWords: Number(state.confirmed?.targetWords) || 0,
-  });
-  const official = isOfficialGenre(g);
-  const argumentative = ['议论文', '学术论文', '报告'].includes(g);
-  if (official) {
-    // 公文系：问"事项/主送/依据"，不问立意/论点/情感。
-    const hasItems =
-      (state.confirmed?.items || []).length > 0 || (state.materials || []).length > 0;
-    if (!hasItems) missing.push('事项/素材');
-    if (!state.confirmed?.basis && !state.confirmed?.stance) missing.push('依据/缘由');
-  } else {
-    if (!state.confirmed?.stance) missing.push('立场/目的');
-    if ((state.materials || []).length < b.materialsMin)
-      missing.push(`具体素材（≥${b.materialsMin}条）`);
-    if (!state.confirmed?.theme) missing.push('核心立意');
-    // 散文/小说/演讲稿不强制"支撑论点"——只有议论文/学术/报告要。
-    if (argumentative && (state.confirmed?.arguments || []).length < b.argumentsMin)
-      missing.push(`支撑论点（≥${b.argumentsMin}个）`);
-  }
   return { ok: missing.length === 0, missing, state };
 }
 

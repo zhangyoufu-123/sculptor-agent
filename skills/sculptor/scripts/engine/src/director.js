@@ -181,7 +181,35 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
 
   // ── 大纲：生成 → 用户确认/修改 → 确认后进入写作 ─────────
   if (d.stage === 'outline') {
-    if (!state.outline) return advanceToOutline(cfg, workspace, state);
+    if (!state.outline) {
+      // 大纲生成门槛未过时，先接住用户为"还差一点信息"给出的回答（走澄清补齐），
+      // 避免"问→答→重新生成→再问"的死循环。
+      if (lastInput.trim()) {
+        const cr = await clarifyStep(cfg, workspace, { lastInput });
+        ({ state, d } = load());
+        if (cr.question) {
+          return {
+            kind: 'ask',
+            question: cr.question,
+            recommendation: cr.recommendation,
+            options: cr.options,
+            checklist: cr.checklist || null,
+            liveOutline: cr.liveOutline || null,
+            phase: state.phase,
+          };
+        }
+        if (missingNeed(state) !== '' && !cr.stop) {
+          return {
+            kind: 'ask',
+            question: '还需要补充一些关键信息才能继续，先回答上一条问题好吗？',
+            recommendation: '我一次只问一件事；答完我会自动往下推进。',
+            options: [],
+            phase: state.phase,
+          };
+        }
+      }
+      return advanceToOutline(cfg, workspace, state);
+    }
     if (!state.outlineConfirmed) {
       const reply = classifyOutlineReply(lastInput);
       if (!lastInput.trim()) {
