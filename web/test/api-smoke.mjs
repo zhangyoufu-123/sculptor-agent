@@ -207,6 +207,13 @@ await step('导出（先落一份草稿）', async () => {
   assert(pptx.statusCode === 200 && pptx._body().startsWith('PK'), 'pptx 导出（zip 魔数）');
   const rep = await call(`/api/report?sessionId=${sid}`);
   assert(rep.statusCode === 200 && JSON.parse(rep._body()).metrics, '审计报告接口');
+  const cmp = await call(
+    `/api/works/compare?sessionId=${sid}&file=draft.md&sessionId2=${sid}&file2=draft.md`,
+  );
+  assert(
+    cmp.statusCode === 200 && typeof JSON.parse(cmp._body()).a?.chars === 'number',
+    '作品对比接口返回指标',
+  );
 });
 
 await step('节奏曲线与伏笔回收端点（v0.41）', async () => {

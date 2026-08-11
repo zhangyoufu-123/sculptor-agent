@@ -633,6 +633,28 @@ body.focus-mode .views { padding: 24px 20px; max-width: 860px; margin: 0 auto; }
 body.split-mode .views { max-width: none; margin-right: 46vw; padding: 24px 28px 20px; }
 body.split-mode .context-panel { width: 46vw; }
 .icon-btn.is-active { color: var(--gold, #9c6b3f); border-color: rgba(156,107,63,.5); background: rgba(156,107,63,.08); }
+.ol-view-toggle { display: flex; gap: 6px; margin: 2px 0 8px; }
+.ol-rail { position: relative; padding-left: 18px; border-left: 2px solid rgba(156,107,63,.25); margin-left: 8px; }
+.ol-part-head { margin: 12px 0 4px -6px; font-size: 13px; font-weight: 600; letter-spacing: .03em; color: var(--gold, #9c6b3f); }
+.ol-node { display: flex; gap: 8px; align-items: center; width: 100%; text-align: left; padding: 8px 10px; margin: 6px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--paper-2); cursor: pointer; transition: border-color .15s ease; }
+.ol-node:hover { border-color: rgba(156,107,63,.5); }
+.ol-node-no { flex: none; width: 22px; height: 22px; border-radius: 50%; background: rgba(156,107,63,.12); color: var(--gold, #9c6b3f); display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.ol-node-main { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ol-node-main b { font-size: 13px; color: var(--ink); }
+.ol-node-main em { font-style: normal; font-size: 11px; color: var(--ink-3); }
+.ol-node-main i { font-style: normal; font-size: 12px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ol-node-side { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.dot.ok { color: var(--ok); } .dot.gold { color: var(--gold, #9c6b3f); }
+.work-card.selectable { cursor: pointer; border-style: dashed; }
+.work-card.selectable.selected { border-color: var(--gold, #9c6b3f); background: rgba(156,107,63,.08); }
+.work-card.selectable.selected h4::before { content: '✓ '; color: var(--gold, #9c6b3f); }
+.compare-head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
+.compare-titles { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 200px; }
+.compare-titles span { color: var(--ink-3); font-size: 12px; }
+.compare-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.compare-table th, .compare-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+.compare-table th { color: var(--ink-3); font-weight: 600; }
+.compare-table td small { display: block; color: var(--ink-3); font-size: 11px; }
 .report-list .tag { color: var(--gold); }
 
 /* ── 风格肖像 ─────────────────────────────────────── */

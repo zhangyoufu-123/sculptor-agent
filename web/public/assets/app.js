@@ -24,6 +24,9 @@ let worksCat = '';
 let kbCache = [];
 let kbType = '';
 let workCtx = null;
+let outlineGraphMode = false; // 大纲图谱（v0.48，P2 可视化）：只读卡片流，列表模式保留编辑
+let worksCompareMode = false; // 作品对比（v0.48，P2）：选两篇并排看人类化指标
+let worksCompareSel = [];
 
 const DIM_CN = {
   temperature: '语气温度', sentencePreference: '句式偏好', modifierDensity: '修饰密度',
@@ -196,6 +199,39 @@ function renderOutlinePane(c) {
     parts.push(ctxSection('实时大纲', '<div class="ctx-line">大纲会随我们的讨论由 AI 总结成形——你只管聊，我来归纳。</div>'));
   } else {
     outlineEdits = secs.map((s) => ({ ...s }));
+    parts.push(`<div class="ol-view-toggle">
+      <button class="seg-btn ${!outlineGraphMode ? 'is-active' : ''}" id="olViewList">列表</button>
+      <button class="seg-btn ${outlineGraphMode ? 'is-active' : ''}" id="olViewGraph">图谱</button>
+    </div>`);
+    // 卷级分组（v0.42）：parts 只是展示分组，节列表与编辑索引仍是扁平的
+    const groupParts = lo.parts && Array.isArray(lo.parts) && lo.parts.length ? lo.parts : null;
+    const idxByHead = new Map(secs.map((s, i) => [s.heading, i]));
+    if (outlineGraphMode) {
+      // 大纲图谱（v0.48）：卷→节 卡片连线，点击卡片定位到草稿对应节（只读）
+      const node = (s, i) => `
+        <button class="ol-node ${s.status === 'ready' ? 'ok' : s.status === 'needs' ? 'gold' : ''}" data-i="${i}" title="点击定位到草稿对应节">
+          <span class="ol-node-no">${i + 1}</span>
+          <span class="ol-node-main"><b>${esc(s.heading || '未命名节')}</b><em>${esc(s.function || '')}</em>${s.thesis ? `<i>${esc(s.thesis)}</i>` : ''}</span>
+          <span class="ol-node-side">${s.words || ''} 字 <span class="dot ${s.status === 'ready' ? 'ok' : s.status === 'needs' ? 'gold' : ''}">${s.status === 'ready' ? '✓' : s.status === 'needs' ? '…' : '○'}</span></span>
+        </button>`;
+      const rail = (secIdxs) => `<div class="ol-rail">${secIdxs.map((i) => node(secs[i], i)).join('')}</div>`;
+      let railHtml = '';
+      if (groupParts) {
+        railHtml = groupParts
+          .map((p) => {
+            const idxs = (p.sections || []).map((h) => idxByHead.get(h)).filter((i) => i !== undefined);
+            if (!idxs.length) return '';
+            return `<div class="ol-part-head">${esc(p.title)}</div>${rail(idxs)}`;
+          })
+          .join('');
+        const covered = new Set(groupParts.flatMap((p) => p.sections || []).map((h) => idxByHead.get(h)));
+        const rest = secs.map((_, i) => i).filter((i) => !covered.has(i));
+        if (rest.length) railHtml += `<div class="ol-part-head">未分组</div>${rail(rest)}`;
+      } else {
+        railHtml = rail(secs.map((_, i) => i));
+      }
+      parts.push(ctxSection(`大纲图谱 · ${secs.length} 节${groupParts ? ` · ${groupParts.length} 卷` : ''}（点击卡片定位到草稿）`, railHtml));
+    } else {
     const rowHtml = (s, i) => `
       <div class="ol-edit" data-i="${i}">
         <div class="ol-edit-row">
@@ -209,9 +245,6 @@ function renderOutlinePane(c) {
         ${s.notes ? `<div class="ol-thesis">${esc(s.notes)}</div>` : ''}
         ${editable ? `<div class="ol-tools"><button class="icon-btn" data-act="up">↑</button><button class="icon-btn" data-act="down">↓</button><button class="icon-btn danger" data-act="del">删</button></div>` : ''}
       </div>`;
-    // 卷级分组（v0.42）：parts 只是展示分组，节列表与编辑索引仍是扁平的
-    const groupParts = lo.parts && Array.isArray(lo.parts) && lo.parts.length ? lo.parts : null;
-    const idxByHead = new Map(secs.map((s, i) => [s.heading, i]));
     const chunks = [];
     const covered = new Set();
     if (groupParts) {
@@ -236,6 +269,7 @@ function renderOutlinePane(c) {
         </div>`
       : '';
     parts.push(ctxSection(`实时大纲 · AI 总结${secs.length ? ` · ${secs.length} 部分${groupParts ? ` · ${groupParts.length} 卷` : ''}` : ''}${editable ? '（可直接编辑）' : '（写作中只读）'}`, `${rows}${editActions}`));
+    }
   }
   // 明确的"开始写作"确认点：AI 已总结成形或已有内容时即可拍板
   if (editable && !c.outlineConfirmed && (lo.complete || secs.length >= 1)) {
@@ -271,6 +305,11 @@ function renderOutlinePane(c) {
       refreshPanel();
     } catch (e) { toast(e.message); }
   });
+  $('olViewList')?.addEventListener('click', () => { outlineGraphMode = false; renderOutlinePane(c); });
+  $('olViewGraph')?.addEventListener('click', () => { outlineGraphMode = true; renderOutlinePane(c); });
+  document.querySelectorAll('#pane-outline .ol-node').forEach((b) =>
+    b.addEventListener('click', () => gotoDraftSection(Number(b.dataset.i))),
+  );
   $('olStartWrite')?.addEventListener('click', () => submitChat('大纲完成，开始写作'));
   document.querySelectorAll('#pane-outline .ol-tools [data-act]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -283,6 +322,23 @@ function renderOutlinePane(c) {
       renderOutlinePane({ ...c, liveOutline: { ...lo, sections: outlineEdits } });
     });
   });
+}
+
+/* ── 大纲图谱 → 草稿定位（v0.48）：点节卡片跳到草稿对应节并选中标题 ── */
+function gotoDraftSection(i) {
+  setPanelTab('draft');
+  const ta = $('paneDraftText');
+  if (!ta) return;
+  const heading = outlineEdits[i]?.heading;
+  const idx = heading ? ta.value.indexOf(`## ${heading}`) : -1;
+  if (idx >= 0) {
+    ta.focus();
+    ta.setSelectionRange(idx, idx + heading.length + 3);
+    const line = ta.value.slice(0, idx).split('\n').length;
+    ta.scrollTop = Math.max(0, (line - 3) * 18);
+  } else {
+    ta.focus();
+  }
 }
 
 function renderPaneDraft(c) {
@@ -1398,15 +1454,77 @@ function applyWorksFilter() {
       <h3>${esc(cat)} · ${items.length} 篇</h3>
       <div class="work-list">
         ${items.map((w) => `
-          <div class="work-card" data-sid="${esc(w.sessionId)}" data-file="${esc(w.file)}">
+          <div class="work-card ${worksCompareMode ? 'selectable' : ''}" data-sid="${esc(w.sessionId)}" data-file="${esc(w.file)}">
             <h4>${esc(w.title)}</h4>
             <div class="meta">${esc(w.sessionTitle || '')} · ${w.chars ? `${w.chars} 字 · ` : ''}${fmtDate(w.ts)}${w.draftOnly ? ' · 进行中' : ''}</div>
           </div>`).join('')}
       </div>
     </div>`).join('');
   $('worksBody').querySelectorAll('.work-card').forEach((card) => {
-    card.addEventListener('click', () => openWork(card.dataset.sid, card.dataset.file));
+    card.addEventListener('click', () => {
+      if (worksCompareMode) {
+        const key = `${card.dataset.sid}|${card.dataset.file}`;
+        const idx = worksCompareSel.findIndex((x) => x.key === key);
+        if (idx >= 0) {
+          worksCompareSel.splice(idx, 1);
+          card.classList.remove('selected');
+        } else {
+          if (worksCompareSel.length >= 2) {
+            const removed = worksCompareSel.shift();
+            document.querySelectorAll('#worksBody .work-card').forEach((c) => {
+              if (`${c.dataset.sid}|${c.dataset.file}` === removed.key) c.classList.remove('selected');
+            });
+          }
+          worksCompareSel.push({
+            key,
+            sid: card.dataset.sid,
+            file: card.dataset.file,
+            title: card.querySelector('h4')?.textContent || '',
+          });
+          card.classList.add('selected');
+        }
+        if (worksCompareSel.length === 2) renderWorksCompare();
+      } else {
+        openWork(card.dataset.sid, card.dataset.file);
+      }
+    });
   });
+}
+
+/* ── 多作品对比（v0.48，P2）：两篇作品的人类化指标并排 ── */
+async function renderWorksCompare() {
+  const [x, y] = worksCompareSel;
+  $('worksBody').innerHTML = '<div class="working"><span class="spinner"></span>对比两篇作品…</div>';
+  try {
+    const r = await apiGet(
+      `/api/works/compare?sessionId=${encodeURIComponent(x.sid)}&file=${encodeURIComponent(x.file)}` +
+        `&sessionId2=${encodeURIComponent(y.sid)}&file2=${encodeURIComponent(y.file)}`,
+    );
+    const num = (v, d = 2) => (v == null ? '—' : Number(v).toFixed(d));
+    const pct = (v) => (v == null ? '—' : `${v}%`);
+    const metric = (label, a, b, note) =>
+      `<tr><td>${label}${note ? `<small>${note}</small>` : ''}</td><td>${a}</td><td>${b}</td></tr>`;
+    $('worksBody').innerHTML = `
+      <div class="compare-head">
+        <button class="btn btn-ghost btn-sm" id="compareBack">← 返回作品库</button>
+        <div class="compare-titles"><b>${esc(x.title)}</b><span>vs</span><b>${esc(y.title)}</b></div>
+      </div>
+      <table class="compare-table">
+        <tr><th>指标（真人参考区间）</th><th>作品 A</th><th>作品 B</th></tr>
+        ${metric('字数', r.a.chars, r.b.chars)}
+        ${metric('句长标准差（≥8）', num(r.a.sentenceLengthStddev), num(r.b.sentenceLengthStddev))}
+        ${metric('段落变异系数（≥0.35）', num(r.a.paragraphCv), num(r.b.paragraphCv))}
+        ${metric('句首去重率（≥75%）', pct(r.a.sentenceStartDedup), pct(r.b.sentenceStartDedup))}
+        ${metric('词汇二元 TTR（≥0.70）', num(r.a.bigramTtr), num(r.b.bigramTtr))}
+        ${metric('黑名单 / 重复比喻 / 句式复用', `${r.a.blacklistHits || 0} / ${r.a.repeatedMetaphors || 0} / ${r.a.repeatedPatterns || 0}`, `${r.b.blacklistHits || 0} / ${r.b.repeatedMetaphors || 0} / ${r.b.repeatedPatterns || 0}`)}
+      </table>`;
+    $('compareBack')?.addEventListener('click', () => {
+      worksCompareSel = [];
+      applyWorksFilter();
+    });
+  } catch (e) {
+    $('worksBody').innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+  }
 }
 
 async function renderWorks() {
@@ -1560,6 +1678,12 @@ document.addEventListener('keydown', (e) => {
 /* ── 初始化 ───────────────────────────────────────── */
 renderDash();
 ensureSplitBtn();
+$('worksCompare')?.addEventListener('click', () => {
+  worksCompareMode = !worksCompareMode;
+  worksCompareSel = [];
+  $('worksCompare').classList.toggle('is-active', worksCompareMode);
+  applyWorksFilter();
+});
 
 // 实时伴随：面板每 4 秒自动刷新一次，让大纲/进度在讨论与写作中"自己长大"。
 let panelRefreshing = false;

@@ -835,6 +835,22 @@ const server = http.createServer(async (req, res) => {
     works.sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')));
     return json(res, 200, { works });
   }
+  // ── 多作品对比（v0.48，P2）：两篇作品的人类化指标并排 ──
+  if (req.method === 'GET' && p === '/api/works/compare') {
+    const read = (id, f) => {
+      try {
+        return fs.readFileSync(path.join(sessionDir(String(id || '')), String(f || '')), 'utf8');
+      } catch {
+        return '';
+      }
+    };
+    const t1 = read(url.searchParams.get('sessionId'), url.searchParams.get('file'));
+    const t2 = read(url.searchParams.get('sessionId2'), url.searchParams.get('file2'));
+    return json(res, 200, {
+      a: { ...humanMetrics(t1), chars: t1.replace(/\s/g, '').length },
+      b: { ...humanMetrics(t2), chars: t2.replace(/\s/g, '').length },
+    });
+  }
   if (req.method === 'GET' && p === '/api/work') {
     const id = String(url.searchParams.get('sessionId') || '');
     const dir = sessionDir(id);
