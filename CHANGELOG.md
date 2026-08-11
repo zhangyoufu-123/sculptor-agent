@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-08-11（v0.46：Web 人机交互 P1——改写候选卡 + 版本回滚 + 专注模式）
+
+按 UX-PLAN 的 P1 路线继续：
+
+- **改写候选卡（Sudowrite History 式）**：`point-edit.js` 新增 `rewriteVariants`
+  （同一句生成 3 个方向不同的候选，不落盘）；`pointEdit` 支持直接应用指定候选
+  （replacement 参数：跳过 LLM，只做定位校验+写回+风格吸收）；CLI `sculptor rewrite`、
+  Web `/api/rewrite`。前端选区工具栏点击动作 → 候选卡（选一个应用 / 换一个 / 取消）。
+- **版本历史与回滚**：`pointEdit` 前自动快照（"每次 AI 改动都可回退"）；
+  Web `/api/history` + `/api/rollback`；草稿区"版本"按钮 → 快照列表 → 一键回滚。
+- **专注模式**：隐藏侧栏与伴随面板，只剩正文；Esc 退出（前端接线检查已适配）。
+- 测试：新增 `agent/test/pointedit.test.mjs`（3 候选不落盘/应用候选写回+风格吸收/
+  常规点改路径）；api-smoke 增加 候选改写/历史/回滚 5 项断言；
+  agent 15 套 + web 7 套 QA 全绿；版本 0.46.0，引擎同步。
+
+## 2026-08-11（v0.45：Web 人机交互 P0——选区 AI 工具栏 + 实时洞察 + 思想/风格可视化）
+
 ## 2026-08-11（v0.45：Web 人机交互 P0——选区 AI 工具栏 + 实时洞察 + 思想/风格可视化）
 
 调研同行（Sudowrite Selection Menu、NovelCrafter 分屏伴随、Openwrite 选区操作与专注模式、

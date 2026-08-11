@@ -369,6 +369,15 @@ export function respond(messages) {
       advice: ['保留现有物象，少用抽象判断'],
     });
   }
+  if (userMsg.includes('"candidates"') && userMsg.includes('改写候选')) {
+    return JSON.stringify({
+      candidates: [
+        '那扇窗没有开口，却什么都知道。',
+        '窗还是那扇窗，只是看它的人变了。',
+        '那扇窗闭着嘴，把一百年的事都咽了下去。',
+      ],
+    });
+  }
   if (userMsg.includes('⟦待修改⟧') && userMsg.includes('修改指令')) {
     return '那扇窗没有开口，却什么都知道。';
   }

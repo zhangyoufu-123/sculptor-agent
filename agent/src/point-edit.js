@@ -2,10 +2,11 @@
 // 校验改动不越界、吸收进风格档案、输出 diff。这是"人机深度协作"的核心协议。
 import fs from 'node:fs';
 import path from 'node:path';
-import { chatWithRetry } from './llm.js';
+import { chatWithRetry, parseJsonContent } from './llm.js';
 import * as ws from './workspace.js';
 import { styleSummary } from './outline.js';
 import { refreshStyleVector } from './style-vector.js';
+import { snapshot } from './history.js';
 
 /** 解析"引用"粘贴格式：〔Sculptor 引用〕《原文》 或 直接原文 */
 export function parseQuoteArg(raw) {
@@ -157,7 +158,7 @@ export function classifyInstruction(inst) {
  * @param quote       选中的原文（或〔引用〕格式）
  * @param instruction 修改指令
  */
-export async function pointEdit(cfg, wsDir, { quote, instruction, dir, file }) {
+export async function pointEdit(cfg, wsDir, { quote, instruction, dir, file, replacement }) {
   const workspace = ws.ensureWorkspace(wsDir);
   const project = path.resolve(dir || process.cwd());
   const q = parseQuoteArg(quote);
@@ -179,30 +180,37 @@ export async function pointEdit(cfg, wsDir, { quote, instruction, dir, file }) {
   const context = `${before.slice(-200)}\n⟦待修改⟧${hit.matched}⟦⟧\n${after.slice(0, 200)}`;
   const writeStyle = styleSummary(path.join(workspace, 'vault', 'write-style.json'));
 
-  const content = await chatWithRetry(
-    cfg,
-    [
-      {
-        role: 'system',
-        content:
-          '你是修订者。只改写 ⟦待修改⟧ 标记的片段本身，保持上下文其余文字完全不变；只输出改写后的片段。',
-      },
-      {
-        role: 'user',
-        content: `修改指令: ${instruction}\n\n【写作风格】${writeStyle}\n\n【上下文】\n${context}`,
-      },
-    ],
-    { temperature: 0.7, maxTokens: 1500 },
-  );
-  const replacement = content.trim();
+  // 直接应用候选（v0.46，改写候选卡）：用户从 3 个候选中选了一个，
+  // 不再调 LLM，只做定位校验 + 写回 + 风格吸收。
+  let finalReplacement = String(replacement || '').trim();
+  if (!finalReplacement) {
+    const content = await chatWithRetry(
+      cfg,
+      [
+        {
+          role: 'system',
+          content:
+            '你是修订者。只改写 ⟦待修改⟧ 标记的片段本身，保持上下文其余文字完全不变；只输出改写后的片段。',
+        },
+        {
+          role: 'user',
+          content: `修改指令: ${instruction}\n\n【写作风格】${writeStyle}\n\n【上下文】\n${context}`,
+        },
+      ],
+      { temperature: 0.7, maxTokens: 1500 },
+    );
+    finalReplacement = content.trim();
+  }
 
-  applyChangeIfUnchanged(targetFile, hit, replacement);
+  // 版本快照（v0.46）：每次 AI 改动都可回退
+  snapshot(workspace, 'point-edit');
+  applyChangeIfUnchanged(targetFile, hit, finalReplacement);
 
   const dims = classifyInstruction(instruction);
   const absorbed = ws.absorbEdit(workspace, {
     target: q,
     original: hit.matched,
-    changed: replacement,
+    changed: finalReplacement,
     intent: instruction,
     evidence: `point-edit: ${String(instruction).slice(0, 40)}`,
     writeDims: dims.write,
@@ -210,9 +218,9 @@ export async function pointEdit(cfg, wsDir, { quote, instruction, dir, file }) {
   });
   // L4 偏好对 + L2 偏好轴 + L1 连续向量：亲手修改是最高权重风格信号
   await refreshStyleVector(cfg, workspace, {
-    text: `${instruction} ${replacement}`,
+    text: `${instruction} ${finalReplacement}`,
     kind: 'edit',
-    edit: { original: hit.matched, changed: replacement, intent: instruction },
+    edit: { original: hit.matched, changed: finalReplacement, intent: instruction },
     evidence: 'point-edit 亲手修改',
   });
   ws.logContext(
@@ -224,8 +232,61 @@ export async function pointEdit(cfg, wsDir, { quote, instruction, dir, file }) {
   return {
     file: targetFile,
     quote: hit.matched,
-    replacement,
+    replacement: finalReplacement,
     writeUpdated: absorbed.writeUpdated,
     readUpdated: absorbed.readUpdated,
   };
+}
+
+/**
+ * 候选改写（v0.46，Sudowrite History 式）：为选中片段生成 3 个不同方向的改写候选，
+ * **不落盘**。用户接受某个候选后，把候选传给 pointEdit 的 replacement 参数应用。
+ * LLM 停摆/失败 → 抛错，前端可"换一个"重试；绝不静默改稿。
+ */
+export async function rewriteVariants(cfg, wsDir, { quote, instruction, dir, file, n = 3 }) {
+  const workspace = ws.ensureWorkspace(wsDir);
+  const project = path.resolve(dir || process.cwd());
+  const q = parseQuoteArg(quote);
+  if (!q) throw new Error('引用为空：请提供选中的原文');
+  const found = locateQuote(project, q, file);
+  if (found.length === 0) {
+    throw new Error(`在工作区找不到引用的原文:\n「${q}」\n请确认选中的是文档里的原句。`);
+  }
+  if (found.length > 1) {
+    throw new Error(
+      `「${q}」在 ${found.length} 个位置出现，请用 --file 指定文件:\n${found
+        .map((f) => `  ${f.file}`)
+        .join('\n')}`,
+    );
+  }
+  const { text, hit } = found[0];
+  const before = text.slice(0, hit.start);
+  const after = text.slice(hit.end);
+  const context = `${before.slice(-200)}\n⟦待修改⟧${hit.matched}⟦⟧\n${after.slice(0, 200)}`;
+  const writeStyle = styleSummary(path.join(workspace, 'vault', 'write-style.json'));
+  const count = Math.max(2, Math.min(3, Number(n) || 3));
+  const content = await chatWithRetry(
+    cfg,
+    [
+      {
+        role: 'system',
+        content:
+          '你是修订者。围绕同一句原文给出多个**方向不同**的改写候选：有的更口语、有的更克制、有的更有画面；每条都保持原意与上下文，只改片段本身。',
+      },
+      {
+        role: 'user',
+        content: `修改指令: ${instruction}\n\n【写作风格】${writeStyle}\n\n【上下文】\n${context}\n\n输出严格 JSON：{"candidates":["候选1","候选2","候选3"]}`,
+      },
+    ],
+    { json: true, temperature: 0.9, maxTokens: 2000 },
+  );
+  const parsed = parseJsonContent(content, '候选');
+  const candidates = (Array.isArray(parsed?.candidates) ? parsed.candidates : [])
+    .map((c) => String(c).trim())
+    .filter(Boolean)
+    .slice(0, count);
+  if (candidates.length < 2) {
+    throw new Error('候选改写生成失败（不足 2 个），请点"换一个"重试');
+  }
+  return { quote: hit.matched, candidates, instruction };
 }

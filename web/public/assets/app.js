@@ -310,9 +310,13 @@ function renderPaneDraft(c) {
          <button class="btn btn-ghost btn-sm" data-act="调整这句的节奏，长句短句错落">节奏</button>
        </div>
      </div>
+     <div id="paneDraftCands" class="draft-cands" hidden></div>
+     <div id="paneDraftHist" class="draft-hist" hidden></div>
      <div class="draft-edit-bar"><span class="char-count" id="paneDraftChars"></span>
        <button class="btn btn-gold btn-sm" id="paneDraftSave">保存修改</button>
        <button class="btn btn-ghost btn-sm" id="paneDraftView">查看成稿</button>
+       <button class="icon-btn" id="paneDraftVersions" title="版本历史与回滚">版本</button>
+       <button class="icon-btn" id="paneDraftFocus" title="专注模式（Esc 退出）">专注</button>
      </div>
      <div class="draft-edit-bar">
        <button class="icon-btn" id="paneDraftMd">导出 md</button>
@@ -403,7 +407,7 @@ function renderPaneDraft(c) {
       toast(e.message);
     }
   });
-  // 选区快捷动作：润色/扩写/缩写/口语/克制/节奏 → point-edit（改动即进风格档案）
+  // 选区快捷动作（v0.46）：先生成 3 个候选 → 用户选一个应用（Sudowrite History 式）
   document.querySelectorAll('#paneDraftQuick [data-act]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd).trim();
@@ -412,24 +416,113 @@ function renderPaneDraft(c) {
         return;
       }
       const inst = btn.dataset.act;
+      const box = $('paneDraftCands');
+      if (!box) return;
+      box.hidden = false;
+      box.innerHTML = '<div class="working"><span class="spinner"></span>生成 3 个改写候选…</div>';
       try {
         await apiPost('/api/save-draft', { sessionId, text: ta.value });
-        await apiPost('/api/point-edit', { sessionId, quote: sel, instruction: inst });
-        toast(`已${btn.textContent.trim()}，改动已吸收进风格档案`);
-        const d = await apiGet(`/api/draft?sessionId=${sessionId}`);
-        if (d.text) {
-          ta.value = d.text;
-          $('paneDraftChars').textContent = `${d.text.replace(/\s/g, '').length} 字`;
-        }
-        $('paneDraftQuick').hidden = true;
-        refreshPanel();
+        const r = await apiPost('/api/rewrite', { sessionId, quote: sel, instruction: inst });
+        box.innerHTML =
+          `<div class="cands-head">「${esc(inst)}」 · 选一个应用（改动会吸收进风格档案）</div>` +
+          `<div class="cands">${r.candidates
+            .map(
+              (c, i) =>
+                `<button class="btn btn-ghost btn-sm cand" data-c="${esc(c)}"><b>候选 ${i + 1}</b><span class="cand-text">${esc(c.slice(0, 52))}${c.length > 52 ? '…' : ''}</span></button>`,
+            )
+            .join('')}<button class="btn btn-gold btn-sm" id="candRetry">换一个</button><button class="btn btn-ghost btn-sm" id="candCancel">取消</button></div>`;
+        box.querySelectorAll('.cand').forEach((b) =>
+          b.addEventListener('click', async () => {
+            try {
+              await apiPost('/api/point-edit', {
+                sessionId,
+                quote: sel,
+                instruction: inst,
+                replacement: b.dataset.c,
+              });
+              toast('已应用候选，并吸收进风格档案');
+              box.hidden = true;
+              const d = await apiGet(`/api/draft?sessionId=${sessionId}`);
+              if (d.text) {
+                ta.value = d.text;
+                $('paneDraftChars').textContent = `${d.text.replace(/\s/g, '').length} 字`;
+              }
+              refreshPanel();
+            } catch (e) {
+              toast(e.message);
+            }
+          }),
+        );
+        $('candRetry')?.addEventListener('click', () => btn.click());
+        $('candCancel')?.addEventListener('click', () => { box.hidden = true; });
       } catch (e) {
-        toast(e.message);
+        box.innerHTML = `<div class="ctx-line">${esc(e.message)}</div>`;
       }
     });
   });
+  // 版本历史与回滚（v0.46）：每次 AI 写改自动留存快照，可一键回退
+  $('paneDraftVersions')?.addEventListener('click', async () => {
+    const box = $('paneDraftHist');
+    if (!box) return;
+    box.hidden = false;
+    try {
+      const h = await apiGet(`/api/history?sessionId=${sessionId}`);
+      if (!h.entries?.length) {
+        box.innerHTML = '<div class="ctx-line">（还没有版本快照：每次 AI 写作/修改会自动留存）</div>';
+        return;
+      }
+      box.innerHTML =
+        `<div class="cands-head">版本历史（1=最新；回滚前会先存当前版）</div>` +
+        h.entries
+          .map(
+            (e, i) =>
+              `<div class="hist-row"><span>${i + 1}</span><em>${esc(e.reason || '')}</em><small>${esc((e.ts || '').slice(11, 19))} · ${e.chars || 0} 字</small><button class="btn btn-ghost btn-sm" data-i="${i + 1}">回滚</button></div>`,
+          )
+          .join('');
+      box.querySelectorAll('[data-i]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          try {
+            const rr = await apiPost('/api/rollback', { sessionId, index: Number(b.dataset.i) });
+            toast(`已回滚到版本 ${b.dataset.i}（${rr.reason || ''}）`);
+            box.hidden = true;
+            const d = await apiGet(`/api/draft?sessionId=${sessionId}`);
+            if (d.text) {
+              ta.value = d.text;
+              $('paneDraftChars').textContent = `${d.text.replace(/\s/g, '').length} 字`;
+            }
+            refreshPanel();
+          } catch (e) {
+            toast(e.message);
+          }
+        }),
+      );
+    } catch (e) {
+      box.innerHTML = `<div class="ctx-line">${esc(e.message)}</div>`;
+    }
+  });
+  $('paneDraftFocus')?.addEventListener('click', () => toggleFocus(true));
   renderInsights(c, 0);
 }
+
+/* ── 专注模式（v0.46）：隐藏侧栏与伴随面板，只剩正文；Esc 退出 ── */
+function toggleFocus(on) {
+  document.body.classList.toggle('focus-mode', Boolean(on));
+  let h = $('focusHint');
+  if (on) {
+    if (!h) {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = '<div id="focusHint" class="focus-hint">专注模式 · Esc 退出</div>';
+      h = wrap.firstChild;
+      document.body.appendChild(h);
+    }
+    h.hidden = false;
+  } else if (h) {
+    h.hidden = true;
+  }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.body.classList.contains('focus-mode')) toggleFocus(false);
+});
 
 /* ── 实时洞察（v0.45）：字数/脉搏/节奏，可视化但克制 ── */
 const PULSE_CN = { clarify: '澄清', outline: '大纲', write: '写作', correction: '修改', redteam: '审计' };

@@ -14,7 +14,7 @@ import { redteam, audit } from './redteam.js';
 import { dissect } from './dissect.js';
 import { runMcpServer } from './mcp.js';
 import { runSetup } from './setup.js';
-import { pointEdit } from './point-edit.js';
+import { pointEdit, rewriteVariants } from './point-edit.js';
 import { extractInstruction } from './point-edit.js';
 import { parseQuoteArg } from './point-edit.js';
 import { probeTask } from './observer.js';
@@ -222,6 +222,9 @@ const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四�
                                      自动接入：检测宿主→原生注册→装 skill→复用本机凭据
   sculptor point-edit "<引用/原文>" "<修改指令>" [--dir 项目] [--file 文件]
                                      深度定点修改：只改选中的那一处，吸收进风格档案
+  sculptor rewrite "<引用/原文>" "<修改指令>" [--dir 项目] [--file 文件]
+                                     候选改写：生成 3 个不同方向的候选（不落盘），
+                                     选定后用 point-edit --replacement 应用
   sculptor roundtrip [<文本|文件>] [--file x.md] [工作区]
                                      翻译/回译校验：中译英→回译，信息点核对 + 风格对比
   sculptor probe "<任务描述>"         生态位探测：该不该让 Sculptor 主动介入
@@ -1406,6 +1409,21 @@ export async function runCli(argv, io = {}) {
         console.log(`- ${r.quote}`);
         console.log(`+ ${r.replacement}`);
         console.log(`风格吸收: write ${r.writeUpdated} 维 + read ${r.readUpdated} 维`);
+        break;
+      }
+      case 'rewrite': {
+        const instruction = positional[1] || extractInstruction(positional[0] || '');
+        if (!positional[0] || !instruction)
+          throw new Error('用法: sculptor rewrite "<引用/原文>" "<修改指令>" [--dir 项目] [--file 文件]');
+        const r = await rewriteVariants(cfg, ws.resolveWorkspace(cfg, flags.workspace || ''), {
+          quote: positional[0],
+          instruction,
+          dir: flags.dir,
+          file: flags.file,
+        });
+        console.log(`「${r.quote.slice(0, 30)}」的 ${r.candidates.length} 个改写候选（未落盘）:`);
+        r.candidates.forEach((c, i) => console.log(`  ${i + 1}. ${c}`));
+        console.log('选定后用: sculptor point-edit "<原句>" "<指令>" （同指令会重新生成；直接应用候选见 Web）');
         break;
       }
       case 'roundtrip': {

@@ -1,6 +1,6 @@
 {
   "name": "sculptor-web",
-  "version": "0.45.0",
+  "version": "0.46.0",
   "private": true,
   "type": "module",
   "description": "Sculptor 单会话 Web 演示版：零依赖 Node HTTP 服务 + 聊天式前端",

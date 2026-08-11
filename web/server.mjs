@@ -83,6 +83,12 @@ const { extractInput } = await import(
 const { pointEdit } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'point-edit.js')).href
 );
+const { rewriteVariants } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'point-edit.js')).href
+);
+const { listHistory, rollback } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'history.js')).href
+);
 const { roundtripCheck, renderRoundtrip } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'roundtrip.js')).href
 );
@@ -608,7 +614,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── 句子级点改：选中原文 → AI 只改这一句 → 吸收进风格档案 ──
   if (req.method === 'POST' && p === '/api/point-edit') {
-    const { sessionId, quote, instruction } = await body(req);
+    const { sessionId, quote, instruction, replacement } = await body(req);
     const id = String(sessionId || '');
     if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
     if (!String(quote || '').trim()) return json(res, 400, { error: '请先选中要改写的原文' });
@@ -620,10 +626,53 @@ const server = http.createServer(async (req, res) => {
       const out = await pointEdit(cfg, dir, {
         quote: String(quote),
         instruction: String(instruction),
+        replacement: typeof replacement === 'string' ? replacement : undefined,
         dir,
         file: draftFile,
       });
       return json(res, 200, { ok: true, ...out });
+    } catch (err) {
+      return json(res, 400, { error: String(err.message || err).slice(0, 300) });
+    }
+  }
+
+  // ── 候选改写（v0.46）：选中片段 → 3 个方向不同的候选（不落盘）──
+  if (req.method === 'POST' && p === '/api/rewrite') {
+    const { sessionId, quote, instruction } = await body(req);
+    const id = String(sessionId || '');
+    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    if (!String(quote || '').trim() || !String(instruction || '').trim()) {
+      return json(res, 400, { error: '缺少选中原文或修改指令' });
+    }
+    const dir = sessionDir(id);
+    const draftFile = path.join(dir, 'draft.md');
+    if (!fs.existsSync(draftFile)) return json(res, 400, { error: '还没有成稿，无法改写' });
+    try {
+      const out = await rewriteVariants(cfg, dir, {
+        quote: String(quote),
+        instruction: String(instruction),
+        dir,
+        file: draftFile,
+      });
+      return json(res, 200, { ok: true, ...out });
+    } catch (err) {
+      return json(res, 400, { error: String(err.message || err).slice(0, 300) });
+    }
+  }
+
+  // ── 版本历史 / 回滚（v0.46）：每次 AI 改动都可回退 ──
+  if (req.method === 'GET' && p === '/api/history') {
+    const id = String(url.searchParams.get('sessionId') || '');
+    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    return json(res, 200, { entries: listHistory(sessionDir(id)) });
+  }
+  if (req.method === 'POST' && p === '/api/rollback') {
+    const { sessionId, index } = await body(req);
+    const id = String(sessionId || '');
+    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    try {
+      const r = rollback(sessionDir(id), { index: Number(index || 1) });
+      return json(res, 200, { ok: true, reason: r.reason, ts: r.ts, chars: r.chars });
     } catch (err) {
       return json(res, 400, { error: String(err.message || err).slice(0, 300) });
     }

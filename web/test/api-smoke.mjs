@@ -241,6 +241,31 @@ await step('句子级点改', async () => {
   assert(typeof ctx.styleProgress === 'object', '点改后上下文面板仍正常');
 });
 
+await step('候选改写 / 版本历史 / 回滚（v0.46）', async () => {
+  const rw = await call('/api/rewrite', 'POST', {
+    sessionId: sid,
+    quote: '那扇窗没有开口，却什么都知道。',
+    instruction: '更口语一点',
+  });
+  const d = JSON.parse(rw._body());
+  assert(rw.statusCode === 200 && d.ok && d.candidates?.length === 3, '候选改写返回 3 个候选');
+  const pe = await call('/api/point-edit', 'POST', {
+    sessionId: sid,
+    quote: d.quote,
+    instruction: '更口语一点',
+    replacement: d.candidates[1],
+  });
+  assert(JSON.parse(pe._body()).ok, '应用候选成功');
+  const draft2 = JSON.parse((await call(`/api/draft?sessionId=${sid}`))._body());
+  assert(draft2.text.includes(d.candidates[1]), '候选已写回草稿');
+  const hist = JSON.parse((await call(`/api/history?sessionId=${sid}`))._body());
+  assert(Array.isArray(hist.entries) && hist.entries.length >= 1, '版本历史存在');
+  const rb = await call('/api/rollback', 'POST', { sessionId: sid, index: 1 });
+  assert(JSON.parse(rb._body()).ok, '回滚最新版本成功');
+  const draft3 = JSON.parse((await call(`/api/draft?sessionId=${sid}`))._body());
+  assert(draft3.text.includes('那扇窗'), '回滚后成稿恢复');
+});
+
 await step('回译校验（内容保真）', async () => {
   const r = await call('/api/roundtrip', 'POST', { sessionId: sid });
   const d = JSON.parse(r._body());
