@@ -158,15 +158,33 @@ export async function generateOutline(cfg, wsDir) {
       : '',
     persona: personaBrief(workspace),
   };
-  const content = await chatWithRetry(
-    cfg,
-    [
-      { role: 'system', content: '你是提纲设计师。输出严格 JSON。' },
-      { role: 'user', content: OUTLINE_PROMPT(clipOutlineCtx(ctx)) },
-    ],
-    { json: true, temperature: 0.7, maxTokens: 3000 },
-  );
-  const outline = parseJsonContent(content, '大纲');
+  // v0.49：长文大纲（含卷级 parts）token 预算 3000→6000，避免推理模型
+  // 把 token 花在思考上导致 JSON 截断；解析失败时追加"补全"提示重试一次。
+  const prompt = OUTLINE_PROMPT(clipOutlineCtx(ctx));
+  let outline = null;
+  for (let attempt = 0; attempt < 2 && !outline; attempt++) {
+    const content = await chatWithRetry(
+      cfg,
+      [
+        { role: 'system', content: '你是提纲设计师。输出严格 JSON，不要输出任何多余文字。' },
+        {
+          role: 'user',
+          content:
+            prompt +
+            (attempt === 1
+              ? '\n\n【注意】上一次输出不完整或被截断。请重新输出**完整的大纲 JSON**（含全部 sections，务必闭合所有括号）。'
+              : ''),
+        },
+      ],
+      { json: true, temperature: 0.5, maxTokens: 6000 },
+    );
+    try {
+      outline = parseJsonContent(content, '大纲');
+    } catch {
+      outline = null; // 重试一次
+    }
+  }
+  if (!outline) throw new Error('大纲生成失败：模型输出不是合法 JSON（已重试一次）');
   if (!outline.sections?.length) throw new Error('大纲缺少 sections');
   const total = outline.sections.reduce((s, x) => s + Number(x.words || 0), 0);
   let targetWords = total > 0 ? total : cfg.targetWords;

@@ -135,8 +135,21 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
 
   // ── 澄清：问完所有该问的 ─────────────────────────────
   if (d.stage === 'clarify') {
-    const r = await clarifyStep(cfg, workspace, { lastInput });
+    let r = await clarifyStep(cfg, workspace, { lastInput });
     ({ state, d } = load());
+    // v0.49 确定性收尾护栏（导演侧）：蓝图字段全部确认后，真实 LLM 常不守
+    // stop 规则、在"无缺口"状态下继续追问。连续 2 轮无缺口仍被问 → 强制放行
+    // 进大纲（interview 等独立流程保留自己的完成语义，不受影响）。
+    if (r.question && missingNeed(state) === '') {
+      state.extraRounds = (state.extraRounds || 0) + 1;
+      if (state.extraRounds >= 2) {
+        state.extraRounds = 0;
+        r = { ...r, question: null, stop: true, deterministic: true };
+      }
+    } else {
+      state.extraRounds = 0;
+    }
+    ws.writeState(workspace, state);
     if (r.question) {
       return {
         kind: 'ask',
