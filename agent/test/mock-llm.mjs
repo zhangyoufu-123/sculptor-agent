@@ -92,6 +92,32 @@ const SECTIONS = [
   `离开时我回头看，那栋楼像旧朝宫人一样站在原地。总而言之，历史从不缺席，只等一个人走进去，把百年前的脚步声重新踩亮。`,
 ];
 
+// 同一内容的三套风格变体：验证"风格注入真的改变写法"（克制/口语/豪迈）。
+const STYLE_VARIANTS = {
+  restrained: [
+    `门开着。石阶旧，被磨得发亮。我在门口站了一会儿，没有进去。风从里面出来，带着木头的气味。我想，一百年前有人也这样站过。历史不响，它只是等着。`,
+    `木梯窄。每一步都响。窗台积灰，灰上有细痕，像谁用手指划过。我没有擦，只是看。过去不说话，可它留了痕迹。`,
+    `回头。楼还在。暮色里，红砖暗下去。纪念牌上的字，我念了一遍。历史从不等谁，它只等人走进去，再走出来。`,
+  ],
+  casual: [
+    `你猜怎么着，我今儿站北大红楼门口，腿都有点软。那石阶，磨得能当镜子照，一百年多少人踩过啊。门是深红的，漆都掉了，露出底下的灰白，特像我家那老木柜。我寻思，一百年前那个早晨，是不是也有个学生娃，攥着纸，手心出汗，站这儿愣神。`,
+    `上楼那木梯，嘎吱嘎吱响，跟要散架似的。二楼那窗户，窗台上全是灰，灰上还有几道印子，跟人拿指甲划的。我趴在窗边往外瞅，树影被玻璃压得扁扁的。那时候我就想，一百年前是不是也有人站这儿，翻着纸，叹口气，把纸往兜里一揣。`,
+    `出来的时候我回头瞅了一眼，那楼还杵在那儿，跟个大闷罐似的。纪念牌上写着什么百年征程，我念了一遍，突然觉得那话不是给墙看的，是给咱这些走进去又出来的人看的。历史这东西吧，你走进去过，它就沾你身上了，洗都洗不掉。`,
+  ],
+  grand: [
+    `风从门里涌出，像一声古老的叹息。石阶被一百年的脚步磨得发亮，我踏上它，仿佛踏在雷声与号角的交界。门扉深红，漆皮剥落处露出苍白的底色，那是时间亲手留下的年轮。我想象那个早晨：长衫的青年攥着传单，掌心滚烫，他跨过门槛的瞬间，历史便从纸面站起，成为人。`,
+    `木梯向上，每一步都像擂鼓，在空旷的穹顶下回荡。窗台积灰，灰上刻着细痕，那是无数只手在暗夜中摸索过的证明。我抚过窗棂，仿佛触到一百年前同一扇窗前跳动的心脏。人们说历史很远，可它就在这灰里、这木纹里，等着一个敢走进去的人，把它重新点燃。`,
+    `离去时我回头，那栋楼如巨人般立在暮色里，红砖似烧透的炭火。纪念牌上的字，我逐字读过：百年征程，波澜壮阔。历史从不缺席，它只等一个人走进去，把沉睡的脚步声唤醒，再带着那团火，走进属于自己的时代。`,
+  ],
+};
+
+// 风格化扩写续段（句长结构刻意不同，用于验证最终成稿风格可区分）。
+const STYLE_CONT = {
+  restrained: `石阶旧了。风从门里出来。历史不响。我站了一会儿。没有进去。后来进去了。楼里暗。光从窗缝进来，落在灰上。灰很厚。厚到像时间自己落下来。我伸手，又缩回。有些东西不该惊动。楼梯响了一声。像有人。回头看，没有人。只有我的影子。离开时，门在身后合上。声音很轻。像什么被放回原处。我走在街上，步子慢下来。楼在身后，越来越远。可它在我心里，越来越近。近到能听见一百年前那声脚步。`,
+  casual: `说真的，走进那楼之前我还挺紧张，怕自己像个游客一样瞎转。结果一进去就忘了紧张，光顾着看那窗台了，灰厚得跟棉被似的。我寻思，这灰底下是不是还压着谁写的纸条啊？楼里安安静静的，就我自己的脚步声，噔噔噔，跟敲鼓似的。有一块地板还翘着，一踩就响，吓我一跳。出来的时候太阳都斜了，那楼在身后立着，像送客的老头儿。我回头挥了挥手，也不知道跟谁。反正那一下午，挺值。`,
+  grand: `当我终于迈过那道门槛，历史便从沉寂中苏醒，如潮水般漫过脚踝。每一级木梯都在应和我的脚步，仿佛百年前的先辈在暗处列队注视。窗台上积着经年的灰，那不是尘埃，是无数个被折叠的日夜。我抬手，让光线从指缝穿过，看见时间在空气里缓缓流动。那一刻，个人与历史不再隔着玻璃，而是同一条河流里的两朵浪花。走出大门，回望，那栋楼在暮色中巍然不动，如一座未熄的烽火台。我知道，走进去的那一刻，我已经成了它的一部分，而它，也成了我的一部分。`,
+};
+
 const EXPANDED_SECTIONS = [
   `站在北大红楼的门口，我先看见了石阶。它被无数双脚磨得光滑，边角却还锋利，像一本被翻旧的书。我蹲下来，手指按在青灰的砖缝上，砖缝里嵌着细碎的砂砾和一片干枯的槐叶。门是深红色的，漆面剥落的地方露出底下的灰白，那颜色让我想起祖父抽屉里的旧信封。我想象百年前的那个早晨，一个穿长衫的青年也是这样站在门口，他攥着几张纸，掌心微微出汗。他走进去的时候，门槛被他的布鞋蹭出一道浅浅的痕迹。风从门里出来，带着木头的旧气。我在门口站了很久，久到门卫多看了我两眼，才忽然明白：这栋楼从来不是橱窗里的展品，它一直在等人走进去，把纸上的名字重新站成一个人。后来我又想，历史并不只在课本的年份里，它也在门槛被磨低的弧度里，在门轴每一次吱呀的声响里，在每一个路过的人停下来看的那一眼里。我们把目光放进去，历史就从墙上的字，变成了脚下能踩到的东西。`,
   `沿着木梯向上，每一步都踩出低沉的响声，那声音在空旷的走廊里散开，又折回来，像有人在身后跟着，却始终没有脚步声落在我肩上。二楼西侧有一扇窗，窗台积着灰，灰上有一道道细痕，像是有人用指甲划过。窗玻璃泛着旧绿，透过它，外面的树影被压得扁扁的。我忽然想，一百年前，是不是也有一个人站在这扇窗前，把一页纸翻来覆去，最后叹一口气，把纸折进口袋？木地板在脚下微微发颤，我停住，听见自己的呼吸被放大成整个走廊的节拍。人们总说历史很远，其实它就藏在窗台积灰的缝隙里，藏在你方才踩过的那一级石阶的磨损里。我试着不去想那些宏大的词语，只记下此刻看见的：灰的走向、光的斜度、木纹的深浅。这些细小的东西没有被写进任何课本，却比任何结论都更接近真实。`,
@@ -240,33 +266,49 @@ export function respond(messages) {
     });
   }
   if (userMsg.includes('提取写作风格') && userMsg.includes('14 维')) {
+    const dimensions =
+      /豪迈|激昂|澎湃|有气势|大气|磅礴/.test(userMsg)
+        ? {
+            temperature: { value: '情绪昂扬', confidence: 0.7, evidence: ['样本情绪饱满'] },
+            sentencePreference: { value: '长句铺陈', confidence: 0.65, evidence: ['句长有气势'] },
+            imageryTendency: { value: '宏大意象', confidence: 0.75, evidence: ['潮水/烽火台'] },
+          }
+        : /口语|亲切|像聊天|生活化/.test(userMsg)
+          ? {
+              temperature: { value: '亲切松弛', confidence: 0.7, evidence: ['口语化表达'] },
+              languageRegister: { value: '口语化', confidence: 0.8, evidence: ['像朋友聊天'] },
+            }
+          : {
+              temperature: { value: '中性平稳', confidence: 0.5, evidence: ['未显式要求方向'] },
+              sentencePreference: { value: '长短交错', confidence: 0.5, evidence: ['节奏自然'] },
+            };
     return JSON.stringify({
-      dimensions: {
-        temperature: { value: '克制内敛', confidence: 0.7, evidence: ['样本情绪克制，少直白宣泄'] },
-        sentencePreference: { value: '长短交错', confidence: 0.65, evidence: ['样本句长有起伏'] },
-        imageryTendency: {
-          value: '善用意象承载情感',
-          confidence: 0.8,
-          evidence: ['地坛/落日/节日等意象'],
-        },
-        endingPattern: {
-          value: '以通透平静收束',
-          confidence: 0.75,
-          evidence: ['样本结尾平静超脱'],
-        },
-      },
+      dimensions,
       associations: ['地坛', '落日', '节日'],
       techniques: ['以景写情', '平静审视'],
       attentionFocus: { 生命: 0.8, 死亡: 0.7, 苦难: 0.6 },
     });
   }
   if (userMsg.includes('风格提炼师') && userMsg.includes('对话发言')) {
+    // 按注入的方向词返回对应维度（否则固定的"克制"会把方向覆盖掉）。
+    const writeStyle =
+      /豪迈|激昂|澎湃|有气势|大气|磅礴/.test(userMsg)
+        ? {
+            temperature: { value: '情绪昂扬', confidence: 0.75, evidence: '用户要求更豪迈' },
+            emotionalSpectrum: { value: '情感浓度高', confidence: 0.7, evidence: '豪迈大气' },
+            sentencePreference: { value: '长句铺陈', confidence: 0.6, evidence: '有气势' },
+          }
+        : /口语|亲切|像聊天|生活化/.test(userMsg)
+          ? {
+              languageRegister: { value: '口语化', confidence: 0.8, evidence: '像朋友聊天' },
+              temperature: { value: '亲切松弛', confidence: 0.7, evidence: '口语' },
+            }
+          : {
+              temperature: { value: '中性平稳', confidence: 0.5, evidence: '未显式要求方向' },
+              sentencePreference: { value: '长短交错', confidence: 0.5, evidence: '节奏自然' },
+            };
     return JSON.stringify({
-      writeStyle: {
-        imageryTendency: { value: '物象承载情感（银杏/葡萄藤）', confidence: 0.8, evidence: '反复用自然物象寄托情绪' },
-        endingPattern: { value: '留白收束、意会不点破', confidence: 0.75, evidence: '用户要求结尾留白' },
-        emotionalSpectrum: { value: '克制低气压，偶有反诘', confidence: 0.7, evidence: '平静陈述到心酸' },
-      },
+      writeStyle,
       readStyle: {
         emotionalCurve: { value: '平静→心酸→空落→余味', confidence: 0.8, evidence: '用户确认的情感曲线' },
         endingTaste: { value: '环境回望、余味收束', confidence: 0.75, evidence: '首尾呼应' },
@@ -374,13 +416,21 @@ export function respond(messages) {
     const heading = match ? match[1].trim() : '一、站在门口';
     const idx = OUTLINE.sections.findIndex((s) => s.heading === heading);
     const i = idx >= 0 ? idx : 0;
-    // 一次扩写即给足篇幅（真实模型也会按目标写足，mock 直接达标）。
+    // 一次扩写即给足篇幅；且扩写也按风格走，避免风格差异被扩写抹平。
+    if (/豪迈|大气|恢弘|雄浑/.test(userMsg)) return `${STYLE_VARIANTS.grand[i]}\n\n${STYLE_CONT.grand}`;
+    if (/口语|亲切|像说话|自然|口语化/.test(userMsg)) return `${STYLE_VARIANTS.casual[i]}\n\n${STYLE_CONT.casual}`;
+    if (/克制|留白|内敛|简洁|短句/.test(userMsg)) return `${STYLE_VARIANTS.restrained[i]}\n\n${STYLE_CONT.restrained}`;
     return `${EXPANDED_SECTIONS[i]}\n\n${EXPANDED_MORE[i]}`;
   }
   if (userMsg.includes('写作者')) {
     const match = userMsg.match(/【本节】(.+?)（/);
     const heading = match ? match[1].trim() : '一、站在门口';
     const idx = OUTLINE.sections.findIndex((s) => s.heading === heading);
+    const i = idx >= 0 ? idx : 0;
+    // 按注入的风格方向返回不同变体，验证"风格真的有区别"
+    if (/豪迈|大气|恢弘|雄浑/.test(userMsg)) return STYLE_VARIANTS.grand[i];
+    if (/口语|亲切|像说话|自然|口语化/.test(userMsg)) return STYLE_VARIANTS.casual[i];
+    if (/克制|留白|内敛|简洁|短句/.test(userMsg)) return STYLE_VARIANTS.restrained[i];
     return SECTIONS[idx >= 0 ? idx : 0];
   }
   if (userMsg.trim() === 'ping') return 'pong';

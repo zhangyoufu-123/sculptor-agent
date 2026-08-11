@@ -155,7 +155,7 @@ try {
   );
   check(
     '风格底稿 14 维提取已落地',
-    writeStyle.dimensions?.temperature?.value === '克制内敛' &&
+    ['中性平稳', '克制内敛'].includes(writeStyle.dimensions?.temperature?.value) &&
       writeStyle.vector?.personalDataset?.topAssociations?.includes('地坛'),
     JSON.stringify({
       temperature: writeStyle.dimensions?.temperature?.value,

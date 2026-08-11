@@ -170,6 +170,8 @@ export const EXPAND_PROMPT = (ctx) => `你是 Sculptor 的写作者。本节字�
 【目标字数】${ctx.target} 字（中文字符）
 【当前字数】${ctx.actual} 字
 【本节可用素材】${(ctx.materials || []).join('；') || '（无分配素材）'}
+${ctx.styleDirection ? `【写作风格方向】${ctx.styleDirection}——扩写必须延续这个方向，不得回落到默认腔调。` : ''}
+${ctx.writeStyle ? `【写作风格档案】${ctx.writeStyle}` : ''}
 
 ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
 

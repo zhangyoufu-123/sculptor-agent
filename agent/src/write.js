@@ -189,6 +189,8 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
               text,
               materials: section.materials || [],
               styleShot: ctx.styleShot, // 扩写同样注入少样本，防止风格漂移
+              styleDirection: ctx.styleDirection, // 扩写延续方向，不回落到默认腔调
+              writeStyle: ctx.writeStyle,
             }),
           },
         ],
