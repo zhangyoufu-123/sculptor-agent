@@ -606,6 +606,7 @@ body {
 .curve-bars { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .curve-bars .bar { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
 .curve-bars .bar::first-letter { color: var(--gold, #9c6b3f); font-weight: 600; }
+.ol-part { margin: 12px 0 6px; padding: 5px 10px; font-size: 13px; font-weight: 600; letter-spacing: .04em; color: var(--gold, #9c6b3f); background: rgba(156,107,63,.07); border-radius: 6px; }
 .report-list .tag { color: var(--gold); }
 
 /* ── 风格肖像 ─────────────────────────────────────── */

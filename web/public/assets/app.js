@@ -196,7 +196,7 @@ function renderOutlinePane(c) {
     parts.push(ctxSection('实时大纲', '<div class="ctx-line">大纲会随我们的讨论由 AI 总结成形——你只管聊，我来归纳。</div>'));
   } else {
     outlineEdits = secs.map((s) => ({ ...s }));
-    const rows = secs.map((s, i) => `
+    const rowHtml = (s, i) => `
       <div class="ol-edit" data-i="${i}">
         <div class="ol-edit-row">
           <span class="ol-no">${i + 1}</span>
@@ -208,14 +208,34 @@ function renderOutlinePane(c) {
         ${s.thesis ? `<div class="ol-thesis">${esc(s.thesis)}</div>` : ''}
         ${s.notes ? `<div class="ol-thesis">${esc(s.notes)}</div>` : ''}
         ${editable ? `<div class="ol-tools"><button class="icon-btn" data-act="up">↑</button><button class="icon-btn" data-act="down">↓</button><button class="icon-btn danger" data-act="del">删</button></div>` : ''}
-      </div>`).join('');
+      </div>`;
+    // 卷级分组（v0.42）：parts 只是展示分组，节列表与编辑索引仍是扁平的
+    const groupParts = lo.parts && Array.isArray(lo.parts) && lo.parts.length ? lo.parts : null;
+    const idxByHead = new Map(secs.map((s, i) => [s.heading, i]));
+    const chunks = [];
+    const covered = new Set();
+    if (groupParts) {
+      for (const p of groupParts) {
+        const idxs = (p.sections || []).map((h) => idxByHead.get(h)).filter((i) => i !== undefined);
+        if (!idxs.length) continue;
+        chunks.push(`<div class="ol-part">${esc(p.title || '')}</div>`);
+        for (const i of idxs) {
+          chunks.push(rowHtml(secs[i], i));
+          covered.add(i);
+        }
+      }
+      for (let i = 0; i < secs.length; i++) if (!covered.has(i)) chunks.push(rowHtml(secs[i], i));
+    } else {
+      secs.forEach((s, i) => chunks.push(rowHtml(s, i)));
+    }
+    const rows = chunks.join('');
     const editActions = editable
       ? `<div class="ol-actions">
           <button class="icon-btn" id="olAdd">＋ 新增一部分</button>
           <button class="btn btn-gold btn-sm" id="olSave">保存大纲</button>
         </div>`
       : '';
-    parts.push(ctxSection(`实时大纲 · AI 总结${secs.length ? ` · ${secs.length} 部分` : ''}${editable ? '（可直接编辑）' : '（写作中只读）'}`, `${rows}${editActions}`));
+    parts.push(ctxSection(`实时大纲 · AI 总结${secs.length ? ` · ${secs.length} 部分${groupParts ? ` · ${groupParts.length} 卷` : ''}` : ''}${editable ? '（可直接编辑）' : '（写作中只读）'}`, `${rows}${editActions}`));
   }
   // 明确的"开始写作"确认点：AI 已总结成形或已有内容时即可拍板
   if (editable && !c.outlineConfirmed && (lo.complete || secs.length >= 1)) {

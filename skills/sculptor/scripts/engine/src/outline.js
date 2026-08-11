@@ -65,6 +65,35 @@ function clipOutlineCtx(ctx, budget = 1200) {
   return ctx;
 }
 
+/**
+ * 卷级分组规范化（v0.42）：parts 只是展示分组，不是写作真源。
+ * - 只保留 heading 确实存在于 sections 的分组项；空卷丢弃；
+ * - 未进任何卷的节归入"未分组"（保证展示完整、写作结构不被 parts 改动）。
+ */
+export function normalizeParts(outline) {
+  const headings = new Set(
+    (outline?.sections || [])
+      .map((s) => String(s?.heading || '').trim())
+      .filter(Boolean),
+  );
+  const raw = Array.isArray(outline?.parts) ? outline.parts : [];
+  const parts = raw
+    .map((p, i) => ({
+      title: String(p?.title || `第 ${i + 1} 卷`).trim().slice(0, 40),
+      sections: (Array.isArray(p?.sections) ? p.sections : [])
+        .map((h) => String(h || '').trim())
+        .filter((h) => headings.has(h)),
+    }))
+    .filter((p) => p.sections.length > 0)
+    .slice(0, 8);
+  const grouped = new Set(parts.flatMap((p) => p.sections));
+  const ungrouped = (outline?.sections || [])
+    .map((s) => String(s?.heading || '').trim())
+    .filter((h) => h && !grouped.has(h));
+  if (ungrouped.length) parts.push({ title: '未分组', sections: ungrouped });
+  return parts.length ? parts : null;
+}
+
 export async function generateOutline(cfg, wsDir) {
   const workspace = ws.ensureWorkspace(wsDir);
   const { ok, missing, state } = gate(workspace);
@@ -166,6 +195,8 @@ export async function generateOutline(cfg, wsDir) {
     outline.title = review.outline.title || outline.title;
     outline.reviewed = true;
   }
+  // 卷级分组（v0.42，长文展示用）：sections 不变，parts 只做分组视图
+  outline.parts = normalizeParts(outline);
   state.outlineReviews = state.outlineReviews || [];
   state.outlineReviews.push({
     ts: ws.nowIso(),
@@ -177,7 +208,7 @@ export async function generateOutline(cfg, wsDir) {
   if (state.outlineReviews.length > 5) state.outlineReviews = state.outlineReviews.slice(-5);
 
   state.phase = 'plan';
-  state.summary = `大纲已生成：${outline.sections.length} 节（立意+论点已挂载），目标 ${targetWords} 字`;
+  state.summary = `大纲已生成：${outline.parts?.length ? `${outline.parts.length} 卷 · ` : ''}${outline.sections.length} 节（立意+论点已挂载），目标 ${targetWords} 字`;
   if (review.revised) state.summary += '（已按内部评审自动微调）';
   const pulse = pulseAfterOutline(workspace, outline);
   pushPulseToState(state, pulse);
@@ -205,6 +236,7 @@ export async function generateOutline(cfg, wsDir) {
   state.liveOutline = {
     title: outline.title,
     sections: outline.sections,
+    parts: outline.parts,
     complete: progress.complete,
     progress,
     nextGap: progress.complete ? null : nextOutlineGap(progress),

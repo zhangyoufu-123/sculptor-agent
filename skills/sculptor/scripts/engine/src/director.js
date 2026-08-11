@@ -63,6 +63,7 @@ function classifyOutlineReply(a) {
 function outlineView(outline) {
   return {
     title: outline.title,
+    parts: Array.isArray(outline.parts) ? outline.parts : null,
     sections: (outline.sections || []).map((s) => ({
       heading: s.heading,
       function: s.function,

@@ -58,6 +58,10 @@ const CLARIFY_QUESTIONS = [
 
 const OUTLINE = {
   title: '百年历久，北大红楼',
+  parts: [
+    { title: '卷一·走进红楼', sections: ['一、站在门口', '二、窗前的停顿'] },
+    { title: '卷二·走出红楼', sections: ['三、百年之后'] },
+  ],
   sections: [
     {
       heading: '一、站在门口',

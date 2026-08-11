@@ -411,6 +411,7 @@ const server = http.createServer(async (req, res) => {
       outline: state.outline
         ? {
             title: state.outline.title,
+            parts: Array.isArray(state.outline.parts) ? state.outline.parts : null,
             sections: sections.map((s) => ({
               heading: s.heading,
               function: s.function,
@@ -458,9 +459,25 @@ const server = http.createServer(async (req, res) => {
     const prev = state.liveOutline || {};
     const liveSections = sanitized.length ? sanitized : prev.sections || [];
     const progress = outlineProgress({ title: prev.title || '', sections: liveSections }, state);
+    // 卷级分组（v0.42）：只做展示分组；heading 必须存在于当前节列表，未分组节自动收尾
+    const validHeadings = new Set(liveSections.map((s) => s.heading));
+    const rawParts = Array.isArray(outline?.parts) ? outline.parts : prev.parts || [];
+    const parts = rawParts
+      .map((p, i) => ({
+        title: String(p?.title || `第 ${i + 1} 卷`).trim().slice(0, 40),
+        sections: (Array.isArray(p?.sections) ? p.sections : [])
+          .map((h) => String(h || '').trim())
+          .filter((h) => validHeadings.has(h)),
+      }))
+      .filter((p) => p.sections.length > 0)
+      .slice(0, 8);
+    const grouped = new Set(parts.flatMap((p) => p.sections));
+    const ungrouped = liveSections.map((s) => s.heading).filter((h) => !grouped.has(h));
+    if (ungrouped.length) parts.push({ title: '未分组', sections: ungrouped });
     state.liveOutline = {
       title: String(outline?.title || state.confirmed?.topic || prev.title || '').trim().slice(0, 40),
       sections: liveSections,
+      parts: parts.length ? parts : null,
       complete: Boolean(prev.complete),
       progress,
       updatedAt: ws.nowIso(),

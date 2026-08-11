@@ -19,6 +19,9 @@ const ws = await import(path.join(HERE, '..', 'src', 'workspace.js'));
 const { clarifyStep, missingNeed, ensureLiveOutline, liveOutlineText } = await import(
   path.join(HERE, '..', 'src', 'clarify.js'),
 );
+const { generateOutline, normalizeParts } = await import(
+  path.join(HERE, '..', 'src', 'outline.js'),
+);
 
 const cfg = { ...loadConfig(), apiKey: 'mock' };
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-live-outline-'));
@@ -132,6 +135,55 @@ function seedCore(state) {
   const st3 = ws.readState(w);
   assert(st3.confirmed.outlineConfirmed === true, '打磨后拍板定稿');
   console.log('PASS 打磨回路：修正入档 + 拍板定稿');
+}
+
+// 7) 卷级分组（v0.42）：LLM 输出 parts → 只做展示分组，sections 保持完整平铺
+{
+  const w = ws.ensureWorkspace(path.join(tmp, 'w7'), { create: true });
+  let st = ws.readState(w);
+  seedCore(st);
+  st.confirmed.targetWords = 12000; // 长文 → 触发卷级分组
+  st.confirmed.genre = '小说';
+  st.deferred = true; // 聚焦 parts 链路：跳过文体素材门槛（合法逃生路径）
+  ws.writeState(w, st);
+  const r = await generateOutline(cfg, w);
+  const outline = r.outline;
+  assert(Array.isArray(outline.sections) && outline.sections.length >= 3, 'sections 完整平铺');
+  assert(Array.isArray(outline.parts) && outline.parts.length >= 2, 'parts 卷级分组存在');
+  const flatHeadings = outline.sections.map((s) => s.heading);
+  const partHeadings = outline.parts.flatMap((p) => p.sections);
+  assert(
+    partHeadings.every((h) => flatHeadings.includes(h)),
+    '卷分组只引用真实存在的节',
+  );
+  assert(
+    outline.parts.some((p) => p.title === '未分组') === false ||
+      new Set(partHeadings).size === flatHeadings.length,
+    '未分组节会自动收尾、不丢节',
+  );
+  const st2 = ws.readState(w);
+  assert(st2.liveOutline?.parts?.length >= 2, 'liveOutline 携带卷级分组');
+  assert(st2.summary.includes('卷'), '摘要体现卷数');
+  console.log('PASS 卷级分组：展示分组不改变写作真源');
+}
+
+// 8) normalizeParts 兜底：空卷/错引用/部分分组都能收敛
+{
+  const parts = normalizeParts({
+    sections: [
+      { heading: 'A' },
+      { heading: 'B' },
+      { heading: 'C' },
+    ],
+    parts: [
+      { title: '卷一', sections: ['A', '不存在的节'] },
+      { title: '', sections: [] },
+    ],
+  });
+  assert(parts && parts.length === 2, '空卷丢弃、错引用过滤');
+  assert(parts[0].sections.join() === 'A', '有效引用保留');
+  assert(parts[1].title === '未分组' && parts[1].sections.includes('B') && parts[1].sections.includes('C'), '未分组节收尾');
+  console.log('PASS normalizeParts 容错');
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });

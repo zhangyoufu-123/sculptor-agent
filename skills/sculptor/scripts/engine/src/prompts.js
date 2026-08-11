@@ -110,9 +110,15 @@ ${ctx.liveOutline ? `【你们一起打磨出的实时大纲】（结构视图�
 6. **每节必须挂一个支撑论点**（"thesis" 字段）：节的功能与论点一一对应，全篇围绕核心立意展开，不跑题、不空转。
 7. **每节必须分配至少一条用户已确认素材**（"materials" 字段引用上面的【素材】原文）；
    没有可用素材的节要么删掉、要么明确写"本节需补充素材：××"。
+8. **卷级分组（只用于长文，可选）**：当总目标字数 ≥6000 字或文体为长篇/系列/中篇小说时，
+   可在 sections 之外额外输出 "parts" 卷级分组（每卷 title + 该卷包含的节 heading 列表），
+   用于给读者/作者展示"几卷、每卷讲什么"；**sections 必须始终是全部节的完整平铺**——
+   写作与字数分配只认 sections，parts 只是展示分组，不得因此删节或改节序。
+   短文（<6000 字）不输出 parts。
 
 输出严格 JSON：
-{"title":"标题","sections":[{"heading":"节标题","function":"铺垫/转折/细节/收束/升华","thesis":"支撑的论点","words":200,"keyPoints":["要点"],"materials":["用到的素材"]}]}`;
+{"title":"标题","sections":[{"heading":"节标题","function":"铺垫/转折/细节/收束/升华","thesis":"支撑的论点","words":200,"keyPoints":["要点"],"materials":["用到的素材"]}],"parts":[{"title":"卷一·…","sections":["节标题"]}]}
+parts 可选（长文才输出）；sections 必填且完整平铺。`;
 
 export const WRITE_PROMPT = (
   ctx,

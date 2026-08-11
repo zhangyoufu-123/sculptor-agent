@@ -138,6 +138,10 @@ await step('上下文面板与概览接口', async () => {
     sessionId: sid,
     outline: {
       title: '实时大纲测试',
+      parts: [
+        { title: '卷一·起', sections: ['开头'] },
+        { title: '卷二·承', sections: ['主体'] },
+      ],
       sections: [
         { heading: '开头', function: '铺垫', words: 200, keyPoints: ['门'], materials: [] },
         { heading: '主体', function: '展开', words: 500, keyPoints: ['窗', '灰'], materials: [] },
@@ -147,6 +151,12 @@ await step('上下文面板与概览接口', async () => {
   assert(JSON.parse(save._body()).ok, 'POST /api/outline 保存实时大纲');
   const ctx2 = JSON.parse((await call(`/api/context?sessionId=${sid}`))._body());
   assert(ctx2.liveOutline?.sections?.length === 2, '保存后 liveOutline 已更新');
+  assert(ctx2.liveOutline?.parts?.length === 2, '卷级分组随大纲保存');
+  assert(
+    ctx2.liveOutline.parts[0].sections.join() === '开头' &&
+      ctx2.liveOutline.parts[1].sections.join() === '主体',
+    '卷分组引用有效节',
+  );
   const ov = JSON.parse((await call('/api/overview'))._body());
   assert(typeof ov.sessions === 'number' && ov.sessions >= 1, 'overview 会话统计');
   assert(typeof ov.byCat === 'object', 'overview 分类统计');

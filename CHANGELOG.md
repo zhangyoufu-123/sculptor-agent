@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-08-11（v0.42：卷级大纲——长文结构分层，展示分组不碰写作真源）
+
+补齐行业六尺子第①项"大纲层级"的长文部分：长文（≥6000 字或长篇/中篇/系列）由 LLM
+在完整平铺的 sections 之外输出可选 parts 卷级分组（每卷 title + 节 heading 列表）。
+
+- **LLM 优先、零硬编码**：parts 只是展示分组；sections 仍是写作与字数分配的唯一真源，
+  write 链路零改动。代码只做规范化（`normalizeParts`）：空卷丢弃、错引用过滤、
+  未分组节自动收尾，绝不删节改序。
+- **导演/CLI**：`generateOutline` 输出 `outline.parts`，摘要体现"N 卷 · M 节"；
+  director 的确认大纲视图携带 parts。
+- **Web**：`/api/outline` 保存时接受并规范化 parts（沿用旧分组、按新节列表重挂）；
+  `/api/context` 返回 parts；大纲面板按卷渲染分组标题（编辑索引仍扁平）。
+- **测试**：live-outline 新增"卷级分组不改变写作真源"与 normalizeParts 容错断言；
+  api-smoke 覆盖 parts 保存/返回/引用校验。
+- 自检（用户要求）：agent 13 套 + web 6 套 QA 全绿；密钥扫描、循环依赖、语法检查、
+  硬编码路径扫描全过；引擎同步后提交。
+
 ## 2026-08-11（v0.41：行业调研落地——节奏曲线 + 伏笔回收 + 隐式风格流水）
 
 深度调研同行（马良写作 18 款横评的"六把尺子"、Sudowrite/NovelCrafter 等）与最新论文

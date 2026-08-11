@@ -108,7 +108,8 @@
 
 - StyleVector 式激活层 steering（`style-vector.js` 已留接口）；
 - 公共仿写样本库升级为"大规模结构化样本"（library.js 已有骨架）；
-- 卷级大纲（卷→章→节）与反向级联编辑（outline.js 扩展）；
+- ~~卷级大纲（卷→章→节）与反向级联编辑~~ → **v0.42 已完成**：LLM 输出可选 parts
+  卷级分组（长文），sections 仍是写作真源，代码只做规范化；反向级联编辑待后续。
 - 多智能体任务编排视图（director 已有 stage 状态机，前端加"各 agent 分工图"即可）。
 
 ---
