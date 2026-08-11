@@ -630,6 +630,9 @@ body {
 .focus-hint { position: fixed; right: 18px; bottom: 18px; z-index: 60; padding: 7px 12px; border-radius: 20px; font-size: 12px; color: #fff; background: rgba(52,58,64,.85); box-shadow: 0 4px 14px rgba(0,0,0,.18); }
 body.focus-mode .sidebar, body.focus-mode .context-panel { display: none !important; }
 body.focus-mode .views { padding: 24px 20px; max-width: 860px; margin: 0 auto; }
+body.split-mode .views { max-width: none; margin-right: 46vw; padding: 24px 28px 20px; }
+body.split-mode .context-panel { width: 46vw; }
+.icon-btn.is-active { color: var(--gold, #9c6b3f); border-color: rgba(156,107,63,.5); background: rgba(156,107,63,.08); }
 .report-list .tag { color: var(--gold); }
 
 /* ── 风格肖像 ─────────────────────────────────────── */

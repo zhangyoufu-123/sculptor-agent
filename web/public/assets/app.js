@@ -521,8 +521,33 @@ function toggleFocus(on) {
   }
 }
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && document.body.classList.contains('focus-mode')) toggleFocus(false);
+  if (e.key !== 'Escape') return;
+  if (document.body.classList.contains('focus-mode')) toggleFocus(false);
+  else if (document.body.classList.contains('split-mode')) toggleSplit(false);
 });
+
+/* ── 并排伴随模式（v0.47）：写作时聊天与手写区同时可见（NovelCrafter split）── */
+let splitUserClosed = false;
+function toggleSplit(on) {
+  document.body.classList.toggle('split-mode', Boolean(on));
+  const btn = $('panelSplit');
+  if (btn) btn.classList.toggle('is-active', Boolean(on));
+}
+function ensureSplitBtn() {
+  if ($('panelSplit')) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML =
+    '<button class="icon-btn" id="panelSplit" title="并排：聊天与手写区同时可见（Esc 退出）">并排</button>';
+  const btn = wrap.firstChild;
+  const anchor = $('contextToggle');
+  if (anchor?.parentNode) anchor.parentNode.insertBefore(btn, anchor);
+  btn.addEventListener('click', () => {
+    const next = !document.body.classList.contains('split-mode');
+    splitUserClosed = !next;
+    toggleSplit(next);
+    if (next) setPanelTab('draft');
+  });
+}
 
 /* ── 实时洞察（v0.45）：字数/脉搏/节奏，可视化但克制 ── */
 const PULSE_CN = { clarify: '澄清', outline: '大纲', write: '写作', correction: '修改', redteam: '审计' };
@@ -705,6 +730,15 @@ async function refreshPanel() {
     const stageKey = c.stage || c.phase || '';
     if (stageKey !== lastPanelStage) {
       setPanelTab(defaultTabFor(stageKey));
+      // 进入写作/修订/审计/交付阶段 → 自动开并排（用户手动关过后不再自动开）
+      if (
+        !splitUserClosed &&
+        ['write', 'revise', 'redteam', 'quality', 'style_fix', 'audience', 'deliver', 'rewrite_gaps'].includes(stageKey) &&
+        !document.body.classList.contains('split-mode')
+      ) {
+        toggleSplit(true);
+        setPanelTab('draft');
+      }
       lastPanelStage = stageKey;
     }
   } catch { /* 面板非关键，失败静默 */ }
@@ -850,6 +884,28 @@ async function renderReport() {
         curveHtml = `<div class="report-list"><h3>节奏曲线（张力 / 密度 / 情绪 / 节奏）</h3>${rows}<div class="ctx-line" style="margin-top:6px">分值 0–100，供二次编辑参考；CLI 可运行 <code>sculptor curve</code></div></div>`;
       }
     } catch {}
+    // 伏笔回收时间线（v0.47，P2 可视化）：已回收 → 未回收（悬空）
+    let consHtml = '';
+    try {
+      const cc = await apiGet(`/api/consistency?sessionId=${sessionId}`);
+      if (cc.total > 0) {
+        const rec = (cc.recovered || [])
+          .map(
+            (i) =>
+              `<div class="curve-mini-row"><span class="ok">✓ ${esc(i.section || '后文')}</span><span class="cand-text">${esc(i.clue.slice(0, 44))}${i.clue.length > 44 ? '…' : ''}</span></div>`,
+          )
+          .join('');
+        const unre = (cc.unrecovered || [])
+          .map(
+            (i) =>
+              `<div class="curve-mini-row"><span class="warn">○ ${esc(i.planted || '前文')}</span><span class="cand-text">${esc(i.clue.slice(0, 44))}${i.clue.length > 44 ? '…' : ''}（未回收）</span></div>`,
+          )
+          .join('');
+        consHtml = `<div class="report-list"><h3>伏笔回收 · ${cc.recovered?.length || 0}/${cc.total}</h3>${
+          rec || '<div class="ctx-line">全部已回收 ✓</div>'
+        }${unre}</div>`;
+      }
+    } catch {}
     body.innerHTML =
       `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">` +
       metric('句长标准差', m.sentenceLengthStddev ?? '—', '真人参考 ≥ 8', m.sentenceLengthStddev >= 8 ? 'ok' : 'warn') +
@@ -860,6 +916,7 @@ async function renderReport() {
       `</div>` +
       `<div class="report-list"><h3>审计结论</h3><ul>${issues || '<li>未发现硬伤（黑名单 0 · 硬失败 0）</li>'}</ul></div>` +
       curveHtml +
+      consHtml +
       `<div class="report-list"><h3>内容保真 · 回译校验</h3>${rtHtml}<div id="rtResult"></div>
        <button class="btn btn-gold btn-sm" id="rtRun">运行回译校验（中译英→回译→信息点核对）</button></div>`;
     $('rtRun')?.addEventListener('click', async () => {
@@ -1502,6 +1559,7 @@ document.addEventListener('keydown', (e) => {
 
 /* ── 初始化 ───────────────────────────────────────── */
 renderDash();
+ensureSplitBtn();
 
 // 实时伴随：面板每 4 秒自动刷新一次，让大纲/进度在讨论与写作中"自己长大"。
 let panelRefreshing = false;
