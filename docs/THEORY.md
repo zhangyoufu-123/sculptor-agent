@@ -134,15 +134,22 @@ P 的众数（平滑、无风险、平均脸）；写作助手要做的不是"�
 ### 3.5 风格向量可视化（可检验的"差别明显"）
 
 用 8 维可解释风格特征（节奏均值/句长波动/短句占比/口语度/意象密度/情绪浓度/词汇丰富度/
-语言新鲜度）对三类文本做归一化向量，并画成雷达图与欧氏距离矩阵（`scripts/style-visual.py`，
-样本：SCULPTOR 作者实测文本、人类名家史铁生《我与地坛》、ChatGPT 典型 AI 腔文本）：
+语言新鲜度）对 6 类文本做归一化向量与欧氏距离推导（`scripts/style-vectors.py`，样本：
+SCULPTOR 作者、人类名家史铁生与费孝通、ChatGPT 与 DeepSeek 通用基线、模板公文基线）：
 
-![风格向量对比：SCULPTOR 作者 vs 人类名家 vs ChatGPT](competition/style-vector-compare.png)
+![图1 多维风格向量热力网格](competition/style-vectors-heatmap.png)
+![图2 风格距离矩阵](competition/style-vectors-distance.png)
+![图3 写作能力全方位对比](competition/style-vectors-ability.png)
 
-实测欧氏距离：**SCULPTOR 作者 ↔ 人类名家 1.48，SCULPTOR 作者 ↔ ChatGPT 2.02，
-人类名家 ↔ ChatGPT 2.05**——两个"人类作者"彼此更近，且都与 ChatGPT 拉开明显距离。
-这组可视化直观回答了一个评审必问的问题：**你的风格系统和"人"到底有多近、和"AI 腔"
-到底有多远**——答案是：近到同侧，远到一眼可辨。
+严格数学推导见 [STYLE-MATH.md](competition/STYLE-MATH.md)：特征向量 $\hat v \in \mathbb R^8$、
+逐维 min-max 归一化、欧氏距离 $d(A,B)=\sqrt{\sum_j(\hat v_j^A-\hat v_j^B)^2}$、
+综合能力评分 $C=\sum_k w_k s_k$。
+
+实测读数：**SCULPTOR 作者 ↔ 史铁生 1.11、↔ 费孝通 1.54；↔ ChatGPT 1.46、↔ DeepSeek 1.49、
+↔ 模板公文 1.98**；两个人类名家彼此 1.67，而两个通用模型之间仅 0.65——**AI 腔互相趋同，
+人类各有面目**。综合写作能力 C：SCULPTOR 87.4 vs ChatGPT 38.6 / DeepSeek 38.6 / 模板 34.0。
+这组可视化直观回答评审必问的问题：**你的风格和"人"多近、和"AI 腔"多远**——近到同侧，
+远到一眼可辨。
 
 ---
 
