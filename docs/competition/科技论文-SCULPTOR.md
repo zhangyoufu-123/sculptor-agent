@@ -99,19 +99,13 @@ SCULPTOR 采用三层架构（图 1）：**宿主层**（Codex / Claude Code / O
 
 $$\hat{v} = (\text{句长均值},\ \text{句长波动},\ \text{短句占比},\ \text{口语度},\ \text{意象密度},\ \text{情绪浓度},\ \text{词汇丰富度},\ \text{语言新鲜度}) \in \mathbb{R}^{8}$$
 
-![公式1 8维风格特征向量](formula-vector.png)
-
 对每个维度在全部对象上做 min-max 归一化（式 2），消除量纲影响：
 
 $$\hat{v}_{j}^{(A)} = \frac{v_j^{(A)} - \min_i v_j^{(i)}}{\max_i v_j^{(i)} - \min_i v_j^{(i)}} \in [0,1]$$
 
-![公式2 逐维 min-max 归一化](formula-norm.png)
-
 两个作者 A、B 的风格距离用欧氏距离度量（式 3）：
 
 $$d(A,B) = \sqrt{\sum_{j=1}^{8} \left(\hat{v}_j^{(A)} - \hat{v}_j^{(B)}\right)^2}$$
-
-![公式3 风格距离：欧氏距离](formula-distance.png)
 
 该度量体系与 StyleVector 在"训练免费、推理时干预"上数学同族[2]，但本文在特征层落地，维度可解释、无需 GPU 即可复现（第 3.3 节给出 6 类文本的实测距离矩阵）。
 
@@ -191,8 +185,6 @@ $$d(A,B) = \sqrt{\sum_{j=1}^{8} \left(\hat{v}_j^{(A)} - \hat{v}_j^{(B)}\right)^2
 为回答"写作能力全方位谁强"，定义 5 个能力维度 s_k ∈ [0,100]（离 AI 腔距离、人类化指标、反 AI 味、全流程协作、多文体覆盖），综合评分（式 4）：
 
 $$C = 0.25\,s_1 + 0.20\,s_2 + 0.20\,s_3 + 0.20\,s_4 + 0.15\,s_5$$
-
-![公式4 写作能力综合评分](formula-score.png)
 
 **表 3　写作能力综合评分（C，满分 100）**
 
