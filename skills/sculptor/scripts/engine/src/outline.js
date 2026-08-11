@@ -138,7 +138,17 @@ export async function generateOutline(cfg, wsDir) {
   const outline = parseJsonContent(content, '大纲');
   if (!outline.sections?.length) throw new Error('大纲缺少 sections');
   const total = outline.sections.reduce((s, x) => s + Number(x.words || 0), 0);
-  const targetWords = total > 0 ? total : cfg.targetWords;
+  let targetWords = total > 0 ? total : cfg.targetWords;
+  const userTarget = Number(state.confirmed?.targetWords) || 0;
+  // LLM 大纲字数分配明显不足用户目标（如 2000 字只分 900）→ 按比例重标定，
+  // 保证写作预算贴合用户需求，而不是跟着模型偷懒走。
+  if (userTarget > 0 && total > 0 && total < userTarget * 0.7) {
+    const ratio = userTarget / total;
+    for (const s of outline.sections) {
+      s.words = Math.max(150, Math.round(Number(s.words || 0) * ratio));
+    }
+    targetWords = userTarget;
+  }
   const perSection = Math.round(targetWords / outline.sections.length);
   for (const s of outline.sections) {
     s.words = Number(s.words) > 0 ? Number(s.words) : perSection;

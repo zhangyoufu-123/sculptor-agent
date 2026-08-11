@@ -243,7 +243,8 @@ ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
 【原文】
 ${ctx.text}
 
-要求：只输出改写后的片段；保持原意；不要机械替换同义词；不要解释。`;
+要求：输出**修改后的完整全文**（保持原有篇幅、段落与结构，只改被标记的问题片段；
+不要删减内容，不要解释，不要只给片段——整个文件会被原样写回）。`;
 
 export const DISSECT_PROMPT = (
   ctx,

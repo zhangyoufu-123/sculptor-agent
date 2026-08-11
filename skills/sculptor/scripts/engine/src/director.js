@@ -533,6 +533,11 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     if (rt && rt.verdict === 'attention') {
       rtNote = `⚠ 回译校验：${rt.lost + rt.drifted} 处信息点丢失/漂移（运行 \`sculptor roundtrip\` 看明细）。`;
     }
+    const wq = q.words || null;
+    let wordsNote = '';
+    if (wq && !wq.ok) {
+      wordsNote = `⚠ 字数：${wq.actual}/${wq.target}（未达标，说"再详细点"我会补齐）。`;
+    }
     state.factCheck = { total: fcVerify, verify: fcVerify, ts: ws.nowIso() };
     state.proofread = { total: prCount, ts: ws.nowIso() };
     // 学术论文交付：提示引文整理（确定性检测《书名》，格式由 sculptor citations 生成）
@@ -560,7 +565,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       distilled: distilled || '',
       audience: rendered,
       debate: debateRendered,
-      message: `整篇文章已完成：逐节写作（每节风格脉搏已即时反馈）→ 反 AI 审计 → 读者群像 → 交锋。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}${adapterNote}。${docx ? `已导出 ${docx}。` : ''}${refFile ? `已自动生成参考文献草稿 ${refFile}（基于检索回灌来源；运行 \`sculptor citations\` 可校对格式）。` : ''}${prCount ? `⚠ 校对：${prCount} 处提示（错别字/标点，运行 sculptor proofread 看明细）。` : ''}${fcVerify ? `⚠ 事实核查：${fcVerify} 处数字/年代/引文需核对（运行 sculptor fact-check 看明细）。` : ''}${rtNote}${citeNote ? `\n${citeNote}` : ''}要改某一句用 point-edit，要整体换风格或表达直接说（如"更克制一点"），我会吸收进风格档案并重写。`,
+      message: `整篇文章已完成：逐节写作（每节风格脉搏已即时反馈）→ 反 AI 审计 → 读者群像 → 交锋。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}${adapterNote}。${docx ? `已导出 ${docx}。` : ''}${refFile ? `已自动生成参考文献草稿 ${refFile}（基于检索回灌来源；运行 \`sculptor citations\` 可校对格式）。` : ''}${prCount ? `⚠ 校对：${prCount} 处提示（错别字/标点，运行 sculptor proofread 看明细）。` : ''}${fcVerify ? `⚠ 事实核查：${fcVerify} 处数字/年代/引文需核对（运行 sculptor fact-check 看明细）。` : ''}${wordsNote}${rtNote}${citeNote ? `\n${citeNote}` : ''}要改某一句用 point-edit，要整体换风格或表达直接说（如"更克制一点"），我会吸收进风格档案并重写。`,
       next: 'sculptor redteam / sculptor audience / sculptor debate / sculptor fact-check / sculptor roundtrip / sculptor point-edit',
     };
   }

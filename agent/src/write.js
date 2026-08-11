@@ -172,7 +172,9 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
     let text = body.trim();
     let actual = (text.match(/[\u4e00-\u9fff]/g) || []).length;
     let expanded = false;
-    if (actual < words * 0.6) {
+    let expandTries = 0;
+    // 字数达标保障（v0.38）：低于目标 85% 必须扩写（提示词要求 ±15%）；最多扩两轮。
+    while (actual < words * 0.85 && expandTries < 2) {
       const fixed = await chatWithRetry(
         cfg,
         [
@@ -195,6 +197,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       text = fixed.trim();
       actual = (text.match(/[\u4e00-\u9fff]/g) || []).length;
       expanded = true;
+      expandTries += 1;
     }
     // 实时取数：本节写后仍标注"素材不足" → 解析缺口、排队检索（每节最多一次）。
     let dataRequested = [];
@@ -233,10 +236,17 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
     ws.writeState(workspace, state);
   }
   fs.writeFileSync(draftFile, parts.join(''));
-  const total = report.reduce((s, r) => s + r.actual, 0);
+  // 字数按全文统计（导演逐节调用时，report 只覆盖本次写的节）。
+  const total =
+    (fs.readFileSync(draftFile, 'utf8').match(/[\u4e00-\u9fff]/g) || []).length;
+  const wordsOk = total >= targetWords * 0.85;
   state.lastDraftHash = fileHash(parts.join(''));
   state.lastWriteAt = ws.nowIso(); // 供"回灌后自动重写缺口节"判断时序
-  state.summary = `全文完成：${sections.length} 节，实际 ${total} 字（目标 ${targetWords} 字）`;
+  state.quality = state.quality || {};
+  state.quality.words = { actual: total, target: targetWords, ok: wordsOk };
+  state.summary = `全文完成：${sections.length} 节，实际 ${total} 字（目标 ${targetWords} 字）${
+    wordsOk ? '' : '（字数未达标，可运行 sculptor write 或说"再详细点"补齐）'
+  }`;
   state.nextStep = '运行 sculptor redteam 做反 AI 审计';
   ws.writeState(workspace, state);
   ws.logContext(workspace, 'write', `完成 ${end - start + 1} 节，存至 ${draftFile}`);
