@@ -33,7 +33,13 @@ import {
   markAsked,
   wasAsked,
 } from './knowledge.js';
-import { dataSuggestion, queueAssetSearch, webRecommendation, explicitSearchSuggestion } from './rag.js';
+import {
+  dataSuggestion,
+  queueAssetSearch,
+  webRecommendation,
+  explicitSearchSuggestion,
+  unifiedBrief,
+} from './rag.js';
 import { academicGap } from './academic.js';
 import { outlineProgress } from './outline-state.js';
 
@@ -649,6 +655,12 @@ async function askOnce(state, cfg, workspace) {
     context: contextOf(state),
     lastInput: state.lastInput || '（刚开始）',
     stage: '澄清',
+    // v0.44：蓝图状态只是"还有哪些牌没亮"的清单，不是顺序命令；
+    // 问什么由 LLM 结合用户刚说的话自主判断（规则 10），suggestedNext 只是可推翻的建议。
+    blueprintStatus: activeBlueprint(state)
+      .map((f) => `- ${f.label}${fieldDone(state, f) ? '（已确认 ✓）' : '（待补 ✗）'}`)
+      .join('\n'),
+    suggestedNext: activeBlueprint(state).find((f) => f.key === need)?.label || '',
     stageNeed:
       activeBlueprint(state).find((f) => f.key === need)?.label ||
       NEED_LABELS[need] ||
@@ -656,6 +668,10 @@ async function askOnce(state, cfg, workspace) {
     blueprintFields: activeBlueprint(state).map((f) => f.label).join(' → '),
     coreReady,
     thinking: thinkingBrief(state),
+    knowledgeContext: unifiedBrief(
+      workspace,
+      `${state.confirmed?.topic || ''} ${state.lastInput || ''}`,
+    ),
     styleNote: state.confirmed.styleNote || '',
     blueprintText: state.blueprint && renderBlueprint(state),
     liveOutline: liveOutlineText(state),

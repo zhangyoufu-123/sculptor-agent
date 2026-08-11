@@ -19,6 +19,7 @@ const ws = await import(path.join(HERE, '..', 'src', 'workspace.js'));
 const { clarifyStep } = await import(path.join(HERE, '..', 'src', 'clarify.js'));
 const { missingNeed } = await import(path.join(HERE, '..', 'src', 'clarify.js'));
 const { genreBlueprint } = await import(path.join(HERE, '..', 'src', 'genre.js'));
+const { QUESTIONER_PROMPT } = await import(path.join(HERE, '..', 'src', 'prompts.js'));
 const {
   extractThinkingSignals,
   updateThinkingThread,
@@ -123,6 +124,34 @@ const cfg = { ...loadConfig(), apiKey: 'mock' };
   };
   assert(missingNeed(full) === 'targetWords', `内容齐了才问字数（实际: ${missingNeed(full) || '（无缺口）'}）`);
   console.log('PASS 预算联动：字数最后问，确认后自动回补素材');
+}
+
+// 7) v0.44 去硬编码：蓝图状态是"清单非命令"，问什么由 LLM 自主判断（RAG 知识背景注入）
+{
+  const prompt = QUESTIONER_PROMPT({
+    context: 'topic: 北大红楼',
+    lastInput: '我想写烂梗与语言简化',
+    stage: '澄清',
+    blueprintStatus: '- 立场/目的（待补 ✗）\n- 核心立意（待补 ✗）\n- 目标字数（待补 ✗）',
+    suggestedNext: '立场/目的',
+    knowledgeContext: '【个人知识库】《乡土中国》——文字下乡：语言简化是文化发展的结果',
+    coreReady: false,
+    styleProgress: '',
+    intentBrief: '',
+    thinking: '',
+    styleNote: '',
+    blueprintText: '',
+    liveOutline: '',
+    outlineGap: '',
+    userNegated: '',
+  });
+  assert(prompt.includes('蓝图状态（清单，不是顺序命令'), '蓝图以清单形式注入，非顺序命令');
+  assert(prompt.includes('建议先补「立场/目的」'), 'suggestedNext 作为可推翻建议注入');
+  assert(prompt.includes('我的建议下一步（可推翻）'), '建议明确标注可推翻');
+  assert(prompt.includes('你了解到的用户知识背景'), 'RAG 知识背景注入追问设计师');
+  assert(prompt.includes('问什么由你判断'), '决策权交给 LLM');
+  assert(!prompt.includes('【本阶段最缺'), '不再用单一"本阶段最缺"钦定问题');
+  console.log('PASS 蓝图状态清单化 + RAG 知识背景 + LLM 自主决策（无硬编码顺序）');
 }
 
 console.log('\n✓ thinking.test.mjs 全部通过');

@@ -514,30 +514,10 @@ export function genreBlueprint(name, opts = {}) {
   });
   // 目标字数必问：篇幅决定素材要备多少、大纲要拆几节——长文注水的第一道闸门。
   // 素材/论点/事项下限随篇幅动态放大（如 3000 字 → 素材 ≥8 条、论点 ≥3 个）。
-  // v0.43 提问主次：表达层（为什么想写/立意/思路）→ 内容层（素材/论据/人物）→
-  // 规划层（读者/场合）→ 可选维度 → 风格底稿 → 目标字数（**最后问**，从内容反推，
-  // 确认后按新预算自动回补素材缺口）。排序在同一映射里集中控制，不散落硬编码。
-  const THINKING_FIRST = {
-    topic: 10, // 写什么
-    stance: 20, // 想表达什么 / 为什么现在写
-    theme: 30, // 核心立意（一句话思想内核）
-    plot: 40, // 行文思路 / 情节架构 / 论证怎么走
-    materials: 50, // 关键信息：素材/场景/数据/引文
-    argument: 55, // 支撑论点
-    items: 56, // 公文/合同事项要点
-    character: 57, // 人物
-    known: 60,
-    gap: 61,
-    method: 62,
-    limitation: 63,
-    basis: 64, // 公文依据
-    recipient: 70, // 读者/对象（规划层）
-    audience: 71,
-    emotion: 80, // 情感曲线（可选）
-    ending: 81, // 结尾姿态（可选）
-    styleSample: 90, // 风格底稿
-    targetWords: 100, // 规划参数最后问
-  };
+  // v0.44 提问主次（软原则，不靠代码钦定顺序）：字段声明顺序只用于"清单展示与
+  // LLM 停摆时的兜底"；真正"下一个问什么"由 LLM 结合用户刚说的话自主决定
+  // （见 QUESTIONER_PROMPT 规则 10）。声明顺序按 表达层 → 内容层 → 规划层 →
+  // 可选 → 风格底稿 → 目标字数 排列，targetWords 恒定在最后。
   const F = (fields) => {
     const scaled = fields.map((f) => {
       if (f.key === 'materials' && f.count) {
@@ -554,9 +534,7 @@ export function genreBlueprint(name, opts = {}) {
       }
       return f;
     });
-    const out = [...scaled].sort(
-      (a, b) => (THINKING_FIRST[a.key] ?? 70) - (THINKING_FIRST[b.key] ?? 70),
-    );
+    const out = [...scaled];
     out.push({
       key: 'targetWords',
       label: `目标字数（${b.label}）`,
@@ -573,14 +551,14 @@ export function genreBlueprint(name, opts = {}) {
       return F([
         { key: 'topic', label: '主题/研究问题', required: true },
         { key: 'stance', label: '立场/研究结论', required: true },
-        { key: 'audience', label: '读者与场合', required: true },
-        { key: 'materials', label: '论据/文献/数据（≥2 条）', required: true, count: 2, list: 'materials' },
         { key: 'theme', label: '核心论点/贡献', required: true },
         { key: 'argument', label: '支撑论点（≥2 个）', required: true, count: 2, list: 'arguments' },
+        { key: 'materials', label: '论据/文献/数据（≥2 条）', required: true, count: 2, list: 'materials' },
         { key: 'known', label: '已知共识/现状（可选）', required: false },
         { key: 'gap', label: '研究缺口/核心张力（可选）', required: false },
         { key: 'method', label: '方法与证据（可选）', required: false },
         { key: 'limitation', label: '局限/边界（可选）', required: false },
+        { key: 'audience', label: '读者与场合', required: true },
         { key: 'ending', label: '结论姿态', required: false },
         { key: 'styleSample', label: '风格底稿（同文体旧稿）', required: false },
       ]);
@@ -601,53 +579,53 @@ export function genreBlueprint(name, opts = {}) {
     case '议案':
       return F([
         { key: 'topic', label: '事由/文种事项', required: true },
-        { key: 'recipient', label: '主送/对象', required: true },
         { key: 'basis', label: '依据/缘由', required: true },
         { key: 'items', label: '事项要点（≥1 条）', required: true, count: 1, list: 'items' },
+        { key: 'recipient', label: '主送/对象', required: true },
         { key: 'styleSample', label: '范本/惯例（可选）', required: false },
       ]);
     case '合同':
       return F([
         { key: 'topic', label: '合同类型', required: true },
-        { key: 'recipient', label: '当事人（甲乙双方）', required: true },
         { key: 'items', label: '标的/价款/履行/违约/争议解决条款要点', required: true, count: 2, list: 'items' },
+        { key: 'recipient', label: '当事人（甲乙双方）', required: true },
         { key: 'styleSample', label: '范本/惯例（可选）', required: false },
       ]);
     case '新闻稿':
       return F([
         { key: 'topic', label: '事件/主题', required: true },
-        { key: 'recipient', label: '发布对象/媒体', required: true },
-        { key: 'materials', label: '事实素材 5W1H（≥3 条）', required: true, count: 3, list: 'materials' },
         { key: 'stance', label: '报道角度/目的', required: true },
+        { key: 'materials', label: '事实素材 5W1H（≥3 条）', required: true, count: 3, list: 'materials' },
+        { key: 'recipient', label: '发布对象/媒体', required: true },
         { key: 'ending', label: '结尾落点（回扣/展望）', required: false },
         { key: 'styleSample', label: '风格底稿（同文体）', required: false },
       ]);
     case '邮件':
       return F([
         { key: 'topic', label: '邮件主题', required: true },
-        { key: 'recipient', label: '收件人与关系', required: true },
         { key: 'stance', label: '写这封邮件的目的', required: true },
         { key: 'materials', label: '背景/要点（≥1 条）', required: true, count: 1, list: 'materials' },
+        { key: 'recipient', label: '收件人与关系', required: true },
         { key: 'styleSample', label: '风格底稿（可选）', required: false },
       ]);
     case '视频脚本':
       return F([
         { key: 'topic', label: '选题/主题', required: true },
-        { key: 'recipient', label: '平台与观众', required: true },
         { key: 'stance', label: '目的/CTA', required: true },
         { key: 'materials', label: '素材/画面点（≥2 条）', required: true, count: 2, list: 'materials' },
         { key: 'emotion', label: '节奏/情绪曲线', required: false },
         { key: 'ending', label: '结尾 CTA/钩子', required: false },
+        { key: 'recipient', label: '平台与观众', required: true },
         { key: 'styleSample', label: '风格底稿（可选）', required: false },
       ]);
     case '小说':
       return F([
         { key: 'topic', label: '故事主题', required: true },
         { key: 'stance', label: '想表达的核心倾向', required: true },
-        { key: 'recipient', label: '读者与题材定位', required: true },
-        { key: 'materials', label: '人物/场景/素材（≥2 条）', required: true, count: 2, list: 'materials' },
         { key: 'plot', label: '情节架构（伏笔/冲突/反转设计）', required: true },
+        { key: 'materials', label: '人物/场景/素材（≥2 条）', required: true, count: 2, list: 'materials' },
         { key: 'character', label: '角色（谁、想要什么、怕什么）', required: false },
+        { key: 'recipient', label: '读者与题材定位', required: true },
         { key: 'emotion', label: '情感曲线', required: false },
         { key: 'ending', label: '结局/反转落点', required: false },
         { key: 'styleSample', label: '风格底稿（可选）', required: false },
@@ -657,11 +635,11 @@ export function genreBlueprint(name, opts = {}) {
       return F([
         { key: 'topic', label: '主题', required: true },
         { key: 'stance', label: '立场/目的', required: true },
-        { key: 'audience', label: '读者与场合', required: true },
-        { key: 'materials', label: '具体素材（≥2 条）', required: true, count: 2, list: 'materials' },
         { key: 'theme', label: '核心立意', required: true },
+        { key: 'materials', label: '具体素材（≥2 条）', required: true, count: 2, list: 'materials' },
         { key: 'emotion', label: '情感曲线', required: false },
         { key: 'ending', label: '结尾姿态', required: false },
+        { key: 'audience', label: '读者与场合', required: true },
         { key: 'styleSample', label: '风格底稿（同文体旧稿）', required: false },
       ]);
   }
