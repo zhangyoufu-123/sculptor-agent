@@ -47,6 +47,9 @@ const { humanMetrics } = await import(
 const { styleProgress } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'style.js')).href
 );
+const { recentPulses } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'style-pulse.js')).href
+);
 const { thinkingBrief } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'thinking.js')).href
 );
@@ -403,6 +406,12 @@ const server = http.createServer(async (req, res) => {
       category: meta.category,
       intent: state.intent || null,
       thinking: thinkingBrief(state),
+      pulses: recentPulses(dir, { limit: 6 }).map((p) => ({
+        phase: p.phase,
+        score: p.score,
+        summary: p.summary || '',
+        suggestion: p.suggestion || '',
+      })),
       blueprint: state.blueprint || null,
       checklist: checklistOf(state),
       confirmed: state.confirmed || {},

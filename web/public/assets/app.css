@@ -607,6 +607,18 @@ body {
 .curve-bars .bar { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
 .curve-bars .bar::first-letter { color: var(--gold, #9c6b3f); font-weight: 600; }
 .ol-part { margin: 12px 0 6px; padding: 5px 10px; font-size: 13px; font-weight: 600; letter-spacing: .04em; color: var(--gold, #9c6b3f); background: rgba(156,107,63,.07); border-radius: 6px; }
+.draft-quick { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; margin: 6px 0; border: 1px solid rgba(156,107,63,.25); border-radius: 8px; background: rgba(156,107,63,.05); }
+.draft-quick-sel { font-size: 12px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.draft-quick-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.insight-row { padding: 7px 0; border-bottom: 1px dashed var(--line, rgba(0,0,0,.07)); }
+.insight-label { display: inline-block; min-width: 34px; font-size: 12px; color: var(--ink-3); }
+.pulse-chip { display: inline-block; padding: 2px 7px; margin: 0 4px 4px 0; border-radius: 10px; font-size: 12px; background: rgba(156,107,63,.1); color: var(--gold, #9c6b3f); }
+.curve-mini { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+.curve-mini-row { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--ink-2); }
+.curve-mini-row i { font-style: normal; letter-spacing: 1px; color: var(--gold, #9c6b3f); }
+.mini-bar { height: 5px; margin: 3px 0; border-radius: 3px; background: rgba(0,0,0,.06); overflow: hidden; }
+.mini-bar i { display: block; height: 100%; background: var(--gold, #9c6b3f); border-radius: 3px; }
+.ctx-line.think { border-left: 2px solid rgba(156,107,63,.4); padding-left: 8px; margin: 3px 0; }
 .report-list .tag { color: var(--gold); }
 
 /* ── 风格肖像 ─────────────────────────────────────── */

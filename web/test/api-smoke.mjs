@@ -130,6 +130,7 @@ await step('上下文面板与概览接口', async () => {
   const ctx = JSON.parse((await call(`/api/context?sessionId=${sid}`))._body());
   assert(Array.isArray(ctx.checklist) && ctx.checklist.length > 0, 'context 返回确认清单');
   assert(typeof ctx.thinking === 'string', 'context 返回思想脉络字段');
+  assert(Array.isArray(ctx.pulses), 'context 返回风格脉搏列表');
   assert(typeof ctx.answerStats === 'object' && 'L0' in ctx.answerStats, 'context 回答层次统计');
   assert(typeof ctx.materials === 'object', 'context 素材字段');
   assert(typeof ctx.progress === 'object' && 'done' in ctx.progress, 'context 写作进度字段');

@@ -299,6 +299,17 @@ function renderPaneDraft(c) {
   html += ctxSection(
     '手写草稿',
     `<textarea class="draft-edit" id="paneDraftText" rows="14" placeholder="在这里亲手改稿，改完点保存；保存会写回草稿文件。"></textarea>
+     <div class="draft-quick" id="paneDraftQuick" hidden>
+       <div class="draft-quick-sel" id="paneDraftQuickSel"></div>
+       <div class="draft-quick-actions">
+         <button class="btn btn-ghost btn-sm" data-act="润色这句，保持原意">润色</button>
+         <button class="btn btn-ghost btn-sm" data-act="把这段扩写得更丰满，保留原意和细节">扩写</button>
+         <button class="btn btn-ghost btn-sm" data-act="把这段浓缩得更精炼，保留核心信息">缩写</button>
+         <button class="btn btn-ghost btn-sm" data-act="更口语化一点">更口语</button>
+         <button class="btn btn-ghost btn-sm" data-act="更克制一点，减少修饰">更克制</button>
+         <button class="btn btn-ghost btn-sm" data-act="调整这句的节奏，长句短句错落">节奏</button>
+       </div>
+     </div>
      <div class="draft-edit-bar"><span class="char-count" id="paneDraftChars"></span>
        <button class="btn btn-gold btn-sm" id="paneDraftSave">保存修改</button>
        <button class="btn btn-ghost btn-sm" id="paneDraftView">查看成稿</button>
@@ -310,6 +321,8 @@ function renderPaneDraft(c) {
        <button class="btn btn-gold btn-sm" id="paneDraftPointEdit">AI 改写选中</button>
      </div>`,
   );
+  // 实时洞察卡（v0.45）：字数进度 + 最近风格脉搏 + 节奏迷你曲线
+  html += ctxSection('AI 洞察 · 实时', `<div id="paneInsights"><div class="ctx-line">读取中…</div></div>`);
   if (c.outline?.sections?.length) {
     html += ctxSection('大纲参考', c.outline.sections.map((s, i) => `<div class="ol-ref"><span>${i + 1}.</span>${esc(s.heading)}<em>${esc(s.function || '')}</em></div>`).join(''));
   }
@@ -324,7 +337,28 @@ function renderPaneDraft(c) {
     }).catch(() => {});
   }
   const ta = $('paneDraftText');
-  if (ta) ta.addEventListener('input', () => { $('paneDraftChars').textContent = `${ta.value.replace(/\s/g, '').length} 字`; });
+  if (ta) {
+    ta.addEventListener('input', () => {
+      const n = ta.value.replace(/\s/g, '').length;
+      $('paneDraftChars').textContent = `${n} 字`;
+      renderInsights(c, n);
+    });
+    // 选区 AI 工具栏（v0.45）：选中文字即出现快捷动作
+    const refreshQuick = () => {
+      const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd).trim();
+      const q = $('paneDraftQuick');
+      if (!q) return;
+      if (sel) {
+        $('paneDraftQuickSel').textContent = `已选中：${sel.slice(0, 36)}${sel.length > 36 ? '…' : ''}`;
+        q.hidden = false;
+      } else {
+        q.hidden = true;
+      }
+    };
+    ta.addEventListener('mouseup', refreshQuick);
+    ta.addEventListener('keyup', refreshQuick);
+    ta.addEventListener('blur', () => { const q = $('paneDraftQuick'); if (q) q.hidden = true; });
+  }
   $('paneDraftSave')?.addEventListener('click', async () => {
     try {
       await apiPost('/api/save-draft', { sessionId, text: ta.value });
@@ -369,6 +403,65 @@ function renderPaneDraft(c) {
       toast(e.message);
     }
   });
+  // 选区快捷动作：润色/扩写/缩写/口语/克制/节奏 → point-edit（改动即进风格档案）
+  document.querySelectorAll('#paneDraftQuick [data-act]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd).trim();
+      if (!sel) {
+        toast('先在草稿里选中文字');
+        return;
+      }
+      const inst = btn.dataset.act;
+      try {
+        await apiPost('/api/save-draft', { sessionId, text: ta.value });
+        await apiPost('/api/point-edit', { sessionId, quote: sel, instruction: inst });
+        toast(`已${btn.textContent.trim()}，改动已吸收进风格档案`);
+        const d = await apiGet(`/api/draft?sessionId=${sessionId}`);
+        if (d.text) {
+          ta.value = d.text;
+          $('paneDraftChars').textContent = `${d.text.replace(/\s/g, '').length} 字`;
+        }
+        $('paneDraftQuick').hidden = true;
+        refreshPanel();
+      } catch (e) {
+        toast(e.message);
+      }
+    });
+  });
+  renderInsights(c, 0);
+}
+
+/* ── 实时洞察（v0.45）：字数/脉搏/节奏，可视化但克制 ── */
+const PULSE_CN = { clarify: '澄清', outline: '大纲', write: '写作', correction: '修改', redteam: '审计' };
+async function renderInsights(c, knownChars) {
+  const box = $('paneInsights');
+  if (!box) return;
+  try {
+    const d = knownChars ? null : await apiGet(`/api/draft?sessionId=${sessionId}`);
+    const chars = knownChars || (d?.text || '').replace(/\s/g, '').length;
+    const target = Number(c.targetWords) || 0;
+    const pct = target ? Math.min(100, Math.round((chars / target) * 100)) : 0;
+    let html = `<div class="insight-row"><span class="insight-label">字数</span><b>${chars}</b>${target ? `/${target}（${pct}%）` : ''}`;
+    html += `<div class="progress" style="margin:4px 0 0"><i style="width:${pct}%"></i></div></div>`;
+    const pulses = Array.isArray(c.pulses) ? c.pulses.slice(-3) : [];
+    if (pulses.length) {
+      html += `<div class="insight-row"><span class="insight-label">脉搏</span>${pulses
+        .map((p) => `<span class="pulse-chip">${PULSE_CN[p.phase] || p.phase} ${p.score != null ? (p.score * 100).toFixed(0) : ''}分</span>`)
+        .join(' ')}<div class="ctx-line">${esc(pulses[pulses.length - 1].suggestion || pulses[pulses.length - 1].summary || '')}</div></div>`;
+    }
+    try {
+      const cv = await apiGet(`/api/curve?sessionId=${sessionId}`);
+      if (cv.sections?.length) {
+        const bar = (v) => '▁▂▃▄▅▆▇█'[Math.min(7, Math.floor(Math.max(0, v || 0) / 12.5))];
+        html += `<div class="insight-row"><span class="insight-label">节奏</span><div class="curve-mini">${cv.sections
+          .map((s) => `<div class="curve-mini-row"><span title="${esc(s.section)}">${esc(s.section.slice(0, 8))}</span><i>${bar(s.tension)}${bar(s.density)}${bar(s.emotion)}</i></div>`)
+          .join('')}</div></div>`;
+      }
+    } catch {}
+    box.innerHTML = html;
+  } catch {
+    box.innerHTML = '<div class="ctx-line">（尚无成稿可洞察）</div>';
+  }
 }
 
 function renderPaneContext(c) {
@@ -400,6 +493,15 @@ function renderPaneContext(c) {
   if (c.materials?.length) {
     parts.push(ctxSection(`素材 ×${c.materials.length}`, c.materials.map((m) => `<div class="ctx-material">${esc(m.slice(0, 90))}</div>`).join('')));
   }
+  // 思想脉络（v0.43/0.45 可视化）：AI 理解到的用户主张/前提/推理/来源
+  if (c.thinking) {
+    const lines = c.thinking
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => `<div class="ctx-line think">${esc(l)}</div>`)
+      .join('');
+    parts.push(ctxSection('思想脉络', lines || '<div class="ctx-line">（AI 正在从你的发言里归纳）</div>'));
+  }
   // 多模态输入：上传 md/txt/docx/xlsx/图片 → 提取成素材
   parts.push(ctxSection(
     '素材上传',
@@ -422,7 +524,18 @@ function renderPaneContext(c) {
      </div>`,
   ));
   const sp = c.styleProgress || {};
-  let styleHtml = `<div class="ctx-line">write ${sp.write?.learned || 0}/${sp.write?.total || 14} 维 · read ${sp.read?.learned || 0}/${sp.read?.total || 7} 维</div>`;
+  const dimBar = (learned, total) =>
+    `<div class="mini-bar"><i style="width:${total ? Math.round(((learned || 0) / total) * 100) : 0}%"></i></div>`;
+  let styleHtml = `<div class="ctx-line">write ${sp.write?.learned || 0}/${sp.write?.total || 14} 维${dimBar(sp.write?.learned, sp.write?.total)}read ${sp.read?.learned || 0}/${sp.read?.total || 7} 维${dimBar(sp.read?.learned, sp.read?.total)}</div>`;
+  const topDims = (sp.write?.top || []).slice(0, 3);
+  if (topDims.length) {
+    styleHtml += topDims
+      .map(
+        (t) =>
+          `<div class="ctx-row"><span>${esc(t.dim)}</span>${esc(t.value || '')}<em>${((t.confidence || 0) * 100).toFixed(0)}%</em></div>`,
+      )
+      .join('');
+  }
   if (c.styleNote) styleHtml += `<div class="ctx-line">风格底稿 · ${esc(c.styleNote)}</div>`;
   parts.push(ctxSection('风格进度', styleHtml));
   if (c.answerLevels?.length) {
