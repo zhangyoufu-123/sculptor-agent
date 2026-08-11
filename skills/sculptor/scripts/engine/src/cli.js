@@ -52,6 +52,7 @@ import {
   exportDocx,
   exportOfficialDocx,
   exportAcademicDocx,
+  exportLatex,
   exportHtml,
   exportSrt,
   exportPdf,
@@ -204,6 +205,7 @@ const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四�
   sculptor export --official [--redhead] [--docx out.docx] [工作区]  按 GB/T 9704-2012 公文排版导出 docx
   sculptor export --academic [--docx out.docx] [工作区]  按学术论文排版导出 docx（宋体小四/黑体标题）
   sculptor export --html out.html / --srt out.srt / --pdf out.pdf [工作区]  导出 HTML / 字幕 SRT / PDF
+  sculptor export --latex out.tex [工作区]  导出 LaTeX 论文（数学公式等特殊格式原样保留）
   sculptor cite "<json条目或数组>" [--style gbt7714|apa] [--file refs.json]  生成参考文献（期刊/图书/网页/报纸/论文/报告）
   sculptor citations [--file x.md] [--append refs.json] [--auto] [工作区]  提取文中《引文》清单；--append 追加参考文献到草稿；--auto 从检索回灌来源生成参考文献草稿
   sculptor rag [status|search|ingest|ingest-assets|needs] [工作区]  联网检索：search 生成查询并直连/排队宿主代检；ingest <results.json> 回灌缓存与素材；ingest-assets 回灌联网资产/思想（书目自动入知识库）；needs 查看待办资料请求
@@ -1208,6 +1210,9 @@ export async function runCli(argv, io = {}) {
         } else if (flags.srt) {
           out = exportSrt(text, path.resolve(String(flags.srt)));
           console.log(`已导出字幕 SRT → ${out}`);
+        } else if (flags.latex) {
+          out = exportLatex(text, path.resolve(String(flags.latex)));
+          console.log(`已导出 LaTeX（公式原样保留）→ ${out}`);
         } else if (flags.pdf) {
           out = exportPdf(text, path.resolve(String(flags.pdf)));
           console.log(`已导出 PDF → ${out}`);

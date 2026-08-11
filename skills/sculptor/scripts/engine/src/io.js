@@ -275,6 +275,61 @@ function inlineMd(s) {
     .replace(/`([^`]+)`/g, '<code>$1</code>');
 }
 
+function escLatex(s) {
+  return String(s || '')
+    .replace(/\\/g, '\\textbackslash{}')
+    .replace(/&/g, '\\&')
+    .replace(/%/g, '\\%')
+    .replace(/#/g, '\\#')
+    .replace(/_/g, '\\_')
+    .replace(/\{/g, '\\{')
+    .replace(/\}/g, '\\}')
+    .replace(/~/g, '\\textasciitilde{}')
+    .replace(/\^/g, '\\textasciicircum{}');
+}
+
+/** markdown（含 $$…$$ 公式）→ LaTeX 论文（v0.51：数学公式等特殊格式以 LaTeX 原样输出）。 */
+export function exportLatex(mdText, outFile) {
+  const lines = String(mdText || '').split('\n');
+  const out = [
+    '\\documentclass[12pt]{article}',
+    '\\usepackage[UTF8]{ctex}',
+    '\\usepackage{amsmath,amssymb}',
+    '\\usepackage{graphicx}',
+    '\\title{SCULPTOR 论文}',
+    '\\begin{document}',
+    '\\maketitle',
+  ];
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+    const img = t.match(/^!\[(.*?)\]\((.*?)\)$/);
+    if (img) {
+      out.push(`\\begin{figure}[htbp]\\centering\\includegraphics[width=0.75\\textwidth]{${escLatex(img[2])}}\\caption{${escLatex(img[1])}}\\end{figure}`);
+      continue;
+    }
+    const h = t.match(/^(#{1,6})\s+(.+)$/);
+    if (h) {
+      const level = Math.min(6, h[1].length);
+      out.push(`\\section*{${escLatex(h[2])}}`.replace('section', level <= 2 ? 'section' : level <= 3 ? 'subsection' : 'subsubsection'));
+      continue;
+    }
+    if (t.startsWith('$$')) {
+      out.push(t); // 数学公式原样保留
+      continue;
+    }
+    if (t.startsWith('|')) continue; // 表格简化为注释（公式论文以文本为准）
+    if (t.startsWith('**关键词')) {
+      out.push(`\\noindent\\textbf{${escLatex(t)}}\\\\`);
+      continue;
+    }
+    out.push(escLatex(t));
+  }
+  out.push('', '\\end{document}');
+  fs.writeFileSync(outFile, out.join('\n'));
+  return path.resolve(outFile);
+}
+
 /** markdown（标题/段落/引用/列表/粗斜体）→ 完整 HTML 文档（纯 Node，零依赖）。 */
 export function exportHtml(mdText, outFile) {
   const lines = String(mdText || '').split('\n');

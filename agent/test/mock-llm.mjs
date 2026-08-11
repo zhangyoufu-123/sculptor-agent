@@ -386,6 +386,15 @@ export function respond(messages) {
       keyPoints: ['石阶被磨亮了一百年', '历史从不缺席，只等一个人走进去', '百年征程波澜壮阔'],
     });
   }
+  if (userMsg.includes('【原意解读】')) {
+    return JSON.stringify({
+      intent: '作者追忆与历史现场的相遇，强调历史需要人走进去才活过来',
+      tone: '克制、怀旧、带哲思',
+      genre: '散文',
+      keyImagery: '石阶/窗台积灰/门的气味',
+      pitfalls: ['"破晓的号角"类意象', '口语化的停顿语气'],
+    });
+  }
   if (userMsg.includes('【主题提炼】')) {
     const m = userMsg.match(/用户开局说了：(.+?)\n/);
     const startsCommand = /^(开始|写吧|开写|你看着办|随便|帮我写$|写吧$)/.test(String(m ? m[1] : ''));

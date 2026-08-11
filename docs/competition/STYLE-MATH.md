@@ -8,15 +8,21 @@
 
 $$\hat{v} = (\text{句长均值},\ \text{句长波动},\ \text{短句占比},\ \text{口语度},\ \text{意象密度},\ \text{情绪浓度},\ \text{词汇丰富度},\ \text{语言新鲜度}) \in \mathbb{R}^{8}$$
 
+![公式1 特征向量](formula-vector.png)
+
 ## 2. 归一化
 
 对每个维度 $j$ 在全部对象上做 min-max 归一化：
 
 $$\hat{v}_{j}^{(A)} = \frac{v_j^{(A)} - \min_i v_j^{(i)}}{\max_i v_j^{(i)} - \min_i v_j^{(i)}} \in [0,1]$$
 
+![公式2 逐维 min-max 归一化](formula-norm.png)
+
 ## 3. 风格距离（欧氏距离）
 
 $$d(A,B) = \sqrt{\sum_{j=1}^{8} \left(\hat{v}_j^{(A)} - \hat{v}_j^{(B)}\right)^2}$$
+
+![公式3 风格距离：欧氏距离](formula-distance.png)
 
 ## 4. 实测风格距离矩阵
 
@@ -37,6 +43,8 @@ $$d(A,B) = \sqrt{\sum_{j=1}^{8} \left(\hat{v}_j^{(A)} - \hat{v}_j^{(B)}\right)^2
 定义 5 个能力维度 $s_k \in [0,100]$：离 AI 腔距离、人类化指标、反 AI 味、全流程协作、多文体覆盖，综合评分：
 
 $$C = 0.25\,s_1 + 0.20\,s_2 + 0.20\,s_3 + 0.20\,s_4 + 0.15\,s_5$$
+
+![公式4 写作能力综合评分](formula-score.png)
 
 | 对象 | 离AI腔 | 人类化 | 反AI味 | 全流程 | 多文体 | 综合 C |
 | --- | --- | --- | --- | --- | --- | --- |

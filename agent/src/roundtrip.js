@@ -1,8 +1,9 @@
-// 翻译/回译校验（v0.32）：翻译的本质是"同一件事用两种语言说清楚"。
+// 翻译/回译校验（v0.32→v0.51）：翻译的本质是"同一件事用两种语言说清楚"。
 // 利用翻译前后"内容对齐、风格不同"的性质：
+//   0) 原意解读：先读懂"作者想表达什么"（意图/语气/文体/关键意象/易损点）
 //   1) 内容分析：提取必须保留的信息点（专名/数字/论断/意象）
-//   2) 中译英（直译，不润色）
-//   3) 英译中（忠实回译）
+//   2) 中译英：带着作者原意翻译——**理解作者原意是第一标准，达意优先于逐字**
+//   3) 英译中：同样带着原意忠实回译
 //   4) 信息点核对：回译丢了/漂移了什么 → 内容保真审计
 //   5) 风格对比：原文 vs 回译文（同为中文）用人类化指标对比 → 风格层信号
 // 整条链路 LLM 不可用时全部确定性兜底，绝不中断写作流程。
@@ -14,6 +15,7 @@ import { humanMetrics } from './experiment.js';
 import { readVector, vectorSummary } from './style-vector.js';
 
 export const RT_MARKERS = {
+  intent: '【原意解读】',
   key: '【内容要点提取】',
   fwd: '【中译英】',
   back: '【英译中】',
@@ -117,15 +119,49 @@ export async function roundtripCheck(cfg, wsDir, { text, file } = {}) {
   }
   if (!keyPoints.length) keyPoints = fallbackKeyPoints(src);
 
-  // 2) 中译英（直译）
+  // 1.5) 原意解读（v0.51 方法论：翻译以理解作者原意为第一标准）
+  let intent = { summary: '', tone: '', genre: '', keyImagery: '', pitfalls: [] };
+  try {
+    const it = await chatWithRetry(
+      cfg,
+      [
+        { role: 'system', content: '你是翻译前的原意解读官。只输出严格 JSON。' },
+        {
+          role: 'user',
+          content: `${RT_MARKERS.intent}\n先读懂作者想表达什么，再交给翻译。输出：\n{"intent":"作者想表达的核心意思（一句话）","tone":"语气/情绪","genre":"文体","keyImagery":"关键意象/比喻","pitfalls":["容易在翻译中丢损的点（双关/文化词/语气词）"]}\n\n原文：\n${src.slice(0, 3000)}`,
+        },
+      ],
+      { json: true, temperature: 0.2, maxTokens: 600 },
+    );
+    const p = parseJsonContent(it, '原意');
+    intent = {
+      summary: String(p.intent || '').trim(),
+      tone: String(p.tone || '').trim(),
+      genre: String(p.genre || '').trim(),
+      keyImagery: String(p.keyImagery || '').trim(),
+      pitfalls: Array.isArray(p.pitfalls) ? p.pitfalls.map(String).filter(Boolean).slice(0, 4) : [],
+    };
+  } catch {
+    const stance =
+      src.split(/[。\n]/).find((s) => /我想|我认为|我的理解|关键是|其实|说白了/.test(s)) || '';
+    const first = src.split(/[。\n]/).find((s) => s.trim().length > 8) || '';
+    intent = { summary: (stance || first).trim().slice(0, 60), tone: '', genre: '', keyImagery: '', pitfalls: [] };
+  }
+  const intentBlock = `【作者原意（理解它：达意优先于逐字）】\n意图：${intent.summary || '（自动判断）'}\n语气：${intent.tone || '（自动判断）'}\n文体：${intent.genre || '（自动判断）'}\n关键意象：${intent.keyImagery || '（自动判断）'}\n易损点：${intent.pitfalls.join('；') || '（自动判断）'}`;
+
+  // 2) 中译英（带着原意：达意优先）
   let forward = '';
   try {
     forward = (
       await chatWithRetry(
         cfg,
         [
-          { role: 'system', content: '你是忠实直译官。只做直译，不润色、不增删信息。只输出译文。' },
-          { role: 'user', content: `${RT_MARKERS.fwd}\n${src.slice(0, 3000)}` },
+          {
+            role: 'system',
+            content:
+              '你是达意翻译官。**理解作者原意是第一标准**：先想清楚作者要表达什么，再翻译；字面上对不上的地方以原意为准，宁可调整语序也不要丢掉语气与意象；不增删信息。只输出译文。',
+          },
+          { role: 'user', content: `${RT_MARKERS.fwd}\n${intentBlock}\n\n原文：\n${src.slice(0, 3000)}` },
         ],
         { temperature: 0.3, maxTokens: 2500 },
       )
@@ -134,7 +170,7 @@ export async function roundtripCheck(cfg, wsDir, { text, file } = {}) {
     forward = '';
   }
 
-  // 3) 英译中（忠实回译）
+  // 3) 英译中（同样带着原意忠实回译）
   let back = '';
   if (forward) {
     try {
@@ -142,8 +178,12 @@ export async function roundtripCheck(cfg, wsDir, { text, file } = {}) {
         await chatWithRetry(
           cfg,
           [
-            { role: 'system', content: '你是忠实回译官。把英文忠实译回中文，不增删信息。只输出译文。' },
-            { role: 'user', content: `${RT_MARKERS.back}\n${forward.slice(0, 3000)}` },
+            {
+              role: 'system',
+              content:
+                '你是忠实回译官。带着原作者的原意把英文译回中文：内容不增删，语气与意象尽量贴近原作者。只输出译文。',
+            },
+            { role: 'user', content: `${RT_MARKERS.back}\n${intentBlock}\n\n英文：\n${forward.slice(0, 3000)}` },
           ],
           { temperature: 0.3, maxTokens: 2500 },
         )
@@ -201,6 +241,7 @@ export async function roundtripCheck(cfg, wsDir, { text, file } = {}) {
   return {
     source: file ? path.basename(file) : 'draft.md',
     chars: src.length,
+    intent,
     keyPoints,
     forward,
     back,
@@ -214,6 +255,10 @@ export async function roundtripCheck(cfg, wsDir, { text, file } = {}) {
 export function renderRoundtrip(r) {
   const lines = [];
   lines.push(`《${r.source}》翻译/回译校验（${r.chars} 字）`);
+  if (r.intent?.summary) {
+    lines.push(`\n【原意理解】${r.intent.summary}${r.intent.tone ? `（语气：${r.intent.tone}）` : ''}${r.intent.pitfalls?.length ? ` · 易损点：${r.intent.pitfalls.join('；')}` : ''}`);
+    lines.push('方法论：翻译以理解作者原意为第一标准——先懂后译、达意优先于逐字、回译校验闭环。');
+  }
   lines.push(`信息点 ${r.keyPoints.length} 条：${r.keyPoints.slice(0, 6).join('；')}`);
   if (r.forward) lines.push(`\n【英译】${r.forward.slice(0, 220)}${r.forward.length > 220 ? '…' : ''}`);
   if (r.back) lines.push(`\n【回译】${r.back.slice(0, 220)}${r.back.length > 220 ? '…' : ''}`);

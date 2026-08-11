@@ -12,6 +12,7 @@ const ws = await import(path.join(HERE, '..', 'src', 'workspace.js'));
 const { roundtripCheck, renderRoundtrip } = await import(
   path.join(HERE, '..', 'src', 'roundtrip.js'),
 );
+const { exportLatex } = await import(path.join(HERE, '..', 'src', 'io.js'));
 
 const cfg = { ...loadConfig(), apiKey: 'mock' };
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-roundtrip-'));
@@ -30,6 +31,8 @@ const TEXT =
   assert(r.keyPoints.length >= 3, '提取出信息点');
   assert(r.forward.includes('stone'), '中译英完成');
   assert(r.back.includes('石阶'), '回译完成');
+  assert(r.intent && r.intent.summary.includes('作者追忆'), '原意解读完成（以理解作者原意为第一标准）');
+  assert(renderRoundtrip(r).includes('原意理解'), '报告含原意理解段');
   assert(Array.isArray(r.content.kept) && Array.isArray(r.content.lost), '信息点核对字段完整');
   assert.strictEqual(r.content.lost.length, 0, 'mock 回译无信息丢失');
   assert.strictEqual(r.verdict, 'pass', '判定通过');
@@ -64,6 +67,23 @@ const TEXT =
   const r = await roundtripCheck(cfg, w2, {});
   assert(r.source === 'draft.md' && r.chars > 0, '默认读工作区草稿');
   console.log('PASS 默认读取工作区 draft.md');
+}
+
+// 3) 数学公式特殊格式导出：markdown（含 $$…$$）→ LaTeX（公式原样保留）
+{
+  const md = path.join(tmp, 'math.md');
+  const tex = path.join(tmp, 'math.tex');
+  fs.writeFileSync(
+    md,
+    '# 标题\n\n$$d(A,B) = \\sqrt{\\sum_{j=1}^{8} \\left(v_j^A - v_j^B\\right)^2}$$\n\n正文包含 & 符号。\n',
+  );
+  exportLatex(fs.readFileSync(md, 'utf8'), tex);
+  const out = fs.readFileSync(tex, 'utf8');
+  assert(out.includes('\\documentclass'), '生成 LaTeX 文档骨架');
+  assert(out.includes('\\sqrt{\\sum'), '数学公式原样保留');
+  assert(out.includes('\\section*{标题}'), '标题映射为 section');
+  assert(out.includes('\\&'), '特殊符号转义');
+  console.log('PASS LaTeX 导出（数学公式原样 + 特殊符号转义）');
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });
