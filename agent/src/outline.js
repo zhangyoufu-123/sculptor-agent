@@ -19,6 +19,7 @@ import { academicNarrative } from './academic.js';
 import { personaBrief } from './persona.js';
 import { outlineProgress, nextOutlineGap } from './outline-state.js';
 import { requiredMissing } from './clarify.js';
+import { thinkingBrief } from './thinking.js';
 
 export function styleSummary(file) {
   try {
@@ -113,6 +114,7 @@ export async function generateOutline(cfg, wsDir) {
     topic: state.confirmed.topic,
     theme: state.confirmed.theme,
     stance: state.confirmed.stance,
+    thinking: thinkingBrief(state),
     arguments: state.confirmed.arguments || [],
     audience: state.confirmed.audience,
     targetWords: Number(state.confirmed?.targetWords) || cfg.targetWords,

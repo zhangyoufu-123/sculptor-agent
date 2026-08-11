@@ -166,6 +166,22 @@ const DISSECT = {
 export function respond(messages) {
   const userMsg = (messages || []).map((m) => m.content || '').join('\n');
   if (userMsg.includes('追问设计师')) {
+    // 思想层优先（v0.43）：用户本轮抛出理论/因果推理时，返回"向下挖一层"的追问，
+    // 验证思想脉络机制（主张复述 → 一步概括 → 追问根源），不干扰普通澄清序列。
+    const lastInputRaw = userMsg.match(/【用户刚说】\n"([\s\S]*?)"\n/)?.[1] || '';
+    if (/推理|可以顺着|顺着.{0,6}思路|因为|所以|理论/.test(lastInputRaw)) {
+      return JSON.stringify({
+        question:
+          '我理解你的主张是：烂梗不是简单的没素质，而是语言简化走到极端后切断了交流的共同意义——对吗？如果对，那它阻碍交流的根源，是简化本身，还是大家共享的语境消失了？',
+        recommendation:
+          '顺着《乡土中国》的思路，你其实在论证"简化过头会杀死共同意义"——我理解得对吗？',
+        options: ['对，就是共同语境的消失', '不完全是，我更想说的是……'],
+        blueprintUpdate: {},
+        outlineUpdate: { title: '', sections: [] },
+        outlineComplete: false,
+        stop: false,
+      });
+    }
     // 无状态：从上下文推断还缺什么（跨进程/跨调用都可靠）
     const ctx = userMsg.match(/【完整上下文】\n([\s\S]*?)\n【用户刚说】/)?.[1] || '';
     const has = (re) => re.test(ctx);

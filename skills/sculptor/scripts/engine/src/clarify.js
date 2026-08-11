@@ -19,6 +19,12 @@ import { parseTargetWords, guessTargetWords } from './budget.js';
 import { extractInput } from './io.js';
 import { understandIntent, intentBrief } from './intent.js';
 import {
+  extractThinkingWithLLM,
+  extractThinkingSignals,
+  updateThinkingThread,
+  thinkingBrief,
+} from './thinking.js';
+import {
   knowledgeSuggestion,
   captureKbMentions,
   recommendReadings,
@@ -587,6 +593,17 @@ async function askOnce(state, cfg, workspace) {
     } catch {
       // understandIntent 内部已兜底，这里再包一层纯保险
     }
+    // 思想脉络（v0.43）：用户抛出理论/因果推理/引用书籍 → 提炼并累积，
+    // 下一问据此"向下挖一层"，与用户达成思想共识（失败静默，绝不阻塞）。
+    if (extractThinkingSignals(state.lastInput).hasThinking) {
+      try {
+        const llmTh = await extractThinkingWithLLM(cfg, state.lastInput, thinkingBrief(state));
+        const th = updateThinkingThread(state, state.lastInput, llmTh);
+        if (th.updated) {
+          ws.logContext(workspace, 'thinking', `记录思想信号（${th.merged ? '合并' : '新增'}）`);
+        }
+      } catch {}
+    }
   }
   const style = workspace ? styleProgress(workspace) : null;
   // 确认题上用户说"再打磨一下"→ 确定性打磨问题（不依赖 LLM 临场发挥，绝不退回无关模板）。
@@ -638,6 +655,7 @@ async function askOnce(state, cfg, workspace) {
       '素材细节',
     blueprintFields: activeBlueprint(state).map((f) => f.label).join(' → '),
     coreReady,
+    thinking: thinkingBrief(state),
     styleNote: state.confirmed.styleNote || '',
     blueprintText: state.blueprint && renderBlueprint(state),
     liveOutline: liveOutlineText(state),

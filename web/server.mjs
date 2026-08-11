@@ -47,6 +47,9 @@ const { humanMetrics } = await import(
 const { styleProgress } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'style.js')).href
 );
+const { thinkingBrief } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'thinking.js')).href
+);
 const { rhythmCurve } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'style-pulse.js')).href
 );
@@ -399,6 +402,7 @@ const server = http.createServer(async (req, res) => {
       title: meta.title,
       category: meta.category,
       intent: state.intent || null,
+      thinking: thinkingBrief(state),
       blueprint: state.blueprint || null,
       checklist: checklistOf(state),
       confirmed: state.confirmed || {},
