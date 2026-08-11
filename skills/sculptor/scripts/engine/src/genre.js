@@ -514,6 +514,30 @@ export function genreBlueprint(name, opts = {}) {
   });
   // 目标字数必问：篇幅决定素材要备多少、大纲要拆几节——长文注水的第一道闸门。
   // 素材/论点/事项下限随篇幅动态放大（如 3000 字 → 素材 ≥8 条、论点 ≥3 个）。
+  // v0.43 提问主次：表达层（为什么想写/立意/思路）→ 内容层（素材/论据/人物）→
+  // 规划层（读者/场合）→ 可选维度 → 风格底稿 → 目标字数（**最后问**，从内容反推，
+  // 确认后按新预算自动回补素材缺口）。排序在同一映射里集中控制，不散落硬编码。
+  const THINKING_FIRST = {
+    topic: 10, // 写什么
+    stance: 20, // 想表达什么 / 为什么现在写
+    theme: 30, // 核心立意（一句话思想内核）
+    plot: 40, // 行文思路 / 情节架构 / 论证怎么走
+    materials: 50, // 关键信息：素材/场景/数据/引文
+    argument: 55, // 支撑论点
+    items: 56, // 公文/合同事项要点
+    character: 57, // 人物
+    known: 60,
+    gap: 61,
+    method: 62,
+    limitation: 63,
+    basis: 64, // 公文依据
+    recipient: 70, // 读者/对象（规划层）
+    audience: 71,
+    emotion: 80, // 情感曲线（可选）
+    ending: 81, // 结尾姿态（可选）
+    styleSample: 90, // 风格底稿
+    targetWords: 100, // 规划参数最后问
+  };
   const F = (fields) => {
     const scaled = fields.map((f) => {
       if (f.key === 'materials' && f.count) {
@@ -530,8 +554,10 @@ export function genreBlueprint(name, opts = {}) {
       }
       return f;
     });
-    const out = [...scaled];
-    out.splice(1, 0, {
+    const out = [...scaled].sort(
+      (a, b) => (THINKING_FIRST[a.key] ?? 70) - (THINKING_FIRST[b.key] ?? 70),
+    );
+    out.push({
       key: 'targetWords',
       label: `目标字数（${b.label}）`,
       required: true,

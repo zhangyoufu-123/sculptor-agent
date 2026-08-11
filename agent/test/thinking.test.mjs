@@ -17,6 +17,8 @@ globalThis.fetch = async (url, opts) => {
 const { loadConfig } = await import(path.join(HERE, '..', 'src', 'config.js'));
 const ws = await import(path.join(HERE, '..', 'src', 'workspace.js'));
 const { clarifyStep } = await import(path.join(HERE, '..', 'src', 'clarify.js'));
+const { missingNeed } = await import(path.join(HERE, '..', 'src', 'clarify.js'));
+const { genreBlueprint } = await import(path.join(HERE, '..', 'src', 'genre.js'));
 const {
   extractThinkingSignals,
   updateThinkingThread,
@@ -73,6 +75,54 @@ const cfg = { ...loadConfig(), apiKey: 'mock' };
   assert(Array.isArray(st.thinking) && st.thinking.length >= 1, '思想已写入 state');
   assert(st.thinking[0].source && st.thinking[0].source.includes('乡土中国'), '理论来源入库');
   console.log('PASS 澄清全链路：理论发言 → 思想层追问 + 思想入库');
+}
+
+// 4) 提问主次（v0.43）：表达层先、内容层次之、规划参数（字数）最后
+{
+  const keys = genreBlueprint('散文').map((f) => f.key);
+  assert(keys[keys.length - 1] === 'targetWords', `字数最后问（实际最后: ${keys[keys.length - 1]}）`);
+  const stanceIdx = keys.indexOf('stance');
+  const themeIdx = keys.indexOf('theme');
+  const matIdx = keys.indexOf('materials');
+  const twIdx = keys.indexOf('targetWords');
+  assert(stanceIdx < matIdx && themeIdx < matIdx && matIdx < twIdx, '表达层→内容层→规划层顺序正确');
+  console.log('PASS 蓝图字段主次：主题/立意 → 素材/论点 → 字数最后');
+}
+
+// 5) need 顺序：topic 已确认 → 先问表达层（stance），而不是字数
+{
+  const state = { confirmed: { topic: '北大红楼' }, materials: [] };
+  assert(missingNeed(state) === 'stance', `表达层先于规划层（实际: ${missingNeed(state)}）`);
+  console.log('PASS 首问表达层而非字数');
+}
+
+// 6) 预算联动：字数确认后按新预算回补素材；字数本身在内容齐后才问
+{
+  const base = {
+    confirmed: {
+      topic: '教育变革',
+      stance: '想表达能力培养比知识灌输重要',
+      theme: '教育要转向能力',
+      styleSample: true,
+    },
+    materials: [],
+  };
+  const needBeforeWords = missingNeed(base);
+  assert(needBeforeWords === 'materials', `字数未确认时先补素材（实际: ${needBeforeWords}）`);
+  const withWords = {
+    ...base,
+    confirmed: { ...base.confirmed, targetWords: 3000 },
+    materials: ['芬兰教育', '可汗学院'],
+  };
+  assert(missingNeed(withWords) === 'materials', '字数 3000 后按新预算回补素材');
+  const full = {
+    ...base,
+    confirmed: { ...base.confirmed, audience: '家长', emotionalCurve: '先疑再信', endingTaste: '心安' },
+    materials: Array.from({ length: 10 }, (_, i) => `素材${i}`),
+    arguments: ['论点一', '论点二'],
+  };
+  assert(missingNeed(full) === 'targetWords', `内容齐了才问字数（实际: ${missingNeed(full) || '（无缺口）'}）`);
+  console.log('PASS 预算联动：字数最后问，确认后自动回补素材');
 }
 
 console.log('\n✓ thinking.test.mjs 全部通过');
