@@ -278,6 +278,29 @@ export function audit(text, opts = {}) {
     }
   }
 
+  // ── 假思考痕迹（v0.52）：统计层抓不到的姿态层 AI 味 ──────────────
+  // "表演思考" = 用金句排比做形式高潮、用路标式转折假装在推进、用点题式收尾假装想通了。
+  // 这类问题 redteam 单句检查抓不到，但对读者体感伤害最大（《语言匮乏》诊断的"正确语言的堆积"）。
+  const fakeThinking = [];
+  const goldenClosers = all.match(/(，是[\u4e00-\u9fff]{1,10}){2,}[。！？]/g) || [];
+  if (goldenClosers.length >= 1) {
+    fakeThinking.push(
+      `金句排比收束 ${goldenClosers.length} 处（"…，是…，是…，是…"式同义反复，如「${goldenClosers[0].slice(0, 26)}…」）——形式高潮、内容悬空`,
+    );
+  }
+  const signposts =
+    (all.match(/后来我想|然后我就想|但这里头有个悖论|我绕了很久才绕出来|想了很久，|让我重新想/g) || [])
+      .length;
+  if (signposts >= 3) {
+    fakeThinking.push(`路标式转折 ${signposts} 次（"后来我想/但这里头有个悖论"——作者在走流程，不在思考）`);
+  }
+  const epiphanies = (all.match(/我终于明白|原来[^。！？]{0,14}才是|其实[^。！？]{0,10}就是/g) || []).length;
+  if (epiphanies >= 2) {
+    fakeThinking.push(`点题式顿悟 ${epiphanies} 处（"我终于明白/原来…才是"——思考被提前宣告完成）`);
+  }
+  report.fakeThinking = fakeThinking;
+  for (const s of fakeThinking) structural.push(s);
+
   report.structuralSignals = structural;
   for (const s of structural.slice(0, 5)) report.suggestions.push(s);
 
