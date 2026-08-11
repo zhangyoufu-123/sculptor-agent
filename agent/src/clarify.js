@@ -10,6 +10,7 @@ import {
   applyStyleDirection,
   styleProgress,
   extractStyleFromSamples,
+  recordImplicitSignals,
 } from './style.js';
 import { pulseAfterClarify, pushPulseToState } from './style-pulse.js';
 import { refreshStyleVector } from './style-vector.js';
@@ -921,6 +922,10 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
         `被动采集到风格信号 ${style.writeUpdated} 维（write）+ ${style.readUpdated} 维（read）`,
       );
     }
+    // 隐式风格信号流水：每轮留一份可回看的记录（style-signals.jsonl/md），压缩也不丢。
+    try {
+      recordImplicitSignals(workspace, lastInput);
+    } catch {}
     // 四层复合风格向量：澄清每轮实时刷新（连续向量 EMA + 动态维度 + 困惑度签名）
     await refreshStyleVector(cfg, workspace, { text: lastInput, kind: 'clarify', evidence: '澄清回答' });
     clarifyPulse = pulseAfterClarify(workspace, lastInput);

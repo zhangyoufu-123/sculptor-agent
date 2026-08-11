@@ -606,6 +606,24 @@ async function renderReport() {
       const mark = rt.verdict === 'pass' ? '✓ 信息完整' : '⚠ 需要修订';
       rtHtml = `<div class="ctx-line">交付时已自动回译校验：${mark}（保留 ${rt.kept || 0} · 丢失 ${rt.lost || 0} · 漂移 ${rt.drifted || 0}）</div>`;
     }
+    let curveHtml = '';
+    try {
+      const cv = await apiGet(`/api/curve?sessionId=${sessionId}`);
+      if (cv.sections?.length) {
+        const bar = (v) => '▁▂▃▄▅▆▇█'[Math.min(7, Math.floor(Math.max(0, v || 0) / 12.5))];
+        const rows = cv.sections
+          .map(
+            (s) =>
+              `<div class="curve-row"><div class="curve-label">${esc(s.section)}</div><div class="curve-bars">` +
+              `<span class="bar">张力 ${s.tension} ${bar(s.tension)}</span>` +
+              `<span class="bar">密度 ${s.density} ${bar(s.density)}</span>` +
+              `<span class="bar">情绪 ${s.emotion} ${bar(s.emotion)}</span>` +
+              `<span class="bar">节奏 ${s.pacing} ${bar(s.pacing)}</span></div></div>`,
+          )
+          .join('');
+        curveHtml = `<div class="report-list"><h3>节奏曲线（张力 / 密度 / 情绪 / 节奏）</h3>${rows}<div class="ctx-line" style="margin-top:6px">分值 0–100，供二次编辑参考；CLI 可运行 <code>sculptor curve</code></div></div>`;
+      }
+    } catch {}
     body.innerHTML =
       `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">` +
       metric('句长标准差', m.sentenceLengthStddev ?? '—', '真人参考 ≥ 8', m.sentenceLengthStddev >= 8 ? 'ok' : 'warn') +
@@ -615,6 +633,7 @@ async function renderReport() {
       metric('黑名单/重复', `${m.blacklistHits || 0} / ${m.repeatedMetaphors || 0} / ${m.repeatedPatterns || 0}`, '套话 / 重复比喻 / 句式复用') +
       `</div>` +
       `<div class="report-list"><h3>审计结论</h3><ul>${issues || '<li>未发现硬伤（黑名单 0 · 硬失败 0）</li>'}</ul></div>` +
+      curveHtml +
       `<div class="report-list"><h3>内容保真 · 回译校验</h3>${rtHtml}<div id="rtResult"></div>
        <button class="btn btn-gold btn-sm" id="rtRun">运行回译校验（中译英→回译→信息点核对）</button></div>`;
     $('rtRun')?.addEventListener('click', async () => {

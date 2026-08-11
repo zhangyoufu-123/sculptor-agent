@@ -163,6 +163,15 @@ export function renderStyleProfile(workspace) {
     if (assoc.length) lines.push(`- 联想库：${assoc.join('、')}`);
     if (tech.length) lines.push(`- 惯用技巧：${tech.join('、')}`);
   }
+  const signals = implicitSignalLog(workspace, { limit: 8 });
+  if (signals.length) {
+    lines.push('', '## 隐式风格信号（每轮对话被动采集）');
+    for (const s of signals) {
+      lines.push(
+        `- 第 ${s.round} 轮：${s.text}${s.dims.length ? ` → ${s.dims.slice(0, 5).join('、')}` : ''}`,
+      );
+    }
+  }
   return lines.join('\n');
 }
 
@@ -224,6 +233,58 @@ export function extractStyleSignals(text) {
     pushRead('infoDensity', '中短信息块，节奏适中', 0.03, '素材篇幅适中');
   else if (t.length >= 400) pushRead('infoDensity', '长信息块，偏密', 0.03, '素材篇幅较长');
   return out;
+}
+
+// ── 隐式风格信号流水（v0.41，GhostWriter 隐式学习 + EMNLP 2025 结论的工程落地）──
+// 每轮用户发言都轻量采集一次（clarify 每轮已调用 applyStyleSignals），这里再留一份
+// 可回看的流水：vault/style-signals.jsonl（结构化）+ vault/style-signals.md（人类可读），
+// 让"从第一句话起就在读你"这件事对用户可见、可查，也让压缩后风格不会被遗忘。
+export function implicitSignalLog(workspace, { limit = 20 } = {}) {
+  const file = path.join(workspace, 'vault', 'style-signals.jsonl');
+  let lines = [];
+  try {
+    lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).slice(-limit);
+  } catch {
+    return [];
+  }
+  return lines.map((l) => {
+    try {
+      return JSON.parse(l);
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+}
+
+/** 记录一轮隐式风格信号（原文摘录 + 命中维度），并刷新人类可读卡片。 */
+export function recordImplicitSignals(workspace, text, { round = 0 } = {}) {
+  const t = String(text || '').trim();
+  if (!t) return null;
+  const signals = extractStyleSignals(t);
+  const dims = [...Object.keys(signals.write), ...Object.keys(signals.read)];
+  const existing = implicitSignalLog(workspace, { limit: 10000 });
+  const entry = {
+    ts: ws.nowIso(),
+    round: round || existing.length + 1,
+    text: t.slice(0, 120),
+    dims,
+    learned: dims.length,
+  };
+  const file = path.join(workspace, 'vault', 'style-signals.jsonl');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.appendFileSync(file, JSON.stringify(entry) + '\n');
+  // 刷新 md 卡片（最近 20 条）
+  const lines = ['# 隐式风格信号流水', '', '每一轮对话我都从这里读你：措辞、素材、语气、修改理由。', ''];
+  for (const e of implicitSignalLog(workspace, { limit: 20 })) {
+    lines.push(
+      `- 第 ${e.round} 轮 ${(e.ts || '').slice(11, 19)}：${e.text}${e.dims.length ? ` → ${e.dims.slice(0, 6).join('、')}` : '（暂无新维度）'}`,
+    );
+  }
+  lines.push('', '完整结构化记录见 style-signals.jsonl（供风格向量与实验复用）。');
+  try {
+    fs.writeFileSync(path.join(workspace, 'vault', 'style-signals.md'), lines.join('\n') + '\n');
+  } catch {}
+  return entry;
 }
 
 /** 把一段用户话语的风格信号累积进 write/read 风格档案（无 LLM，纯增量）。 */

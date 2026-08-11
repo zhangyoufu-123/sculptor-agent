@@ -47,6 +47,12 @@ const { humanMetrics } = await import(
 const { styleProgress } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'style.js')).href
 );
+const { rhythmCurve } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'style-pulse.js')).href
+);
+const { checkConsistency } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'consistency.js')).href
+);
 const { readVector, vectorSummary } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'style-vector.js')).href
 );
@@ -831,6 +837,24 @@ const server = http.createServer(async (req, res) => {
       });
     } catch {
       return json(res, 200, { metrics: {}, issues: ['（尚无成稿可审计）'], passed: false });
+    }
+  }
+
+  // ── 节奏曲线 / 伏笔回收（v0.41：行业对齐——节奏分析 + 跨章一致性）──
+  if (req.method === 'GET' && p === '/api/curve') {
+    const id = String(url.searchParams.get('sessionId') || '');
+    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    const c = rhythmCurve(sessionDir(id));
+    return json(res, 200, { sections: c.sections, note: c.note || '', file: c.file || '' });
+  }
+  if (req.method === 'GET' && p === '/api/consistency') {
+    const id = String(url.searchParams.get('sessionId') || '');
+    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    try {
+      const r = await checkConsistency(cfg, sessionDir(id));
+      return json(res, 200, r);
+    } catch (e) {
+      return json(res, 200, { score: 100, total: 0, recovered: [], unrecovered: [], note: String(e.message || '校验失败') });
     }
   }
 

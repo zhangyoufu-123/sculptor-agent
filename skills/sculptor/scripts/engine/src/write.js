@@ -24,6 +24,7 @@ import {
 import { simulateCharacter } from './character.js';
 import { academicNarrative, academicStyleNote } from './academic.js';
 import { personaBrief } from './persona.js';
+import { registerClues } from './consistency.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -220,6 +221,24 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
     }
     parts[i] = `## ${section.heading}\n\n${text}\n`;
     const pulse = pulseAfterWrite(workspace, text, { section, index: i + 1, previous: prevPulse });
+    // 伏笔记账（v0.41）：小说/推理每节自动记账，供交付前跨章回收校验（静默，不打扰用户）。
+    let clueNote = '';
+    if (/小说|推理|故事/.test(state.confirmed?.genre || '')) {
+      try {
+        const rc = await registerClues(cfg, workspace, {
+          text,
+          heading: section.heading,
+          sectionIndex: i,
+        });
+        if (rc.added > 0) {
+          state.mystery = state.mystery || {};
+          state.mystery.clues = rc.clues;
+          clueNote = `（伏笔 ${rc.added} 条已记账）`;
+        }
+      } catch {
+        clueNote = '';
+      }
+    }
     await refreshStyleVector(cfg, workspace, { text, kind: 'write', evidence: `第 ${i + 1} 节` });
     prevPulse = pulse;
     pushPulseToState(state, pulse);
@@ -232,6 +251,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       dataRequested,
       pulse: pulse.score,
       pulseNote: pulse.suggestion || '',
+      clueNote,
     });
     state.summary = `正在写第 ${i + 1}/${sections.length} 节：${section.heading}`;
     state.nextStep = i < end ? `继续写第 ${i + 2} 节` : '写完后运行 sculptor redteam';

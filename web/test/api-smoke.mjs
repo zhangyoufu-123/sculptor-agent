@@ -197,6 +197,24 @@ await step('导出（先落一份草稿）', async () => {
   assert(rep.statusCode === 200 && JSON.parse(rep._body()).metrics, '审计报告接口');
 });
 
+await step('节奏曲线与伏笔回收端点（v0.41）', async () => {
+  const cv = JSON.parse((await call(`/api/curve?sessionId=${sid}`))._body());
+  assert(Array.isArray(cv.sections) && cv.sections.length === 2, 'curve 返回按节曲线');
+  assert(
+    cv.sections.every(
+      (s) =>
+        s.tension >= 0 && s.tension <= 100 &&
+        s.emotion >= 0 && s.emotion <= 100 &&
+        s.density >= 0 && s.density <= 100 &&
+        s.pacing >= 0 && s.pacing <= 100,
+    ),
+    '曲线四维分值在 0-100',
+  );
+  const cc = JSON.parse((await call(`/api/consistency?sessionId=${sid}`))._body());
+  assert(typeof cc.score === 'number' && Array.isArray(cc.recovered), 'consistency 返回报告');
+  assert(cc.total === 0 || cc.note.includes('伏笔'), '无伏笔时给出说明');
+});
+
 await step('句子级点改', async () => {
   const pe = await call('/api/point-edit', 'POST', {
     sessionId: sid,

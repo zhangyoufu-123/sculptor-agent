@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-08-11（v0.41：行业调研落地——节奏曲线 + 伏笔回收 + 隐式风格流水）
+
+深度调研同行（马良写作 18 款横评的"六把尺子"、Sudowrite/NovelCrafter 等）与最新论文
+（EMNLP 2025 Findings《Catch Me If You Can? Not Yet》——少量样本模仿个人风格显著失败；
+ACL 2025 StyleVector——激活空间风格向量；GhostWriter——隐式学习 + 显式教学时刻），
+形成 `docs/competition/BEYOND-PLAN.md` 超越方案，并落地差距最大的三项：
+
+- **三线节奏曲线（对标行业"节奏分析"尺子）**：`style-pulse.js` 新增 `rhythmCurve`，
+  按节输出 张力/信息密度/情绪强度/节奏变化 四条 0-100 曲线，落盘 `vault/curve.md`；
+  新 CLI `sculptor curve`、Web `/api/curve`、审计页迷你曲线。
+- **伏笔记账 + 跨章回收校验（对标行业"一致性"尺子）**：新增 `consistency.js`——
+  小说/推理每写一节自动记账伏笔（LLM 提炼，确定性兜底），全文完成后跨章校验回收；
+  新 CLI `sculptor consistency`、Web `/api/consistency`、交付消息带悬空伏笔提示；
+  导演 revise 阶段自动触发，不打断流程。
+- **隐式风格信号流水（对标 GhostWriter + EMNLP 2025 结论）**：`style.js` 新增
+  `recordImplicitSignals`，每轮对话被动采集写 `vault/style-signals.jsonl/md`，
+  压缩不丢风格；`sculptor style --signals` 可回看，风格档案导出包含流水。
+- 测试：新增 `agent/test/consistency.test.mjs`（节奏曲线/伏笔记账去重/跨章回收/悬空标出/
+  隐式信号 15 项断言）；web api-smoke 增加 curve/consistency 端点检查。
+- 版本：agent/web 同步 0.41.0；引擎同步后一并提交。
+
 ## 2026-08-11（v0.40：最终大检查——风格差异验证 + 全问题复核 + 商业化检查）
 
 新增 `web/test/final-qa.mjs`（接入 `web npm test`），并修复最后发现的问题：

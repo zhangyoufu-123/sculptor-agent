@@ -29,6 +29,7 @@ import { evaluateStyleFidelity } from './style-eval.js';
 import { archiveDraft, distillCategory } from './library.js';
 import { exportDocx } from './io.js';
 import { roundtripCheck } from './roundtrip.js';
+import { checkConsistency } from './consistency.js';
 
 const OUTLINE_CONFIRM_RE = /^(对|对的|可以|可以的|没问题|就是这样|好的?|同意|ok|嗯|是|就这样)$/i;
 const OUTLINE_CORRECT_RE =
@@ -299,6 +300,12 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
   // ── 复阅-修订：全文复查一轮，P0（偏题/素材未用/断裂）自动局部修订（静默）──
   if (d.stage === 'revise') {
     const sections = state.outline?.sections || [];
+    // 伏笔回收校验（v0.41）：小说/推理交付前自动检查（LLM 优先、确定性兜底，静默）。
+    if (/小说|推理|故事/.test(state.confirmed?.genre || '')) {
+      try {
+        await checkConsistency(cfg, workspace);
+      } catch {}
+    }
     if (d.reviseRounds >= 1 || sections.length < 3 || !cfg.apiKey) {
       d.stage = 'redteam';
       d.fixAttempts = 0;
@@ -528,6 +535,11 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     const q = state.quality || {};
     const fcVerify = typeof q.factVerify === 'number' ? q.factVerify : 0;
     const prCount = typeof q.proofread === 'number' ? q.proofread : 0;
+    const cq = q.consistency || null;
+    let cqNote = '';
+    if (cq && cq.total > 0 && cq.unrecovered > 0) {
+      cqNote = `⚠ 伏笔回收：${cq.unrecovered}/${cq.total} 条未在后文回收（运行 \`sculptor consistency\` 看清单——可留白设计，也可补一次呼应）。`;
+    }
     const rt = q.roundtrip || null;
     let rtNote = '';
     if (rt && rt.verdict === 'attention') {
@@ -565,7 +577,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       distilled: distilled || '',
       audience: rendered,
       debate: debateRendered,
-      message: `整篇文章已完成：逐节写作（每节风格脉搏已即时反馈）→ 反 AI 审计 → 读者群像 → 交锋。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}${adapterNote}。${docx ? `已导出 ${docx}。` : ''}${refFile ? `已自动生成参考文献草稿 ${refFile}（基于检索回灌来源；运行 \`sculptor citations\` 可校对格式）。` : ''}${prCount ? `⚠ 校对：${prCount} 处提示（错别字/标点，运行 sculptor proofread 看明细）。` : ''}${fcVerify ? `⚠ 事实核查：${fcVerify} 处数字/年代/引文需核对（运行 sculptor fact-check 看明细）。` : ''}${wordsNote}${rtNote}${citeNote ? `\n${citeNote}` : ''}要改某一句用 point-edit，要整体换风格或表达直接说（如"更克制一点"），我会吸收进风格档案并重写。`,
+      message: `整篇文章已完成：逐节写作（每节风格脉搏已即时反馈）→ 反 AI 审计 → 读者群像 → 交锋。${archived ? '已归档进个人写作库' : ''}${distilled ? '，并已蒸馏出「' + archived.category + '」类别的个人写作 skill' : ''}${adapterNote}。${docx ? `已导出 ${docx}。` : ''}${refFile ? `已自动生成参考文献草稿 ${refFile}（基于检索回灌来源；运行 \`sculptor citations\` 可校对格式）。` : ''}${prCount ? `⚠ 校对：${prCount} 处提示（错别字/标点，运行 sculptor proofread 看明细）。` : ''}${fcVerify ? `⚠ 事实核查：${fcVerify} 处数字/年代/引文需核对（运行 sculptor fact-check 看明细）。` : ''}${wordsNote}${rtNote}${cqNote}${citeNote ? `\n${citeNote}` : ''}要改某一句用 point-edit，要整体换风格或表达直接说（如"更克制一点"），我会吸收进风格档案并重写。`,
       next: 'sculptor redteam / sculptor audience / sculptor debate / sculptor fact-check / sculptor roundtrip / sculptor point-edit',
     };
   }

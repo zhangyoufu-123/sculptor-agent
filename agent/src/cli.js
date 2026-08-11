@@ -22,6 +22,7 @@ import { interviewStep, interviewInteractive, interviewSummary } from './intervi
 import { runAudience, renderAudience, runDebate, renderDebate } from './reader-gallery.js';
 import { styleProgress, backfillFromContext, extractStyleFromSamples } from './style.js';
 import { renderStyleProfile } from './style.js';
+import { implicitSignalLog } from './style.js';
 import { buildStyleShot } from './style-memory.js';
 import { restyle } from './restyle.js';
 import { runHook } from './hook.js';
@@ -78,7 +79,9 @@ import {
 } from './style-adapter.js';
 import { factCheck, renderFactCheck } from './fact-check.js';
 import { recentPulses, renderPulse } from './style-pulse.js';
+import { rhythmCurve, renderRhythmCurve } from './style-pulse.js';
 import { vectorSummary, renderVectorSummary, refreshStyleVector } from './style-vector.js';
+import { checkConsistency, renderConsistency } from './consistency.js';
 import { proofread, proofScan, renderProofread } from './proofread.js';
 import { transform, PRESETS } from './transform.js';
 import { listHistory, rollback } from './history.js';
@@ -157,6 +160,9 @@ const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四�
   sculptor style [--memory 查询] [--export] [--backfill] [--extract] [工作区]
                                      风格档案进度；--memory 预览按论题检索到的旧稿与修改对；--export 导出人类可读档案（vault/style-profile.md）；--backfill 回填对话日志；--extract 提取风格底稿
   sculptor style --pulses [工作区]    风格脉搏：查看澄清/大纲/每节写作/修改建议的即时评估记录
+  sculptor style --signals [工作区]   隐式风格信号流水：每轮对话被动采集到的风格证据
+  sculptor curve [--file x.md] [工作区]  节奏曲线：每节 张力/信息密度/情绪强度/节奏变化 → vault/curve.md
+  sculptor consistency [--file x.md] [工作区]  伏笔回收校验：跨章检查已记伏笔是否回收 → vault/consistency.md
   sculptor style-vector [--refresh] [工作区]  四层复合风格向量：连续向量(EMA) + 动态维度 + 困惑度签名 + 偏好对；--refresh 立即从档案重算
   sculptor style-adapter [--distill] [--dataset [out.jsonl]] [--lora] [工作区]
                                      风格持续微调：--distill 蒸馏风格适配卡（最高优先级注入）；--dataset 生成偏好对 JSONL；--lora 提交微调（未配置端点时给出本地 LoRA 指引）
@@ -511,6 +517,22 @@ export async function runCli(argv, io = {}) {
         console.log(renderEmotionCurve(emotionCurve(fs.readFileSync(file, 'utf8'))));
         break;
       }
+      case 'curve': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        const file = flags.file ? path.resolve(String(flags.file)) : '';
+        const c = rhythmCurve(w, { file });
+        console.log(renderRhythmCurve(c));
+        if (c.file) console.log(`\n节奏曲线已落盘 → ${c.file}`);
+        break;
+      }
+      case 'consistency': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, workspace));
+        const file = flags.file ? path.resolve(String(flags.file)) : '';
+        const r = await checkConsistency(cfg, w, { file });
+        console.log(renderConsistency(r));
+        if (r.file) console.log(`\n伏笔回收报告已落盘 → ${r.file}`);
+        break;
+      }
       case 'experiment': {
         const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
         const sub = positional[0] || 'help';
@@ -730,6 +752,21 @@ export async function runCli(argv, io = {}) {
           } else {
             console.log('风格脉搏（最近记录）:');
             for (const p of pulses) console.log(`  · ${renderPulse(p)}`);
+          }
+        }
+        if (flags.signals) {
+          const log = implicitSignalLog(w);
+          if (!log.length) {
+            console.log('（还没有隐式风格信号流水：澄清每轮对话会自动记录）');
+          } else {
+            console.log('隐式风格信号流水（每轮对话被动采集）:');
+            for (const s of log) {
+              console.log(
+                `  · 第 ${s.round} 轮 ${(s.ts || '').slice(11, 19)}：${s.text}${
+                  s.dims?.length ? ` → ${s.dims.slice(0, 5).join('、')}` : ''
+                }`,
+              );
+            }
           }
         }
         if (flags.export) {

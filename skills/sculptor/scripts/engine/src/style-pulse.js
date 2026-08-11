@@ -8,6 +8,7 @@ import path from 'node:path';
 import * as ws from './workspace.js';
 import { extractStyleSignals } from './style.js';
 import { audit } from './redteam.js';
+import { emotionCurve } from './revise.js';
 
 const PULSES_FILE = 'style-pulses.jsonl';
 
@@ -186,6 +187,117 @@ export function recentPulses(workspace, { limit = 8 } = {}) {
     // 落到 jsonl 兜底
   }
   return pulsesFromJsonl(workspace, limit);
+}
+
+// ── 三线节奏曲线（v0.41，对标行业"节奏分析"尺子）──────────────────
+// 把成稿按节切成块，每节输出 张力/信息密度/情绪强度/节奏变化 四条 0-100 曲线，
+// 落盘 vault/curve.md。作者像看心电图一样判断哪里太平、哪里该提情绪，
+// 供二次编辑与答辩演示。确定性实现（零 LLM），情绪强度复用 revise.js 的情绪曲线。
+const TENSION_LEXICON = [
+  '突然', '猛地', '颤抖', '屏住', '危险', '逼近', '倒吸', '脚步声', '停住',
+  '推开', '握紧', '回头', '没想到', '竟然', '隐隐', '不祥', '预感', '难道',
+  '究竟', '却', '但是', '然而', '再也',
+];
+const DENSITY_MARKERS = /[0-9０-９]|《[^》]+》|"[^"]*"|“[^”]*”|公元|世纪|年代|据统计|数据显示|万|亿|％|%/;
+
+function sectionBlocks(text) {
+  return String(text || '')
+    .split(/\n(?=## )/)
+    .map((b) => {
+      const heading = (b.match(/^##\s+(.+)$/m) || [])[1]?.trim() || '（正文）';
+      return { heading, body: b.replace(/^##\s+.+$/m, '') };
+    });
+}
+
+// markdown 文档标题（# 开头且没有正文）不算"节"，节奏曲线里跳过
+function isTitleOnly(b) {
+  const lines = String(b.body || '').trim().split('\n');
+  return lines.length === 1 && /^#\s+/.test(lines[0]);
+}
+
+const clamp100 = (v) => Math.max(0, Math.min(100, Math.round(v)));
+
+/**
+ * 节奏曲线：按节计算 张力/信息密度/情绪强度/节奏变化，写 vault/curve.md。
+ * 参数 file 可指向任意 markdown（如 redteam --file 的用法）。
+ */
+export function rhythmCurve(workspace, { file } = {}) {
+  let text = '';
+  try {
+    text = fs.readFileSync(file || path.join(workspace, 'draft.md'), 'utf8');
+  } catch {
+    return { sections: [], file: '', note: '（还没有成稿，先运行 sculptor write）' };
+  }
+  const sections = sectionBlocks(text).filter((b) => !isTitleOnly(b)).map((b) => {
+    const sents = b.body
+      .split(/[。！？.!?]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    const lens = sents.map((s) => [...s].length);
+    const avg = lens.reduce((a, x) => a + x, 0) / Math.max(1, lens.length);
+    const std = Math.sqrt(
+      lens.reduce((a, x) => a + (x - avg) ** 2, 0) / Math.max(1, lens.length),
+    );
+    const shortRatio =
+      sents.filter((s) => [...s].length <= 8).length / Math.max(1, sents.length);
+    const tensionHits = TENSION_LEXICON.reduce(
+      (n, w) => n + (b.body.match(new RegExp(w, 'g')) || []).length,
+      0,
+    );
+    const punctHits = (b.body.match(/[！？!?]/g) || []).length;
+    const per200 = tensionHits / Math.max(1, b.body.length / 200);
+    const tension = clamp100(18 + per200 * 22 + shortRatio * 30 + punctHits * 2);
+    // 信息密度：去重二元组占比（词汇丰富度）+ 具体性标记（数字/引文/专名/统计词）
+    const grams = (b.body.match(/[\u4e00-\u9fff]{2}/g) || []);
+    const uniqueRatio = new Set(grams).size / Math.max(1, grams.length);
+    const specHits = (b.body.match(DENSITY_MARKERS) || []).length;
+    const density = clamp100(30 + uniqueRatio * 45 + Math.min(25, specHits * 2.5));
+    const emotion = Math.round(((emotionCurve(b.body)[0] || {}).intensity || 0) * 100);
+    const pacing = clamp100(25 + std * 5.5);
+    return {
+      section: b.heading,
+      tension,
+      density,
+      emotion,
+      pacing,
+      sentences: sents.length,
+      chars: [...b.body].length,
+      avgSent: Math.round(avg * 10) / 10,
+    };
+  });
+  const out = { sections, note: '' };
+  const filePath = path.join(workspace, 'vault', 'curve.md');
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, renderRhythmCurve(out) + '\n');
+    out.file = filePath;
+  } catch {
+    out.file = '';
+  }
+  return out;
+}
+
+/** 节奏曲线人类可读渲染（ASCII 条形）。 */
+export function renderRhythmCurve(curve) {
+  const secs = curve?.sections || [];
+  if (!secs.length) return curve?.note || '（还没有成稿）';
+  const bar = (v) => '▁▂▃▄▅▆▇█'[Math.min(7, Math.floor(Math.max(0, v) / 12.5))];
+  const lines = [
+    '# 节奏曲线（张力 / 信息密度 / 情绪强度 / 节奏变化）',
+    '',
+    '分值范围 0–100。节奏曲线是给作者看的二次编辑参考，不是硬指标。',
+    '',
+  ];
+  for (const s of secs) {
+    lines.push(`## ${s.section}`);
+    lines.push(`  张力 ${String(s.tension).padStart(3)} ${bar(s.tension)}`);
+    lines.push(`  密度 ${String(s.density).padStart(3)} ${bar(s.density)}`);
+    lines.push(`  情绪 ${String(s.emotion).padStart(3)} ${bar(s.emotion)}`);
+    lines.push(
+      `  节奏 ${String(s.pacing).padStart(3)} ${bar(s.pacing)}（句长均值 ${s.avgSent}，${s.sentences} 句 · ${s.chars} 字）`,
+    );
+  }
+  return lines.join('\n');
 }
 
 // ── 用户修改建议 = 评估反馈 ──────────────────────────────
