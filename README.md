@@ -129,8 +129,8 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/
 ## 仓库结构
 
 本仓库只保留产品本体：`agent/`（核心引擎）、`skills/`（可安装技能）、`web/`（写作工作台）、
-`scripts/`（实验与工具）、`install.sh`、`README.md`。比赛论文、过程档案等材料不提交到本仓库
-（见 `.gitignore` 的 `docs/competition|legacy|experiments`）。
+`scripts/`（实验与工具）、`install.sh`、`README.md`；论文本体与支撑报告随版本提交在
+`docs/competition/`，比赛过程档案与个人分析材料不提交（见 `.gitignore`）。
 - [Web 人机交互规划](docs/UX-PLAN.md)
 - [Web 接口自检报告](docs/WEB-API-AUDIT.md)
 - [Web 演示版部署指南](docs/DEPLOY.md)
