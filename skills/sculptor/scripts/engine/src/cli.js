@@ -86,6 +86,7 @@ import { checkConsistency, renderConsistency } from './consistency.js';
 import { diagnoseFakeThinking, renderFakeThinking } from './fake-thinking.js';
 import { proofread, proofScan, renderProofread } from './proofread.js';
 import { academicNorm, renderNormReport } from './academic-norm.js';
+import { docTranslate, docRestyle, renderDocReport } from './doc-pipeline.js';
 import { transform, PRESETS } from './transform.js';
 import { listHistory, rollback } from './history.js';
 import { exportProfile, importProfile, profileStatus } from './profile.js';
@@ -158,6 +159,10 @@ const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四�
   sculptor fact-check [--file x.md] [工作区]  事实核查：数字/年代/引文/人名/机构 → material/common/verify 分级
   sculptor proofread [--file x.md] [工作区]   校对纠错：错别字/叠字/标点（确定性）+ 语病（LLM，可选）
   sculptor norm [--file x.md] [工作区]   学术规范审计：标点混用/口语化/摘要长度/引用顺序/关键词（确定性 + LLM 深审，只报告不改稿）
+  sculptor doc translate <文件> [--lang en] [--out out] [工作区]
+                                     文档翻译：docx/md/txt → 原意解读 + 结构保留翻译 → md/docx/html 导出（附回译校验）
+  sculptor doc restyle <文件> [--style 旧稿|方向] [--out out] [工作区]
+                                     文档风格重写：把成品文档按作者风格重写 → md/docx/html 导出
   sculptor quote "<原句>"             生成可粘贴的「Sculptor 引用」块
   sculptor hook <工作区> [payload]    宿主生命周期钩子 → 观察日志 + 压缩守卫
   sculptor checklist <工作区>         渲染需求访谈确认清单（不消耗 LLM）
@@ -404,6 +409,18 @@ export async function runCli(argv, io = {}) {
         const r = await academicNorm(cfg, w, { file, genre: state?.confirmed?.genre || '' });
         console.log(renderNormReport(r));
         console.log(`\n学术规范审计报告已落盘 → ${path.join(w, 'vault', 'norm-report.md')}`);
+        break;
+      }
+      case 'doc': {
+        const sub = positional[0] || '';
+        const file = positional[1] || flags.file || '';
+        if (!file) throw new Error('用法: sculptor doc translate|restyle <文件> [--lang en] [--style x] [--out out]');
+        const w = ws.resolveWorkspace(cfg, flags.workspace || process.cwd());
+        const opts = { file, lang: flags.lang || 'en', style: flags.style || '', out: flags.out || '' };
+        const r = sub === 'translate' ? await docTranslate(cfg, w, opts)
+          : sub === 'restyle' ? await docRestyle(cfg, w, opts)
+          : (() => { throw new Error(`未知文档子命令: ${sub}（支持 translate / restyle）`); })();
+        console.log(renderDocReport(r));
         break;
       }
       case 'originality': {

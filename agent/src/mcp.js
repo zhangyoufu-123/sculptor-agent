@@ -29,6 +29,7 @@ import {
 } from './style-adapter.js';
 import { factCheck, renderFactCheck } from './fact-check.js';
 import { proofread, renderProofread } from './proofread.js';
+import { docTranslate, docRestyle, renderDocReport } from './doc-pipeline.js';
 import { transform, PRESETS } from './transform.js';
 import { listHistory, rollback, snapshot } from './history.js';
 import { exportProfile, importProfile, profileStatus } from './profile.js';
@@ -356,6 +357,34 @@ const TOOLS = [
     },
   },
   {
+    name: 'doc_translate',
+    description: '文档翻译：docx/md/txt → 原意解读 + 结构保留翻译 → md/docx/html 导出（附回译校验）',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', description: '输入文档路径（docx/md/txt/xlsx）' },
+        lang: { type: 'string', description: '目标语言，默认 en' },
+        out: { type: 'string', description: '输出路径（不含扩展名或 .md/.docx）' },
+        workspace: { type: 'string' },
+      },
+      required: ['file'],
+    },
+  },
+  {
+    name: 'doc_restyle',
+    description: '文档风格重写：把成品文档按作者风格（旧稿/方向/工作区档案）重写并导出 md/docx/html',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', description: '输入文档路径' },
+        style: { type: 'string', description: '风格来源：文件路径或方向描述；缺省用工作区风格档案' },
+        out: { type: 'string' },
+        workspace: { type: 'string' },
+      },
+      required: ['file'],
+    },
+  },
+  {
     name: 'style_eval',
     description:
       '风格保真评估：对照作者本人的旧稿样本/亲手修改对打分，输出"像不像作者本人"的分数、最像/最不像的句子与可执行修订建议；LLM 失败时确定性统计兜底。',
@@ -495,6 +524,24 @@ async function callTool(name, args, cfg) {
       const w = wsDir(args, cfg);
       const r = await proofread(cfg, w, { file: args.file || null });
       return { text: renderProofread(r) };
+    }
+    case 'doc_translate': {
+      const w = wsDir(args, cfg);
+      const r = await docTranslate(cfg, w, {
+        file: args.file,
+        lang: args.lang || 'en',
+        out: args.out || '',
+      });
+      return { text: renderDocReport(r) };
+    }
+    case 'doc_restyle': {
+      const w = wsDir(args, cfg);
+      const r = await docRestyle(cfg, w, {
+        file: args.file,
+        style: args.style || '',
+        out: args.out || '',
+      });
+      return { text: renderDocReport(r) };
     }
     case 'transform': {
       const w = wsDir(args, cfg);

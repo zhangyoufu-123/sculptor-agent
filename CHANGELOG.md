@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-08-12（v0.56：文档互通管线——全流程"文件进、文件出"，与其他产品衔接）
+
+调研行业最佳实践（Pandoc DOCX↔Markdown 往返、MCP 文档工具生态、MinerU/Docling 高保真解析）后落地：
+
+- **新增 `agent/src/doc-pipeline.js`**：以 Markdown 为规范中间表示（canonical IR）。
+  - `docTranslate`：docx/md/txt → 原意解读（intent/tone/genre/keyImagery/pitfalls）→ 结构保留翻译
+    → md/docx/html 导出 + 回译校验；
+  - `docRestyle`：成品文档按作者风格重写（style 支持旧稿文件/方向描述/工作区档案），结构保留导出；
+  - 无密钥确定性兜底：导出原文 md 并提示。
+- **CLI**：`sculptor doc translate|restyle <文件> [--lang] [--style] [--out]`；
+- **MCP**：新增 `doc_translate` / `doc_restyle` 工具，任何 MCP 客户端可调用；
+- **文档**：docs/INTEROP.md——设计原则、导出矩阵、与 Word/Pandoc/其他 Agent 的衔接方式、批量处理；
+- 测试：doc-pipeline.test.mjs 3 组（翻译结构保留+回译、重写结构保留、无密钥兜底）；
+  agent 套件由 20 套增至 21 套。
+
 ## 2026-08-12（v0.55：学术规范审计——把"格式/语言专项评审"标准做进 Sculptor）
 
 模拟大赛评审给出的"语法、语句、格式与学术规范"专项意见，直接固化为系统能力，

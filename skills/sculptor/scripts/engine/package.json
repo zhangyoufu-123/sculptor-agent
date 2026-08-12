@@ -1,6 +1,6 @@
 {
   "name": "sculptor-agent",
-  "version": "0.55.0",
+  "version": "0.56.0",
   "description": "Sculptor complete agent: standalone writing workflow CLI + point-edit + MCP server for host agents (Codex/Claude Code/OpenCode)",
   "type": "module",
   "bin": {
@@ -22,7 +22,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node test/knowledge.test.mjs && node test/rag.test.mjs && node test/asset-academic-character.test.mjs && node test/persona-rag.test.mjs && node test/v23.test.mjs && node test/consistency.test.mjs && node test/thinking.test.mjs && node test/pointedit.test.mjs && node test/completion-guard.test.mjs && node test/fake-thinking.test.mjs && node test/academic-norm.test.mjs && node test/experiment.test.mjs && node test/intent-lowwill.test.mjs && node test/guide.test.mjs && node test/explicit-search.test.mjs && node test/live-outline.test.mjs && node test/roundtrip.test.mjs && node test/e2e.mjs"
+    "test": "node test/knowledge.test.mjs && node test/rag.test.mjs && node test/asset-academic-character.test.mjs && node test/persona-rag.test.mjs && node test/v23.test.mjs && node test/consistency.test.mjs && node test/thinking.test.mjs && node test/pointedit.test.mjs && node test/completion-guard.test.mjs && node test/fake-thinking.test.mjs && node test/academic-norm.test.mjs && node test/doc-pipeline.test.mjs && node test/experiment.test.mjs && node test/intent-lowwill.test.mjs && node test/guide.test.mjs && node test/explicit-search.test.mjs && node test/live-outline.test.mjs && node test/roundtrip.test.mjs && node test/e2e.mjs"
   },
   "license": "MIT",
   "keywords": [

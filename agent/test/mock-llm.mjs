@@ -165,6 +165,25 @@ const DISSECT = {
 
 export function respond(messages) {
   const userMsg = (messages || []).map((m) => m.content || '').join('\n');
+  if (userMsg.includes('文档翻译官')) {
+    return JSON.stringify({
+      interpretation: {
+        intent: '保留原文信息与结构',
+        tone: '客观',
+        genre: '说明',
+        keyImagery: [],
+        pitfalls: ['专名'],
+      },
+      translated:
+        '# Title\n\nThis is a translated paragraph.\n\n- item one\n- item two\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n',
+    });
+  }
+  if (userMsg.includes('写作风格执行器')) {
+    return JSON.stringify({
+      summary: '改为短句、具体细节的克制写法',
+      rewritten: '# Title\n\n旧石阶。风从门里出来。\n\n- 细节一\n- 细节二\n',
+    });
+  }
   if (userMsg.includes('学术规范评审员')) {
     return JSON.stringify({
       score: 88,
