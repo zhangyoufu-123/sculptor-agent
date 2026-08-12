@@ -165,6 +165,12 @@ const DISSECT = {
 
 export function respond(messages) {
   const userMsg = (messages || []).map((m) => m.content || '').join('\n');
+  if (/\[\[[A-Z]\d+(?:_[A-Z]\d+)*\]\]/.test(userMsg)) {
+    // 块级 docx 翻译/重写：按 [[ID]] 标记逐块返回，前缀标记模式（EN=翻译 / RS=重写）
+    const prefix = userMsg.includes('写作风格执行器') ? 'RS:' : 'EN:';
+    const ids = [...userMsg.matchAll(/\[\[([A-Z]\d+(?:_[A-Z]\d+)*)\]\]\n([^\n]+)/g)].map((m) => ({ id: m[1], text: m[2] }));
+    return JSON.stringify({ blocks: ids.map((b) => ({ id: b.id, text: `${prefix}${b.text}` })) });
+  }
   if (userMsg.includes('文档翻译官')) {
     return JSON.stringify({
       interpretation: {

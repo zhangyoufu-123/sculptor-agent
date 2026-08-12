@@ -11,9 +11,12 @@
   - 无密钥确定性兜底：导出原文 md 并提示。
 - **CLI**：`sculptor doc translate|restyle <文件> [--lang] [--style] [--out]`；
 - **MCP**：新增 `doc_translate` / `doc_restyle` 工具，任何 MCP 客户端可调用；
+- **run 级格式保留（v0.56 追加）**：`.docx` 输入走 `scripts/io/docx_blocks.py` 块级管线——按文档顺序
+  提取段落/表格单元格（P0、T0_R0_C0_P0）→ LLM 逐块翻译/重写（块数与 ID 一一对应、失败块单块重试、
+  仍失败保留原文）→ python-docx 写回原段落首个 run（保留字体/加粗），段落样式与表格结构原样保留；
 - **文档**：docs/INTEROP.md——设计原则、导出矩阵、与 Word/Pandoc/其他 Agent 的衔接方式、批量处理；
-- 测试：doc-pipeline.test.mjs 3 组（翻译结构保留+回译、重写结构保留、无密钥兜底）；
-  agent 套件由 20 套增至 21 套。
+- 测试：doc-pipeline.test.mjs 5 组（md 翻译/重写/兜底 + **docx 块级翻译与重写的 run 级格式保留实测**）；
+  agent 套件 21 套全绿。
 
 ## 2026-08-12（v0.55：学术规范审计——把"格式/语言专项评审"标准做进 Sculptor）
 
