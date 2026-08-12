@@ -177,6 +177,11 @@ def set_font(run_, cn='宋体', en='Times New Roman', size=12, bold=False):
     run_._element.rPr.rFonts.set(qn('w:eastAsia'), cn)
 
 
+def clean_inline(s):
+    """剥离 markdown 行内标记（** 加粗、` 行内代码），docx 直接渲染为文本。"""
+    return str(s).replace('**', '').replace('`', '')
+
+
 def para(text, cn='宋体', size=12, bold=False, align=None, indent=True, space=1.5):
     p = doc.add_paragraph()
     if align is not None:
@@ -186,7 +191,7 @@ def para(text, cn='宋体', size=12, bold=False, align=None, indent=True, space=
         pf.first_line_indent = Pt(size * 2)
     pf.line_spacing = space
     pf.space_after = Pt(4)
-    r = p.add_run(text)
+    r = p.add_run(clean_inline(text))
     set_font(r, cn=cn, size=size, bold=bold)
     return p
 
@@ -320,20 +325,20 @@ while i < len(lines):
         p = doc.add_paragraph()
         p.paragraph_format.space_after = Pt(4)
         p.paragraph_format.line_spacing = 1.3
-        r = p.add_run(line[2:].strip())
+        r = p.add_run(clean_inline(line[2:].strip()))
         set_font(r, size=12)
     elif line.startswith('**关键词**'):
         p = doc.add_paragraph()
         p.paragraph_format.line_spacing = 1.5
         p.paragraph_format.space_after = Pt(8)
-        r = p.add_run(line.strip())
+        r = p.add_run(clean_inline(line.strip()))
         set_font(r, size=12, bold=True)
     elif re.match(r'^[-*] ', line):
         p = doc.add_paragraph()
         p.paragraph_format.line_spacing = 1.4
         p.paragraph_format.space_after = Pt(3)
         p.paragraph_format.left_indent = Pt(18)
-        r = p.add_run(line[2:].strip())
+        r = p.add_run(clean_inline(line[2:].strip()))
         set_font(r, size=12)
     else:
         para(line.strip())

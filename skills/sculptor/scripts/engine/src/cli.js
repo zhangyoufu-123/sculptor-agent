@@ -85,6 +85,7 @@ import { vectorSummary, renderVectorSummary, refreshStyleVector } from './style-
 import { checkConsistency, renderConsistency } from './consistency.js';
 import { diagnoseFakeThinking, renderFakeThinking } from './fake-thinking.js';
 import { proofread, proofScan, renderProofread } from './proofread.js';
+import { academicNorm, renderNormReport } from './academic-norm.js';
 import { transform, PRESETS } from './transform.js';
 import { listHistory, rollback } from './history.js';
 import { exportProfile, importProfile, profileStatus } from './profile.js';
@@ -156,6 +157,7 @@ const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四�
   sculptor dissect [--file x.md] [工作区]  感性解剖 5 维度
   sculptor fact-check [--file x.md] [工作区]  事实核查：数字/年代/引文/人名/机构 → material/common/verify 分级
   sculptor proofread [--file x.md] [工作区]   校对纠错：错别字/叠字/标点（确定性）+ 语病（LLM，可选）
+  sculptor norm [--file x.md] [工作区]   学术规范审计：标点混用/口语化/摘要长度/引用顺序/关键词（确定性 + LLM 深审，只报告不改稿）
   sculptor quote "<原句>"             生成可粘贴的「Sculptor 引用」块
   sculptor hook <工作区> [payload]    宿主生命周期钩子 → 观察日志 + 压缩守卫
   sculptor checklist <工作区>         渲染需求访谈确认清单（不消耗 LLM）
@@ -392,6 +394,16 @@ export async function runCli(argv, io = {}) {
         const w = ws.resolveWorkspace(cfg, workspace);
         const r = await proofread(cfg, w, { file: flags.file || null });
         console.log(renderProofread(r));
+        break;
+      }
+      case 'norm': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, workspace));
+        const file = flags.file ? path.resolve(String(flags.file)) : path.join(w, 'draft.md');
+        if (!fs.existsSync(file)) throw new Error(`找不到文稿: ${file}`);
+        const state = ws.readState(w);
+        const r = await academicNorm(cfg, w, { file, genre: state?.confirmed?.genre || '' });
+        console.log(renderNormReport(r));
+        console.log(`\n学术规范审计报告已落盘 → ${path.join(w, 'vault', 'norm-report.md')}`);
         break;
       }
       case 'originality': {

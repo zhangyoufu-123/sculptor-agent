@@ -165,6 +165,16 @@ const DISSECT = {
 
 export function respond(messages) {
   const userMsg = (messages || []).map((m) => m.content || '').join('\n');
+  if (userMsg.includes('学术规范评审员')) {
+    return JSON.stringify({
+      score: 88,
+      issues: [
+        { type: 'language', severity: 'mid', evidence: '收走', issue: '正式文体中的口语化表达', suggestion: '改为「提取」' },
+        { type: 'format', severity: 'high', evidence: '[4] 之后出现 [2]', issue: '引用编号顺序错误', suggestion: '按首次出现顺序重排' },
+      ],
+      summary: '整体规范，存在少量语言与引用顺序问题。',
+    });
+  }
   if (userMsg.includes('追问设计师')) {
     // 思想层优先（v0.43）：用户本轮抛出理论/因果推理时，返回"向下挖一层"的追问，
     // 验证思想脉络机制（主张复述 → 一步概括 → 追问根源），不干扰普通澄清序列。

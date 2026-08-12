@@ -19,6 +19,7 @@ import { refreshStyleVector } from './style-vector.js';
 import { distillStyleAdapter, adapterStale } from './style-adapter.js';
 import { factScan } from './fact-check.js';
 import { proofScan } from './proofread.js';
+import { normScan, academicNorm } from './academic-norm.js';
 import { originalityScan } from './originality.js';
 import { buildSearchQueries, requestHostSearch, autoReferences } from './rag.js';
 import { buildPersona, personaToVector } from './persona.js';
@@ -464,6 +465,33 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     }
     state.quality.originality = ori;
     state.quality.proofread = pr.items.length;
+    // 学术规范审计（v0.55）：标点混用/口语化/摘要长度/引用顺序/关键词，静默记录；
+    // 学术文体且配置密钥时触发 LLM 深审，只报告不改稿，绝不阻塞交付。
+    state.quality.norm = { skipped: false };
+    try {
+      const genre = String(state.confirmed?.genre || '');
+      const det = normScan(draftText, genre).items;
+      state.quality.norm = {
+        issues: det.length,
+        high: det.filter((i) => i.severity === 'high').length,
+        hint: det.length
+          ? `学术规范审计发现 ${det.length} 处疑点（高优先级 ${det.filter((i) => i.severity === 'high').length} 处）；运行 sculptor norm 查看详情`
+          : '',
+      };
+      if (cfg.apiKey && /学术论文|论文|报告|公文|申报/.test(genre)) {
+        try {
+          const full = await academicNorm(cfg, workspace, { text: draftText, genre });
+          state.quality.norm.issues = full.items.length;
+          state.quality.norm.high = full.items.filter((i) => i.severity === 'high').length;
+          state.quality.norm.score = full.score;
+          state.quality.norm.hint = full.items.length
+            ? `学术规范审计（LLM 深审）发现 ${full.items.length} 处疑点；运行 sculptor norm 查看详情`
+            : '';
+        } catch {}
+      }
+    } catch {
+      state.quality.norm = { skipped: true, reason: '学术规范审计失败（静默跳过）' };
+    }
     state.quality.factVerify = fc.items.filter((i) => i.supported === 'verify').length;
     state.quality.ts = ws.nowIso();
     const queries = buildSearchQueries(draftText, {
