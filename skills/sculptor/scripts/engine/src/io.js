@@ -43,6 +43,49 @@ export function pythonAvailable() {
   }
 }
 
+/** 长文本分割（v0.60）：优先按 Markdown 标题切分，超长部分再按 6000 字切块。
+ *  用于"作品导入分片 / 长文档分段审计 / 分段导出"等全流程互操作场景。 */
+export function splitLongText(text, { maxChars = 6000 } = {}) {
+  const t = String(text || '');
+  if (!t.trim()) return [];
+  if (t.length <= maxChars) return [{ heading: '', text: t.trim() }];
+  const lines = t.split('\n');
+  const parts = [];
+  let cur = [];
+  let curHead = '';
+  const flush = () => {
+    const body = cur.join('\n').trim();
+    if (body) parts.push({ heading: curHead, text: body });
+    cur = [];
+  };
+  for (const ln of lines) {
+    if (/^#{1,3}\s+/.test(ln)) {
+      flush();
+      curHead = String(ln.replace(/^#{1,3}\s+/, '').trim());
+      cur.push(ln);
+    } else {
+      cur.push(ln);
+      if (cur.join('\n').length >= maxChars) flush();
+    }
+  }
+  flush();
+  const out = [];
+  for (const p of parts) {
+    if (p.text.length <= maxChars) {
+      out.push(p);
+      continue;
+    }
+    const chunks = String(p.text).match(new RegExp(`[\\s\\S]{1,${maxChars}}`, 'g')) || [];
+    chunks.forEach((c, i) => {
+      out.push({
+        heading: p.heading ? `${p.heading}（${i + 1}/${chunks.length}）` : `第 ${out.length + 1} 部分`,
+        text: c.trim(),
+      });
+    });
+  }
+  return out;
+}
+
 export function docxAvailable() {
   try {
     runPy(['-c', 'import docx; print(1)']);

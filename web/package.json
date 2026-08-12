@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.mjs",
     "mock": "SCULPTOR_MOCK_LLM=1 node server.mjs",
-    "test": "node test/api-smoke.mjs && node test/tools-qa.mjs && node test/context-qa.mjs && node test/fullflow-qa.mjs && node test/persona-qa.mjs && node test/redteam-qa.mjs && node test/deep-qa.mjs && node test/final-qa.mjs && node test/longform-qa.mjs"
+    "test": "node test/api-smoke.mjs && node test/tools-qa.mjs && node test/context-qa.mjs && node test/fullflow-qa.mjs && node test/persona-qa.mjs && node test/redteam-qa.mjs && node test/deep-qa.mjs && node test/final-qa.mjs && node test/longform-qa.mjs && node test/works-qa.mjs"
   },
   "engines": { "node": ">=18" }
 }

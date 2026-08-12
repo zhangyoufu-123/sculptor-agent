@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-08-12（v0.60 作品同步 / 分割 / 全流程互操作）
+
+用户要求：作品同步、分割、以及全流程与其他流程的接入，必须解决。
+
+- **作品导入与分片**：/api/works/import 支持 text/文件，长文按 Markdown 标题 +
+  6000 字自动分片入库；Web 作品页新增"导入作品"；
+- **作品同步与管理**：/api/works/sync 一键归档各会话最新草稿；/api/work
+  （改名/分类）+ DELETE（删除）；外部 Word/其他 Agent 作品可进入同一作品库，
+  继续对比/审计/导出；
+- **成品文档接续**：/api/import-draft 把成品 md/docx 导入会话成草稿，
+  立即可 审计/导出/风格重写/继续写作；Web 作品卡"继续"一键完成；
+- **长文档分段审计**：学术规范审计按标题/6000 字分片逐段 LLM 审阅、合并去重，
+  不再截断漏检后半部分；
+- **按阶段导出**：/api/export 新增 what=draft|outline|report|style|knowledge，
+  每个环节都能"文件出"（md/docx/pptx）；
+- 底层：agent/src/io.js 新增 splitLongText；library.js 新增 importWork；
+- 回归：web 10 套（新增 works-qa：导入分片/同步/改名/删除/导入草稿/导出）+ agent 19 套全绿。
+
 ## 2026-08-12（v0.59 问询系统·外溢优先：动态规划 + 提示词工程）
 
 依据 docs/问询系统升级-v1.md 升级问询系统：用户主动说出的、系统本来不准备问的

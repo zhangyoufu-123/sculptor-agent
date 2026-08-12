@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chatWithRetry } from './llm.js';
 import * as ws from './workspace.js';
+import { splitLongText } from './io.js';
 
 export const CATEGORIES = [
   '议论文',
@@ -122,6 +123,43 @@ export function addPiece(
   });
   ws.writeJson(d.index, index);
   return { file, category: cat };
+}
+
+/** 导入外部作品（v0.60）：长文自动分片入库，保留"部分"标记，索引可查可删。 */
+export function importWork(workspace, { title = '', text = '', source = 'import', category = '' } = {}) {
+  const body = String(text || '').trim();
+  if (!body) throw new Error('没有内容可导入');
+  const d = ensureLibrary(workspace);
+  const cat = category || classifyPiece(title || '导入作品', body);
+  const dir = path.join(d.root, cat);
+  fs.mkdirSync(dir, { recursive: true });
+  const parts = splitLongText(body, { maxChars: 6000 });
+  const pieces = [];
+  const stamp = Date.now();
+  parts.forEach((p, i) => {
+    const file = path.join(dir, `${stamp}-${i + 1}-${slugify(title || '导入')}.md`);
+    const header = [
+      `# ${p.heading || title || '未命名作品'}`,
+      `- 分类: ${cat}`,
+      `- 归档时间: ${ws.nowIso()}`,
+      `- 来源: ${source}`,
+      `- 部分: ${i + 1}/${parts.length}`,
+      '',
+    ].join('\n');
+    fs.writeFileSync(file, header + p.text + '\n');
+    pieces.push({
+      file: path.relative(d.root, file),
+      title: p.heading || (parts.length > 1 ? `${title || '导入作品'}·第 ${i + 1} 部分` : title || '未命名作品'),
+      category: cat,
+      ts: ws.nowIso(),
+      session: '',
+      source,
+    });
+  });
+  const index = readIndex(workspace);
+  index.pieces.push(...pieces);
+  ws.writeJson(d.index, index);
+  return { pieces, category: cat, parts: pieces.length };
 }
 
 /** 一键归档 draft.md（导演交付时自动调用）。 */

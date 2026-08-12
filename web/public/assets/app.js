@@ -1536,10 +1536,55 @@ function applyWorksFilter() {
           <div class="work-card ${worksCompareMode ? 'selectable' : ''}" data-sid="${esc(w.sessionId)}" data-file="${esc(w.file)}">
             <h4>${esc(w.title)}</h4>
             <div class="meta">${esc(w.sessionTitle || '')} · ${w.chars ? `${w.chars} 字 · ` : ''}${fmtDate(w.ts)}${w.draftOnly ? ' · 进行中' : ''}</div>
+            ${worksCompareMode ? '' : `<div class="ops">
+              <button class="icon-btn" data-op="continue">继续</button>
+              <button class="icon-btn" data-op="rename">改名</button>
+              <button class="icon-btn danger" data-op="del">删除</button>
+            </div>`}
           </div>`).join('')}
       </div>
     </div>`).join('');
   $('worksBody').querySelectorAll('.work-card').forEach((card) => {
+    card.querySelectorAll('[data-op]').forEach((btn) => {
+      btn.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const sid = card.dataset.sid;
+        const file = card.dataset.file;
+        const op = btn.dataset.op;
+        const title = card.querySelector('h4').textContent;
+        if (op === 'rename') {
+          const t = prompt('新标题：', title);
+          if (t && t.trim()) {
+            await apiPost('/api/work', { sessionId: sid, file, title: t.trim() }).catch((e) => toast(e.message));
+            renderWorks();
+          }
+        } else if (op === 'del') {
+          if (confirm(`从作品库删除「${title}」？`)) {
+            await apiDelete('/api/work', { sessionId: sid, file }).catch((e) => toast(e.message));
+            toast('已删除');
+            renderWorks();
+          }
+        } else if (op === 'continue') {
+          // 继续：把这篇作品导入为当前会话的草稿（无会话则新建）
+          try {
+            const { text } = await apiGet(`/api/work?sessionId=${sid}&file=${encodeURIComponent(file)}`);
+            if (!sessionId) {
+              const r = await apiPost('/api/start', { topic: title || '导入作品' });
+              sessionId = r.sessionId;
+              contextVisible = true;
+              updateContextVisibility();
+            }
+            const imp = await apiPost('/api/import-draft', { sessionId, title: title || '导入作品', text });
+            toast(`已导入草稿（${imp.chars} 字），可审计/导出/继续改写`);
+            await resumeSession(sessionId);
+            showView('draft');
+            renderDraft(text, { title: imp.title });
+          } catch (e) {
+            toast('继续失败：' + e.message);
+          }
+        }
+      });
+    });
     card.addEventListener('click', () => {
       if (worksCompareMode) {
         const key = `${card.dataset.sid}|${card.dataset.file}`;
@@ -1721,6 +1766,34 @@ $('draftExportPptx').addEventListener('click', () => downloadExport(sessionId, '
 $('personaRefresh').addEventListener('click', renderPersona);
 $('knowledgeRefresh').addEventListener('click', renderKnowledge);
 $('worksRefresh').addEventListener('click', renderWorks);
+$('worksImport')?.addEventListener('click', () => $('worksImportInput')?.click());
+$('worksImportInput')?.addEventListener('change', async (e) => {
+  const f = e.target.files?.[0];
+  e.target.value = '';
+  if (!f) return;
+  try {
+    const dataBase64 = await fileToBase64(f);
+    const r = await apiPost('/api/works/import', {
+      sessionId: sessionId || '',
+      filename: f.name,
+      dataBase64,
+      title: f.name.replace(/\.(md|txt|docx)$/i, ''),
+    });
+    toast(`已导入 ${r.parts} 个部分，进入作品库`);
+    renderWorks();
+  } catch (err) {
+    toast('导入失败：' + err.message);
+  }
+});
+$('worksSync')?.addEventListener('click', async () => {
+  try {
+    const r = await apiPost('/api/works/sync', {});
+    toast(`同步完成，新归档 ${r.synced} 篇`);
+    renderWorks();
+  } catch (err) {
+    toast('同步失败：' + err.message);
+  }
+});
 
 $('workModalClose').addEventListener('click', () => { $('workModal').hidden = true; });
 $('workModal').addEventListener('click', (e) => {

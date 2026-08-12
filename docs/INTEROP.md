@@ -22,6 +22,22 @@
 
 ## 已实现
 
+### v0.60 全流程互操作（作品同步 / 分割 / 阶段出入）
+
+- **作品导入与分片**：`POST /api/works/import`（text 或文件）→ 长文按 Markdown 标题/
+  6000 字自动分片入库（`vault/library/`），作品库可见每片；Web 作品页"导入作品"按钮；
+- **作品同步**：`POST /api/works/sync` 把各会话最新 draft.md 一键归档进索引；
+  Web"同步作品库"按钮；`/api/works` 已按会话聚合展示；
+- **作品管理**：`POST /api/work`（改名/改分类）、`DELETE /api/work`（删除片）——
+  支持从外部 Word/其他 Agent 带来的作品进入同一库，继续对比/审计/导出；
+- **成品文档接续**：`POST /api/import-draft` 把成品 docx/md 导入会话成草稿，
+  之后可直接 审计（/api/norm）/导出（md/docx/pptx）/风格重写（/api/doc/restyle）/
+  继续写作；Web 作品卡"继续"按钮一键完成；
+- **长文档分段审计**：学术规范审计按标题/6000 字分片逐段 LLM 审阅、合并去重，
+  不再整篇截断漏检；
+- **按阶段导出**：`/api/export?what=draft|outline|report|style|knowledge&fmt=md|docx|pptx`——
+  澄清/大纲/写作/审计/风格/知识 每个环节都能"文件出"。
+
 ### CLI
 
 ```bash

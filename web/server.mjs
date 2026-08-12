@@ -74,6 +74,9 @@ const { readPersona } = await import(
 const { listEntries, removeEntry, normTitle } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'knowledge.js')).href
 );
+const { importWork, addPiece } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'library.js')).href
+).catch(() => ({ importWork: null, addPiece: null }));
 const { checklistOf } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'clarify.js')).href
 );
@@ -884,6 +887,103 @@ const server = http.createServer(async (req, res) => {
     works.sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')));
     return json(res, 200, { works });
   }
+  // ── 作品同步 / 导入 / 管理（v0.60：全流程互操作）────────────────
+  if (req.method === 'POST' && p === '/api/works/import') {
+    const { sessionId = '', title = '', text = '', dataBase64 = '', filename = 'import.md', source = 'import' } = await body(req);
+    let id = String(sessionId || '');
+    if (!id || !fs.existsSync(sessionDir(id))) id = newSession(title || '作品库');
+    const dir = sessionDir(id);
+    let content = String(text || '');
+    if (!content && dataBase64) content = Buffer.from(String(dataBase64), 'base64').toString('utf8');
+    if (!content.trim()) return json(res, 400, { error: '没有可导入的内容' });
+    if (!importWork) return json(res, 500, { error: 'library 模块不可用' });
+    const r = importWork(dir, {
+      title: title || String(filename || 'import.md').replace(/\.(docx|md|txt)$/i, ''),
+      text: content,
+      source,
+    });
+    try {
+      const index = readJsonSafe(path.join(dir, 'vault', 'library', 'index.json'));
+      if (index?.pieces) {
+        for (const piece of index.pieces) if (r.pieces.some((x) => x.file === piece.file)) piece.session = id;
+        fs.writeFileSync(path.join(dir, 'vault', 'library', 'index.json'), JSON.stringify(index, null, 2));
+      }
+    } catch {}
+    return json(res, 200, {
+      ok: true,
+      sessionId: id,
+      parts: r.parts,
+      pieces: r.pieces.map((x) => ({ file: x.file, title: x.title, category: x.category })),
+    });
+  }
+  if (req.method === 'POST' && p === '/api/works/sync') {
+    let synced = 0;
+    for (const meta of listSessions()) {
+      const dir = sessionDir(meta.id);
+      const draft = path.join(dir, 'draft.md');
+      if (!fs.existsSync(draft) || !addPiece) continue;
+      const index = readJsonSafe(path.join(dir, 'vault', 'library', 'index.json'));
+      const existing = (index?.pieces || []).find((x) => x.source === 'draft.md');
+      if (existing && fs.existsSync(path.join(dir, 'vault', 'library', existing.file))) continue;
+      try {
+        const state = ws.readState(dir);
+        addPiece(dir, {
+          title: state?.confirmed?.topic || state?.outline?.title || meta.title || '未命名作品',
+          text: fs.readFileSync(draft, 'utf8'),
+          source: 'draft.md',
+          session: meta.id,
+        });
+        synced += 1;
+      } catch {}
+    }
+    return json(res, 200, { ok: true, synced });
+  }
+  if (req.method === 'POST' && p === '/api/work') {
+    const { sessionId = '', file = '', title = '', category = '' } = await body(req);
+    const dir = sessionDir(String(sessionId));
+    const indexFile = path.join(dir, 'vault', 'library', 'index.json');
+    const index = readJsonSafe(indexFile);
+    if (!index) return json(res, 404, { error: '作品索引不存在' });
+    const piece = (index.pieces || []).find((x) => x.file === file);
+    if (!piece) return json(res, 404, { error: '作品不存在' });
+    if (title) piece.title = String(title).slice(0, 60);
+    if (category) piece.category = String(category).slice(0, 20);
+    fs.writeFileSync(indexFile, JSON.stringify(index, null, 2));
+    return json(res, 200, { ok: true, piece });
+  }
+  if (req.method === 'DELETE' && p === '/api/work') {
+    const { sessionId = '', file = '' } = await body(req);
+    const dir = sessionDir(String(sessionId));
+    const indexFile = path.join(dir, 'vault', 'library', 'index.json');
+    const index = readJsonSafe(indexFile);
+    if (!index) return json(res, 404, { error: '作品索引不存在' });
+    index.pieces = (index.pieces || []).filter((x) => x.file !== file);
+    fs.writeFileSync(indexFile, JSON.stringify(index, null, 2));
+    const full = safeInside(dir, path.join('vault', 'library', String(file)));
+    if (full && fs.existsSync(full)) fs.rmSync(full, { force: true });
+    return json(res, 200, { ok: true, removed: file });
+  }
+  if (req.method === 'POST' && p === '/api/import-draft') {
+    const { sessionId = '', title = '', text = '', dataBase64 = '', filename = 'draft.md' } = await body(req);
+    const id = String(sessionId || '');
+    const dir = sessionDir(id);
+    if (!fs.existsSync(path.join(dir, 'protocol', 'state.json'))) return json(res, 404, { error: '会话不存在' });
+    let content = String(text || '');
+    if (!content && dataBase64) content = Buffer.from(String(dataBase64), 'base64').toString('utf8');
+    if (!content.trim()) return json(res, 400, { error: '没有可导入的内容' });
+    fs.writeFileSync(path.join(dir, 'draft.md'), content);
+    const meta = readMeta(id) || { id, title: '新写作', createdAt: ws.nowIso() };
+    meta.title = String(title || meta.title || filename.replace(/\.(docx|md|txt)$/i, '')).slice(0, 40);
+    meta.status = '已导入草稿';
+    meta.updatedAt = ws.nowIso();
+    writeMeta(id, meta);
+    appendTranscript(id, {
+      role: 'bot',
+      text: `已导入草稿（${content.replace(/\s/g, '').length} 字），可直接审计/导出/继续改写。`,
+      kind: 'working',
+    });
+    return json(res, 200, { ok: true, chars: content.replace(/\s/g, '').length, title: meta.title });
+  }
   // ── 多作品对比（v0.48，P2）：两篇作品的人类化指标并排 ──
   if (req.method === 'GET' && p === '/api/works/compare') {
     const read = (id, f) => {
@@ -915,24 +1015,61 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && p === '/api/export') {
     const id = String(url.searchParams.get('sessionId') || '');
     const fmt = String(url.searchParams.get('fmt') || 'md');
+    const what = String(url.searchParams.get('what') || 'draft');
     const dir = sessionDir(id);
     const meta = readMeta(id);
     if (!meta) return json(res, 404, { error: '会话不存在' });
     const draft = path.join(dir, 'draft.md');
     const fileParam = url.searchParams.get('file');
     const srcFile = fileParam ? safeInside(dir, String(fileParam)) : null;
-    const mdText = srcFile && fs.existsSync(srcFile)
-      ? fs.readFileSync(srcFile, 'utf8')
-      : fs.existsSync(draft)
-      ? fs.readFileSync(draft, 'utf8')
-      : (() => {
-          const state = ws.readState(dir);
-          if (!state.outline?.title) return '';
-          const o = state.outline;
-          return `# ${o.title}\n\n${(o.sections || [])
-            .map((s, i) => `## ${i + 1}. ${s.heading}\n\n${(s.keyPoints || []).join('\n')}`)
-            .join('\n\n')}\n`;
-        })();
+    let mdText = '';
+    if (what === 'outline') {
+      const state = ws.readState(dir);
+      const o = state.outline || state.liveOutline || {};
+      mdText = `# ${o.title || meta.title || '大纲'}\n\n${
+        (o.sections || [])
+          .map((s, i) => `## ${i + 1}. ${s.heading}${s.thesis ? `｜${s.thesis}` : ''}\n\n${(s.keyPoints || []).map((k) => `- ${k}`).join('\n')}`)
+          .join('\n\n')
+      }\n`;
+    } else if (what === 'report') {
+      for (const f of ['norm-report.md', 'redteam-report.md', 'report.md']) {
+        const rf = path.join(dir, 'vault', f);
+        if (fs.existsSync(rf)) {
+          mdText = fs.readFileSync(rf, 'utf8');
+          break;
+        }
+      }
+    } else if (what === 'style') {
+      const w = readJsonSafe(path.join(dir, 'vault', 'write-style.json')) || {};
+      const r = readJsonSafe(path.join(dir, 'vault', 'read-style.json')) || {};
+      const dimLines = (obj) =>
+        Object.entries(obj.dimensions || {})
+          .filter(([, d]) => d && d.value)
+          .map(([k, d]) => `- ${k}：${d.value}（置信 ${Math.round((Number(d.confidence) || 0) * 100)}%）`);
+      mdText = ['# 风格肖像', '', '## write（人想写的）', '', ...dimLines(w), '', '## read（人想听的）', '', ...dimLines(r), ''].join('\n');
+    } else if (what === 'knowledge') {
+      mdText = ['# 个人知识库', '']
+        .concat(
+          listEntries(dir).map(
+            (e) =>
+              `## ${e.title}\n- 类型：${e.type}\n- 来源：${e.source}\n- 置信：${Math.round((e.confidence || 0) * 100)}%\n- 标签：${(e.tags || []).join('、') || '—'}\n${e.note ? `\n${e.note}\n` : ''}`,
+          ),
+        )
+        .join('\n');
+    } else {
+      mdText = srcFile && fs.existsSync(srcFile)
+        ? fs.readFileSync(srcFile, 'utf8')
+        : fs.existsSync(draft)
+        ? fs.readFileSync(draft, 'utf8')
+        : (() => {
+            const state = ws.readState(dir);
+            if (!state.outline?.title) return '';
+            const o = state.outline;
+            return `# ${o.title}\n\n${(o.sections || [])
+              .map((s, i) => `## ${i + 1}. ${s.heading}\n\n${(s.keyPoints || []).join('\n')}`)
+              .join('\n\n')}\n`;
+          })();
+    }
     if (!mdText.trim()) return json(res, 400, { error: '还没有成稿或大纲，无法导出' });
     const base = `${meta.title || 'sculptor'}-${new Date().toISOString().slice(0, 10)}`;
     if (fmt === 'md') {

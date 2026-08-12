@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chatWithRetry, parseJsonContent } from './llm.js';
 import * as ws from './workspace.js';
+import { splitLongText } from './io.js';
 
 const ABSTRACT_MAX = 320; // 摘要正文字数上限（不含关键词）
 const FORMAL_GENRES = /学术论文|论文|报告|公文|新闻稿|调研|申报书|合同/;
@@ -290,7 +291,23 @@ export async function academicNorm(cfg, workspace, { text = '', genre = '', file
   let llm = { skipped: true, reason: '未配置 LLM 密钥，仅确定性安全网' };
   if (cfg.apiKey) {
     try {
-      llm = await llmNormReview(cfg, t, det.map((i) => `${i.type}:${i.issue}`).join('；') || '（无）', genre);
+      // 长文档分段审计（v0.60）：按标题/6000 字分片逐段 LLM 审阅，合并去重，
+      // 避免整篇截断导致后半部分完全漏检。
+      const chunks = splitLongText(t, { maxChars: 6000 });
+      const hits = det.map((i) => `${i.type}:${i.issue}`).join('；') || '（无）';
+      const reviews = [];
+      for (const c of chunks) {
+        reviews.push(await llmNormReview(cfg, c.text, hits, genre));
+      }
+      const scores = reviews.map((r) => r.score).filter((n) => Number.isFinite(n));
+      const issues = [];
+      for (const r of reviews) issues.push(...(Array.isArray(r.issues) ? r.issues : []));
+      llm = {
+        mode: 'llm',
+        score: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
+        issues,
+        summary: reviews.map((r) => r.summary || '').filter(Boolean).join('；'),
+      };
     } catch (e) {
       llm = { skipped: true, reason: `LLM 审阅失败（${String(e?.message || e).slice(0, 80)}）——确定性检查仍可用` };
     }
