@@ -14,7 +14,7 @@ import {
 } from './style.js';
 import { pulseAfterClarify, pushPulseToState } from './style-pulse.js';
 import { refreshStyleVector } from './style-vector.js';
-import { detectGenre, genreBlueprint } from './genre.js';
+import { detectGenre, genreBlueprint, isOfficialGenre } from './genre.js';
 import { parseTargetWords, guessTargetWords } from './budget.js';
 import { extractInput } from './io.js';
 import { understandIntent, intentBrief } from './intent.js';
@@ -44,6 +44,47 @@ import { academicGap } from './academic.js';
 import { outlineProgress } from './outline-state.js';
 
 const LOW_WILL = /没(有|什么)?更多|你决定|你自己决定|就这样|先这样|可以了|够了|你看着办/;
+
+/** LLM 声明的"这个问题在收集哪个维度"（v0.57）：优先于正则分类，兜底才用 classifyAnswer。 */
+const VALID_INTENTS = new Set([
+  'topic',
+  'stance',
+  'audience',
+  'materials',
+  'theme',
+  'argument',
+  'emotion',
+  'ending',
+  'style',
+  'recipient',
+  'basis',
+  'items',
+  'plot',
+  'character',
+  'known',
+  'gap',
+  'method',
+  'limitation',
+  'blueprint',
+  'outlineConfirm',
+]);
+const INTENT_NORM = { material: 'materials' };
+function normalizeIntent(raw) {
+  const v = String(raw || '').trim();
+  if (INTENT_NORM[v]) return INTENT_NORM[v];
+  return VALID_INTENTS.has(v) ? v : null;
+}
+
+/** 低意愿精确判定（v0.57 修复）：只有整句就是"够了/你决定/就这样"等短句才算低意愿，
+ *  绝不因为句子中恰好出现"够了"两个字（如"站一会儿就够了"）就把用户的回答吞掉。 */
+function isLowWill(text) {
+  const t = String(text || '').trim();
+  if (!t) return true;
+  const n = t.replace(/[，。！？、,.！~～\s]+$/g, '').replace(/[，。！？、,.！~～\s]/g, '');
+  if (!n) return true;
+  if (n.length > 8) return false;
+  return /^(没(有|什么)?更多|你决定(继续)?|你自己决定|就这样|先这样|可以了|够了|你看着办|没别的|没有了|先到这里|就到这里)(吧|的)?$/.test(n);
+}
 const NEED_LABELS = {
   topic: '主题',
   stance: '立场/目的',
@@ -175,6 +216,71 @@ export function renderBlueprint(state) {
   if ((b.skeleton || []).length) lines.push(`结构顺序：${b.skeleton.join(' → ')}`);
   if ((b.corrections || []).length) lines.push(`待吸收的修正：${b.corrections.join('；')}`);
   return lines.join('\n');
+}
+
+const AUTO_OUTLINE_HEADS = new Set([
+  '核心立意与立场',
+  '素材与事实',
+  '支撑论点',
+  '情感曲线',
+  '结尾落点',
+  '读者与发布对象',
+  '核心内容（AI 归纳中）',
+]);
+
+/** LLM 未给出大纲节（或只给空节）时，用"已确认内容"生成内容节，保证右侧大纲面板每轮都在生长。
+ *  节由用户实际给的内容驱动（立意/素材/论点/结尾…），不是硬套文体骨架；
+ *  用户可编辑；LLM 一旦给出真正的结构节，就整体接管、本函数不再覆盖。 */
+function growOutlineFromState(state) {
+  const lo = ensureLiveOutline(state);
+  const c = state.confirmed || {};
+  // 已存在 LLM 生成的真实结构节 → 不再用内容节覆盖。
+  if (
+    Array.isArray(lo.sections) &&
+    lo.sections.length &&
+    !lo.sections.every((s) => AUTO_OUTLINE_HEADS.has(String(s.heading || '').trim()))
+  ) {
+    return lo;
+  }
+  const sections = [];
+  const add = (heading, fn, { thesis = '', keyPoints = [] } = {}) => {
+    sections.push({
+      heading,
+      function: fn,
+      thesis: String(thesis || '').trim().slice(0, 120),
+      words: 0,
+      keyPoints: keyPoints.filter(Boolean).map((x) => String(x).trim().slice(0, 60)).slice(0, 6),
+    });
+  };
+  if (c.theme || c.stance) {
+    add('核心立意与立场', '立意', {
+      thesis: c.theme || c.stance,
+      keyPoints: [c.theme, c.stance],
+    });
+  }
+  if ((state.materials || []).length) {
+    add('素材与事实', '素材', { keyPoints: state.materials.slice(0, 6) });
+  }
+  if (Array.isArray(c.arguments) && c.arguments.length) {
+    add('支撑论点', '论点', { keyPoints: c.arguments.slice(0, 6) });
+  }
+  if (c.emotionalCurve) add('情感曲线', '情绪', { thesis: c.emotionalCurve });
+  if (c.endingTaste) add('结尾落点', '收束', { thesis: c.endingTaste });
+  if (c.audience || c.recipient) {
+    add('读者与发布对象', '定位', { thesis: c.audience || c.recipient });
+  }
+  if (!sections.length && (c.topic || c.theme)) {
+    add('核心内容（AI 归纳中）', '内容汇聚', {
+      thesis: c.topic || c.theme,
+      keyPoints: [c.topic, c.theme],
+    });
+  }
+  if (!sections.length) return lo;
+  lo.title = lo.title || String(c.topic || '').trim().slice(0, 40);
+  lo.sections = sections;
+  lo.updatedAt = ws.nowIso();
+  refreshOutlineProgress(state);
+  return lo;
 }
 
 /* ── 实时大纲（v0.29）：讨论中持续生长、大纲状态驱动提问 ────────── */
@@ -349,7 +455,7 @@ function applyAnswer(state, field, answer) {
     const norm = a.replace(/[，。！？、,.！\s]/g, '');
     const confirm =
       !a ||
-      LOW_WILL.test(a) ||
+      isLowWill(a) ||
       /^(对|对的|可以|可以的|同意|没问题|就是这样|是|是的|好的|好|嗯|没错|ok|开始|开始写作|写吧|确认|定稿|不用改了|不用了)/i.test(
         norm,
       );
@@ -370,7 +476,7 @@ function applyAnswer(state, field, answer) {
     const norm = a.replace(/[，。！？、,.！\s]/g, '');
     const confirm =
       !a ||
-      LOW_WILL.test(a) ||
+      isLowWill(a) ||
       /^(对|对的|可以|可以的|同意|没问题|就是这样|是|是的|好的|好|嗯|没错|ok|开始|开始写作|写吧|确认|定稿|可以了)/i.test(
         norm,
       ) ||
@@ -394,7 +500,7 @@ function applyAnswer(state, field, answer) {
     const norm = a.replace(/[，。！？、,.！\s]/g, '');
     const confirm =
       !a ||
-      LOW_WILL.test(a) ||
+      isLowWill(a) ||
       /^(对|对的|可以|可以的|同意|没问题|就是这样|是|是的|好的|好|嗯|没错|ok|不用改|不用了)$/i.test(
         norm,
       ) ||
@@ -408,10 +514,15 @@ function applyAnswer(state, field, answer) {
     state.confirmed.blueprintConfirmed = true;
     return state;
   }
-  if (!a || LOW_WILL.test(a) || /^(没有|不知道|跳过|算了|none|na)$/i.test(a)) return state;
+  if (!a || isLowWill(a) || /^(没有|不知道|跳过|算了|none|na)$/i.test(a)) return state;
   if (field === 'topic') state.confirmed.topic = a;
   else if (field === 'stance') state.confirmed.stance = a;
-  else if (field === 'audience') state.confirmed.audience = a;
+  else if (field === 'audience') {
+    state.confirmed.audience = a;
+    // 非公文文体里"读者/受众"与"发布对象/主送"是同一件事：
+    // 用户答了"给谁看"，就不再回头追问"主送对象/发布对象"，杜绝主次不分。
+    if (!isOfficialGenre(String(state.confirmed.genre || ''))) state.confirmed.recipient = a;
+  }
   else if (field === 'style') state.confirmed.styleNote = a;
   else if (field === 'theme') state.confirmed.theme = a;
   else if (field === 'character') {
@@ -483,6 +594,10 @@ function fieldDone(state, f) {
   if (f.list === 'items') return (c.items || []).length >= (f.count || 1);
   if (f.key === 'styleSample') return Boolean(c.styleSample);
   if (f.key === 'targetWords') return Boolean(c.targetWords);
+  // 非公文文体：读者/受众 与 发布对象/当事人/主送 视为同一维度（答其一即满足）。
+  if (f.key === 'recipient' && !isOfficialGenre(String(state?.confirmed?.genre || ''))) {
+    return Boolean(c.recipient || c.audience);
+  }
   // 蓝图 key 与状态存储的别名映射（emotion→emotionalCurve, ending→endingTaste）
   const valueKey =
     f.key === 'emotion' ? 'emotionalCurve' : f.key === 'ending' ? 'endingTaste' : f.key;
@@ -503,6 +618,14 @@ function blueprintNeed(state) {
   // 才进入确认；未成形就继续自由追问，代码不拿节数/完成度框住 LLM。
   if (ensureLiveOutline(state).complete) return 'outlineConfirm';
   return '';
+}
+
+/** 本轮输入是否值得重新提炼意图（v0.57）：短确认/敷衍回答跳过，
+ *  只对"有新信息或修正信号"的轮次调用 LLM，减少每轮 API 串行等待。 */
+function isMeaningfulTurn(input) {
+  const t = String(input || '').trim();
+  if (t.length >= 16) return true;
+  return /不不不|不是|改成|换成|不要|为什么|读者|主题|立意|素材|结尾|风格|字数|多少字|谁看|发布|对象|角度|目的/.test(t);
 }
 
 /** 核心（必填、非风格底稿）维度是否齐了——齐了就能进大纲。 */
@@ -544,7 +667,7 @@ function missingNeed(state) {
 export function classifyAnswerLevel(input) {
   const t = String(input || '').trim();
   if (!t) return 0;
-  if (/^(没有|不知道|随便|算了|跳过|none|na|你看着办)$/i.test(t) || LOW_WILL.test(t)) return 0;
+  if (/^(没有|不知道|随便|算了|跳过|none|na|你看着办)$/i.test(t) || isLowWill(t)) return 0;
   // L5 精准指令：具体到词/句/写法（引号、改词、句式、留白节奏）
   if (/["「『“”]|改为|改成|换成|删掉|加个|不要用|不用|替代|双引号|标点|句号|逗号|留白|口语/.test(t)) return 5;
   // L4 修正型：否定开头＋给出新需求
@@ -572,8 +695,26 @@ function nextFallback(state, need) {
       .filter(([, v]) => v)
       .map(([k]) => k),
   );
+  // 只从"当前文体蓝图里真正存在的维度 + 普适维度"里换角度，
+  // 防止散文被换到"发文依据/主送对象"这类公文维度上去。
+  const allowed = new Set(
+    activeBlueprint(state)
+      .map((f) => f.key)
+      .concat([
+        'topic',
+        'stance',
+        'audience',
+        'materials',
+        'theme',
+        'emotion',
+        'ending',
+        'styleSample',
+        'targetWords',
+      ]),
+  );
   for (const f of FALLBACK_QUESTIONS) {
     if (f.need === need) continue;
+    if (!allowed.has(f.need)) continue;
     if (done.has(f.need)) continue;
     if (f.need === 'styleSample' && state.confirmed?.styleSample) continue;
     if (f.need === 'targetWords' && state.confirmed?.targetWords) continue;
@@ -591,13 +732,19 @@ async function askOnce(state, cfg, workspace) {
     if (!coreReady) markDeferred(state);
     return { stop: true, ready: true, question: null, lowWill: true };
   }
-  // 意图理解刷新：每轮有新输入时提炼"我的理解/核心诉求/风险"，喂给追问设计师对齐后再问。
+  // 意图理解刷新（v0.57 提速）：首轮串行等（第一问最需要对齐理解）；
+  // 之后并行刷新——本轮先用上一轮的"我的理解"生成问题，同时后台刷新意图，下一轮生效。
   // LLM 失败走确定性兜底，绝不阻塞、绝不让用户等。
-  if (state.lastInput) {
-    try {
-      await understandIntent(cfg, workspace, state);
-    } catch {
-      // understandIntent 内部已兜底，这里再包一层纯保险
+  let intentPromise = null;
+  if (state.lastInput && isMeaningfulTurn(state.lastInput) && !state.metaQuestion) {
+    if (!state.intent) {
+      try {
+        await understandIntent(cfg, workspace, state);
+      } catch {
+        // understandIntent 内部已兜底，这里再包一层纯保险
+      }
+    } else {
+      intentPromise = understandIntent(cfg, workspace, state).catch(() => {});
     }
     // 思想脉络（v0.43）：用户抛出理论/因果推理/引用书籍 → 提炼并累积，
     // 下一问据此"向下挖一层"，与用户达成思想共识（失败静默，绝不阻塞）。
@@ -679,6 +826,7 @@ async function askOnce(state, cfg, workspace) {
     userNegated: /不不不|不是这样|不是这个|你说错了|理解错了|不是要|不要这样|不对[，。,.]/.test(
       state.lastInput || '',
     ),
+    userMeta: state.metaQuestion || '',
     styleProgress: style
       ? `write ${style.write.learned}/${style.write.total} 维 · read ${style.read.learned}/${style.read.total} 维`
       : '',
@@ -693,8 +841,11 @@ async function askOnce(state, cfg, workspace) {
         },
         { role: 'user', content: QUESTIONER_PROMPT(ctx) },
       ],
-      { json: true, temperature: 0.7, maxTokens: 1000 },
+      // maxTokens 必须给足：追问 JSON 含 question+recommendation+options+blueprintUpdate
+      // +outlineUpdate，1000 会被截断 → 解析失败 → 退化成模板兜底问句（v0.57 修复）。
+      { json: true, temperature: 0.7, maxTokens: 2500 },
     );
+    if (intentPromise) await intentPromise; // 并行意图刷新完成（不阻塞本轮问题生成）
     const q = parseJsonContent(content, '追问');
     if (q.stop) {
       if (missingNeed(state) === '') {
@@ -708,31 +859,9 @@ async function askOnce(state, cfg, workspace) {
       }
     }
     const question = String(q.question || '').trim();
-    // 软性拉回（v0.38）：LLM 问了一个"已满足/蓝图外"的维度，而当前还有必填缺口时，
-    // 拉回当前缺口——防止"已答过的维度反复问"造成的死循环。只保底、不硬编码问法。
-    if (need && question) {
-      const qfRaw = classifyAnswer(question, '').field;
-      const qf = qfRaw === 'material' ? 'materials' : qfRaw; // 归类单数 → 蓝图字段复数
-      const bpF = activeBlueprint(state).find((x) => x.key === qf);
-      const qfSatisfied = bpF ? fieldDone(state, bpF) : true;
-      if (qf !== need && qfSatisfied) {
-        const fb = fallbackFor(need, state);
-        state.alignedBack = true;
-        ws.logContext?.(
-          workspace,
-          'clarify',
-          `软性拉回：LLM 问已满足的「${NEED_LABELS[qf] || qf}」，改问当前缺口「${NEED_LABELS[need] || need}」`,
-        );
-        return {
-          stop: false,
-          ready: materialGate(state),
-          question: fb.ask,
-          recommendation: fb.recommendation,
-          options: fb.options || [],
-          warn: '已问过「' + (NEED_LABELS[qf] || qf) + '」，先补「' + (NEED_LABELS[need] || need) + '」',
-        };
-      }
-    }
+    // v0.57：不再做"软性拉回"。LLM 追问已满足的维度（如细化主题、换个角度聊立意）
+    // 往往是高质量追问，直接采用，由 LLM 决定问什么；真正的重复问题由下面的
+    // 重复追问护栏兜底，两条路径不会互相打架，也不再把 LLM 的好问题换成模板句。
     // 重复追问护栏（确定性）：LLM 与上一问同义/互相包含 → 换一个未确认维度问，绝不车轱辘。
     const normQ = (s) => String(s || '').replace(/[，。！？、,.！\s]/g, '').toLowerCase();
     const prevQ = normQ(state.lastQuestion);
@@ -782,12 +911,26 @@ async function askOnce(state, cfg, workspace) {
       stop: false,
       ready: materialGate(state),
       question,
+      askedField: normalizeIntent(q.intent),
       recommendation: q.recommendation,
       options: q.options || [],
       blueprintUpdate: q.blueprintUpdate || null,
     };
   } catch (err) {
-    // LLM 不可用时的确定性兜底：按缺口依次问，绝不死循环。
+    if (intentPromise) await intentPromise;
+    // LLM 不可用时：若用户刚才是反问/质疑，先给"帮助式"回应，绝不生硬套模板；
+    // 否则按缺口确定性兜底问，绝不死循环。
+    if (state.metaQuestion) {
+      const label = NEED_LABELS[need] || '这个方向';
+      return {
+        stop: false,
+        ready: materialGate(state),
+        question: `先回你刚才的疑问——我之所以想先问「${label}」，是因为它会直接决定整篇文章往哪走，而不是在收集琐碎细节。你可以直接说想法，也可以回"跳过"，我会按通用方式继续。`,
+        recommendation: '想跳过就直接回"跳过"，我们继续往下聊',
+        options: ['跳过'],
+        warn: '你刚才的反问我收到了',
+      };
+    }
     const f = pickFallback(state, need);
     return {
       stop: false,
@@ -819,12 +962,36 @@ function pickFallback(state, need) {
 
 /** 每个维度都有确定性问题：LLM 停摆/多问/重复时按需兜底，绝不问无关维度。 */
 function fallbackFor(need, state = {}) {
+  const official = isOfficialGenre(String(state?.confirmed?.genre || ''));
   const f = FALLBACK_QUESTIONS.find((x) => x.need === need);
   if (f) {
     if (['materials', 'arguments', 'items'].includes(need) && state.listRepeat) {
       return {
         ...f,
         ask: `${f.ask.replace(/[？?]$/, '')}？上一条已经记过了——换一条新的，或说"你决定"。`,
+      };
+    }
+    // 兜底问句也要"接住用户重点"：公文才问"发文依据/主送/事项"，
+    // 其它文体（含没识别出来的）一律换成普适的高价值问法，绝不冒出"傻问题"。
+    if (need === 'basis' && !official) {
+      return {
+        ...f,
+        ask: '这件事为什么值得写？有没有具体的缘由、背景或触发点？',
+        recommendation: '比如"身边越来越多人只会说梗，想替这种沉默说句话"——从真实触发点说起最有力',
+      };
+    }
+    if (need === 'recipient' && !official) {
+      return {
+        ...f,
+        ask: '这篇文章主要写给谁看？',
+        recommendation: '老师、同学、编辑、还是陌生读者？这决定信息密度和语气',
+      };
+    }
+    if (need === 'items' && !official) {
+      return {
+        ...f,
+        ask: '还有哪些具体内容或要点需要写进去？',
+        recommendation: '一条一条给就行，我帮你组织成文',
       };
     }
     return f;
@@ -852,7 +1019,23 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     corrections: [],
   };
   let clarifyPulse = null;
-  if (lastInput) {
+  // 用户反问/质疑检测（v0.57）：用户不是回答、而是提问或表示疑惑时，
+  // 绝不把他的反问当作素材/答案记进去，也绝不继续生硬地按模板追问——
+  // 交给 LLM 先正面回答他的疑问，再把话题轻轻带回当前缺口。
+  const rawInput = String(lastInput || '').trim();
+  const META_RE =
+    /^(为什么|为啥|怎么回事|什么意思|你问这个|你问的|这有什么用|有什么用|先回答|等一下|等等|你说什么|没听懂|不明白|没明白|听不懂|你在说什么|你理解错|你搞错|我不是这个意思|我不是说|你误会|你确定|你想问|你到底要问|能不能解释)/;
+  const isMeta = Boolean(
+    rawInput &&
+      (META_RE.test(rawInput) || (/[？?]$/.test(rawInput) && rawInput.length <= 24 && !/写|起草|创作/.test(rawInput))),
+  );
+  if (lastInput && isMeta) {
+    state.lastInput = lastInput;
+    state.metaQuestion = rawInput;
+    state.lowWill = 0;
+    ws.logContext(workspace, 'clarify', `用户反问/质疑（不当作答案）：${rawInput}`);
+  }
+  if (lastInput && !isMeta) {
     state.lastInput = lastInput;
     // 文体识别：开局识别一次（后续答案里的"故事/通知"等词不得误改文体）；
     // 只有用户显式说"改成/换一种文体"时才允许切换。
@@ -878,7 +1061,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
               content: `【主题提炼】\n用户开局说了：${String(lastInput).slice(0, 200)}\n\n如果这句话里给出了要写的主题/题目，提炼成 4-20 字的主题词（去掉"帮我写一篇关于"这类话术）；如果没有明确主题，输出 {"topic":""}。`,
             },
           ],
-          { json: true, temperature: 0.1, maxTokens: 200 },
+          { json: true, temperature: 0.1, maxTokens: 400 },
         );
         const parsed = parseJsonContent(content, '主题提炼');
         topic = String(parsed?.topic || '').trim().slice(0, 40);
@@ -939,7 +1122,7 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
       applyAnswer(state, field, lastInput);
     }
     // 低意愿计数（确定性）："没有更多/你决定/可以了/就这样"→ 连续两次且核心字段齐就早退进大纲。
-    if (LOW_WILL.test(lastInput)) state.lowWill = (state.lowWill || 0) + 1;
+    if (isLowWill(lastInput)) state.lowWill = (state.lowWill || 0) + 1;
     else state.lowWill = 0;
     // 引导质量自检：记录每轮回答的 L0–L5 级别（内置，不展示给用户，供实验与复盘）。
     const level = classifyAnswerLevel(lastInput);
@@ -1010,8 +1193,11 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     ws.logContext(workspace, 'clarify', `${state.lastQuestion || '（首轮）'} → ${lastInput}`);
   }
   const next = await askOnce(state, cfg, workspace);
+  state.metaQuestion = ''; // 反问已交给 LLM 处理，只生效一轮，防止残留重复解释
   // 实时大纲生长：LLM 每轮可输出 outlineUpdate（节列表），面板随之逐轮变化。
   if (next.outlineUpdate) mergeLiveOutline(state, next.outlineUpdate);
+  // LLM 没给结构（或只给空节）时，用已确认内容生成内容节，保证大纲每轮可见地长大。
+  growOutlineFromState(state);
   if (next.outlineComplete === true && state.liveOutline) state.liveOutline.complete = true;
   // 归纳式知识一问（非阻塞）：《书名》未问过才问；主题泛问每会话最多一次。
   const kbSuggest = knowledgeSuggestion(state, workspace, {
@@ -1084,7 +1270,8 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
   }
   if (next.question) {
     state.lastQuestion = next.question;
-    state.lastField = classifyAnswer(next.question, '').field;
+    // LLM 声明的 intent 优先；正则分类只做兜底，避免"问得自然、记错字段"。
+    state.lastField = next.askedField || classifyAnswer(next.question, '').field;
   }
   const checklist = checklistOf(state);
   const doneCount = checklist.filter((c) => c.done).length;
@@ -1164,7 +1351,7 @@ export async function clarifyInteractive(cfg, wsDir) {
           .map((s, i) => `${i + 1}. ${s.heading}（${s.function || ''}${s.words ? `，约${s.words}字` : ''}）${s.thesis ? `｜${s.thesis}` : ''}`)
           .join('\n')}`;
       const answer = await ask(prompt + '\n> ');
-      if (LOW_WILL.test(answer)) lowWill += 1;
+      if (isLowWill(answer)) lowWill += 1;
       else lowWill = 0;
       lastInput = answer;
     }

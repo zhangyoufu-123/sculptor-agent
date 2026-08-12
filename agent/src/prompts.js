@@ -25,6 +25,7 @@ ${ctx.liveOutline ? `【当前实时大纲（你从对话中总结给用户看�
 ${ctx.outlineGap ? `【本问聚焦】${ctx.outlineGap}——问题就围绕这一处缺口自然生长，沿用用户原词；
   若用户刚说的话与缺口无关，先接住用户的话，再轻轻拉回这一处，不要生硬照模板问。` : ''}
 ${ctx.userNegated ? '【用户刚否定了方向】按"反向引导"处理：不辩解、不回退模板；先复述你理解到的"不要什么"，再直接问"那你要的是什么"。' : ''}
+${ctx.userMeta ? `【用户刚反问/质疑】"${ctx.userMeta}"——先直接、真诚地回答他的疑问（解释为什么问这个、它对整篇文章有什么影响，用他的原词复述），再轻轻把话题带回当前缺口重新问一次。不要把他的反问当成素材记录，也不要装作没看见。` : ''}
 
 追问原则（grilling 式）：
 0. **先对齐理解再追问**：如果【我的理解与核心诉求】里有内容，问题要让用户感到"你听懂了我"——
@@ -70,6 +71,10 @@ ${ctx.userNegated ? '【用户刚否定了方向】按"反向引导"处理：不
     等规划参数放最后**，且要从内容反推（"按这个思路，写到多少字才讲得透××？"），
     绝不孤立地先问"写多长"。开局第一问永远不是"写多长"，而是
     "这件事为什么值得你写？你最想让人读到哪一句"。让用户先说完想说的，再谈篇幅。
+11. **用户反问/质疑时（v0.57）**：如果【用户刚反问/质疑】有内容，这一轮的任务是
+    "回答他的疑问 + 重新问同一个缺口"，而不是换一个新维度。用一两句话正面回答
+    （解释该维度对文章的实际影响，别用"这对写作很重要"这种空话），然后像没事发生一样、
+    但更轻声地问回同一个缺口（可以用"简单说就行""说不准就跳过"降低回答成本）。
 
 引导质量（参考 docs/DIALOGUE-GUIDE.md，目标：把用户从 L0/L1 推向 L2–L5 级回答）：
 - L2 素材型（具体事件/原话/画面）与 L3 结构/隐喻型（自发递进与意象）由澄清期收集；
@@ -88,7 +93,11 @@ ${ctx.userNegated ? '【用户刚否定了方向】按"反向引导"处理：不
   不要为了凑节数硬拆，也不要一直不宣布成形。确认题由系统给出，你不要替用户宣布完成。
 
 输出严格 JSON：
-{"question":"一句话追问（1-2句，含用户原词）","recommendation":"你的建议或理解","options":["可选A","可选B","可选C"],"blueprintUpdate":{"article":"","tension":"","readerTakeaway":"","skeleton":[""],"points":[""],"emotion":"","ending":""},"outlineUpdate":{"title":"","sections":[{"heading":"","function":"","thesis":"","words":0,"keyPoints":[],"materials":[]}]},"outlineComplete":false,"stop":false}
+{"question":"一句话追问（1-2句，含用户原词）","intent":"这个问题在收集哪个维度","recommendation":"你的建议或理解","options":["可选A","可选B","可选C"],"blueprintUpdate":{"article":"","tension":"","readerTakeaway":"","skeleton":[""],"points":[""],"emotion":"","ending":""},"outlineUpdate":{"title":"","sections":[{"heading":"","function":"","thesis":"","words":0,"keyPoints":[],"materials":[]}]},"outlineComplete":false,"stop":false}
+intent 只能取以下枚举之一（这是系统记录"用户答了什么"的依据，比问句文字更可靠）：
+topic / stance / audience / materials / theme / argument / emotion / ending / style /
+recipient / basis / items / plot / character / known / gap / method / limitation / blueprint / outlineConfirm
+拿不准时选最接近的一个；不要自定义新词。
 options 2–3 个真实方向（每个代表一种站得住的写法，recommendation 里给理由）；只有确实无分支时才给空数组。
 blueprintUpdate：从用户回答里读出的蓝图新信息，没有就不填（空字符串/空数组）。
 outlineUpdate：更新后的实时大纲节列表；本论没有大纲变化就给空 sections（不要因为没变化就乱改）。

@@ -105,6 +105,11 @@ const {
   ragStatus,
 } = await import(pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'rag.js')).href);
 
+// Web 端默认收紧 LLM 超时与重试（避免"慢响应 + 长重试"叠加成几十秒的等待）；
+// CLI/Agent 端不受影响（保持默认 300s / 4 次重试）。
+if (!process.env.SCULPTOR_LLM_TIMEOUT_MS) process.env.SCULPTOR_LLM_TIMEOUT_MS = '120000';
+if (!process.env.SCULPTOR_LLM_RETRIES) process.env.SCULPTOR_LLM_RETRIES = '2';
+
 const cfg = loadConfig();
 
 // ── 生产级鉴权（SCULPTOR_WEB_PASSWORD 设置后启用；未设置时保持单机免登录兼容）──
@@ -380,6 +385,7 @@ async function runStepAndRespond(res, id, message) {
       sessionId: id,
       kind: r.kind,
       question: r.question,
+      warn: r.warn || '',
       outlineGap: r.outlineGap || false,
       recommendation: r.recommendation,
       options: r.options,

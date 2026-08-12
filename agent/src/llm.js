@@ -58,7 +58,7 @@ export async function chat(cfg, messages, opts = {}) {
 }
 
 export async function chatWithRetry(cfg, messages, opts = {}) {
-  const retries = opts.retries ?? 4;
+  const retries = opts.retries ?? cfg.retries ?? 4;
   const baseDelay = opts.baseDelay ?? 1500;
   let lastErr;
   for (let i = 0; i < retries; i++) {
@@ -90,6 +90,26 @@ export function parseJsonContent(content, label = 'LLM 输出') {
         return JSON.parse(cleaned.slice(start, end + 1));
       } catch {}
     }
+    // 宽容提取（v0.57）：LLM 输出被 max_tokens 截断导致 JSON 不完整时，
+    // 至少抢救顶层关键字段（question/recommendation 等），
+    // 避免把"本来问得很好"的问题整段扔掉、退化成模板兜底问句。
+    const rescued = {};
+    const grab = (key) => {
+      const m = cleaned.match(new RegExp(`"${key}"\\s*:\\s*"([^"]{3,})`));
+      if (m) rescued[key] = m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+    };
+    for (const k of [
+      'question',
+      'recommendation',
+      'intent',
+      'summary',
+      'article',
+      'tension',
+      'readerTakeaway',
+    ]) {
+      grab(k);
+    }
+    if (rescued.question || Object.keys(rescued).length) return rescued;
     throw new LlmError(`${label} 不是合法 JSON: ${cleaned.slice(0, 200)}`);
   }
 }

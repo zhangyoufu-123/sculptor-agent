@@ -27,6 +27,7 @@ let workCtx = null;
 let outlineGraphMode = false; // 大纲图谱（v0.48，P2 可视化）：只读卡片流，列表模式保留编辑
 let worksCompareMode = false; // 作品对比（v0.48，P2）：选两篇并排看人类化指标
 let worksCompareSel = [];
+let prevOutlineCount = 0; // 实时大纲节数快照：每轮对比，变了就给用户可见的"更新"反馈
 
 const DIM_CN = {
   temperature: '语气温度', sentencePreference: '句式偏好', modifierDensity: '修饰密度',
@@ -196,7 +197,22 @@ function renderOutlinePane(c) {
   parts.push(`<div class="ol-status">${statusBits.map(([t, cls]) => `<span class="chip ${cls}">${esc(t)}</span>`).join('')}</div>`);
   parts.push(ctxSection('大纲标题', `<input class="ol-title" id="olTitle" value="${esc(lo.title || '')}" ${editable ? '' : 'disabled'} placeholder="文章标题（可改）" />`));
   if (!secs.length) {
-    parts.push(ctxSection('实时大纲', '<div class="ctx-line">大纲会随我们的讨论由 AI 总结成形——你只管聊，我来归纳。</div>'));
+    // 大纲还没成形时，先把"AI 已捕捉到什么"实时摆出来，让生长过程可见
+    const got = [];
+    const cf = c.confirmed || {};
+    if (cf.genre) got.push(`文体 ${cf.genre}`);
+    if (cf.topic) got.push(`主题 ${cf.topic}`);
+    if (cf.stance) got.push(`立场 ${cf.stance}`);
+    if (cf.theme) got.push(`立意 ${cf.theme}`);
+    if (cf.audience) got.push(`读者 ${cf.audience}`);
+    if (Array.isArray(c.materials) && c.materials.length) got.push(`素材 ${c.materials.length} 条`);
+    const chipHtml = got.length
+      ? `<div class="capture-chips">${got.map((g) => `<span class="capture-chip">${esc(g)}</span>`).join('')}</div>`
+      : '';
+    parts.push(ctxSection(
+      '实时大纲',
+      `<div class="ctx-line">大纲会随我们的讨论由 AI 总结成形——你只管聊，我来归纳。</div>${chipHtml}`,
+    ));
   } else {
     outlineEdits = secs.map((s) => ({ ...s }));
     parts.push(`<div class="ol-view-toggle">
@@ -813,10 +829,20 @@ function addMsg(role, html) {
 function addWorking(label) {
   const div = document.createElement('div');
   div.className = 'msg bot';
-  div.innerHTML = `<div class="working"><span class="spinner"></span>${esc(label)}</div>`;
+  div.innerHTML = `<div class="working"><span class="spinner"></span><span class="working-label">${esc(label)}</span></div>`;
   $('chat').appendChild(div);
   $('chat').scrollTop = $('chat').scrollHeight;
   return div;
+}
+
+/** 长思考时的动态提示（v0.57）：轮换"正在做什么"，避免看起来像卡死。 */
+function spinWorking(w) {
+  const hints = ['正在理解你这句话…', '正在更新实时大纲…', '正在想下一个问题…', '快好了…'];
+  let i = 0;
+  return setInterval(() => {
+    const el = w?.querySelector('.working-label');
+    if (el) el.textContent = hints[i++ % hints.length];
+  }, 6000);
 }
 
 function renderAsk(r) {
@@ -835,6 +861,22 @@ function renderAsk(r) {
   if (r.options && r.options.length) {
     html += `<div class="options">${r.options.map((o, i) => `<button class="opt" data-opt="${esc(o)}">${'ABC'[i]}. ${esc(o)}</button>`).join('')}</div>`;
   }
+  // 对话内联实时大纲：即使不看右侧面板，用户也能在对话里看到大纲逐步成形
+  const lo = r.liveOutline || null;
+  if (lo && Array.isArray(lo.sections) && lo.sections.length) {
+    const rows = lo.sections
+      .map(
+        (s, i) =>
+          `<div class="mo-row"><span class="mo-no">${i + 1}</span><b>${esc(s.heading || '未命名节')}</b>${s.thesis ? `<i>${esc(s.thesis)}</i>` : ''}${s.words ? `<em>${s.words}字</em>` : ''}</div>`,
+      )
+      .join('');
+    html += `<div class="mini-outline"><div class="mo-head">📋 实时大纲 · AI 正在从对话里总结<span class="mo-meta">${lo.complete ? '已成形' : '继续生长中'}</span></div>${rows}</div>`;
+  } else if (r.checklist?.length) {
+    // 大纲还没成形时，至少让用户看到"AI 已捕捉/还差什么"的实时进度
+    const got = r.checklist.filter((c) => c.done).map((c) => c.label.replace(/（.*?）/, '')).join('、');
+    html += `<div class="mini-outline dim"><div class="mo-head">🧩 我正在建立大纲 · 已捕捉：${esc(got || '开始收集')}</div><div class="mo-row muted">大纲会在对话中由我逐步总结成形——右侧面板会实时更新</div></div>`;
+  }
+  if (r.warn) html += `<div class="hint warn">${esc(r.warn)}</div>`;
   const el = addMsg('bot', html);
   el.querySelectorAll('.opt').forEach((b) => {
     b.addEventListener('click', () => { $('input').value = b.dataset.opt; send(); });
@@ -1041,6 +1083,25 @@ async function handleStep(r) {
     addMsg('bot', esc(r.message || '（完成）'));
   }
   refreshPanel();
+  // 实时大纲更新反馈：节数增长 → 右侧面板自动可见、切到大纲标签并高亮闪烁，
+  // 让"大纲随对话逐步成形"这件事肉眼可见。
+  const outlineCount = r.liveOutline?.sections?.length || 0;
+  if (outlineCount > prevOutlineCount) {
+    prevOutlineCount = outlineCount;
+    contextVisible = true;
+    updateContextVisibility();
+    setPanelTab('outline');
+    const pane = $('pane-outline');
+    if (pane) {
+      pane.classList.remove('ol-flash');
+      void pane.offsetWidth;
+      pane.classList.add('ol-flash');
+      setTimeout(() => pane.classList.remove('ol-flash'), 1500);
+    }
+    toast(`📋 实时大纲更新到 ${outlineCount} 部分`);
+  } else if (r.kind === 'ask' && outlineCount === 0) {
+    prevOutlineCount = 0;
+  }
 }
 
 async function submitChat(text) {
@@ -1049,12 +1110,15 @@ async function submitChat(text) {
   addMsg('user', esc(msg));
   busy = true; $('send').disabled = true;
   const w = addWorking('Sculptor 正在思考…');
+  const spin = spinWorking(w);
   try {
     const r = await apiPost('/api/step', { sessionId, message: msg });
     w.remove();
     await handleStep(r);
   } catch (e) {
     w.remove(); addMsg('bot', `<span style="color:var(--bad)">${esc(e.message)}</span>`);
+  } finally {
+    clearInterval(spin);
   }
   busy = false; $('send').disabled = false;
 }
@@ -1070,6 +1134,7 @@ async function send() {
     $('sessionTitle').textContent = '正在理解你的想法…';
     addMsg('user', esc(text));
     const w = addWorking('正在理解你的想法…');
+    const spin = spinWorking(w);
     try {
       const r = await apiPost('/api/start', { topic: text });
       sessionId = r.sessionId;
@@ -1081,6 +1146,8 @@ async function send() {
     } catch (e) {
       w.remove();
       addMsg('bot', `<span style="color:var(--bad)">${esc(e.message)}</span>`);
+    } finally {
+      clearInterval(spin);
     }
     busy = false; $('send').disabled = false; $('seedSend').disabled = false;
     $('input').value = ''; $('seedInput').value = '';
@@ -1098,6 +1165,7 @@ async function resumeSession(id) {
     applyMeta(metaData.meta);
     contextVisible = true;
     updateContextVisibility();
+    setPanelTab('outline');
     const t = await apiGet(`/api/transcript?sessionId=${id}`);
     $('chat').innerHTML = '';
     let sawDraft = false;

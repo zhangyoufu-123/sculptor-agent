@@ -52,6 +52,7 @@ export function loadConfig(env = process.env) {
     styleEma: Number(env.SCULPTOR_STYLE_EMA || 0.75),
     maxTokens: Number(env.SCULPTOR_LLM_MAX_TOKENS || 8000),
     timeoutMs: Number(env.SCULPTOR_LLM_TIMEOUT_MS || 300000),
+    retries: Number(env.SCULPTOR_LLM_RETRIES || 4),
     targetWords: Number(env.SCULPTOR_TARGET_WORDS || 1000),
     quick: env.SCULPTOR_QUICK === '1' || env.SCULPTOR_QUICK === 'true',
     roundtrip: env.SCULPTOR_ROUNDTRIP !== '0',
