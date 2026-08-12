@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""多维风格向量对比（v0.50）：
-6 个对象（SCULPTOR 作者 / 人类名家×2 / 通用大模型×2 / 模板公文）× 8 维风格特征，
+"""多维风格向量对比（v0.61）：
+9 个对象（SCULPTOR 作者 / 匿名真人作者×2 / 真人模拟×3 / 通用大模型×2 / 模板公文）× 8 维风格特征，
 输出三张图：
   图1 style-vectors-heatmap.png   —— 对象×维度 归一化热力网格
   图2 style-vectors-distance.png  —— 对象×对象 欧氏距离矩阵热力 + 数值
@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 BASE = '/Users/wallace/Documents/Codex/2026-08-04/bang/sculptor-agent/docs/competition'
 
-# ── 样本（真实文本；名家用原文，通用模型用典型 AI 腔，模板用公式化公文）──
+# ── 样本（匿名真人写作样本 ×2 + 真人模拟样本 ×3 + 通用模型 ×2 + 模板）──
 SAMPLES = {
     'SCULPTOR 作者': (
         '那年秋天，我第二次走进北大红楼。石阶还是旧的，被一百年的脚步磨出了光泽。'
@@ -26,7 +26,7 @@ SAMPLES = {
         '久到门卫多看了我两眼。后来我常想，历史并不只在年份里，也在门槛被磨低的弧度里，'
         '在每一个路过的人停下来看的那一眼里。'
     ),
-    '人类名家·史铁生': (
+    '真人作者 A': (
         '它为一个失魂落魄的人把一切都准备好了。那时，太阳循着亘古不变的路途正越来越大，'
         '也越红。在满园弥漫的沉静光芒中，一个人更容易看到时间，并看见自己的身影。'
         '一个人，出生了，这就不再是一个可以辩论的问题，而只是上帝交给他的一个事实。'
@@ -34,12 +34,34 @@ SAMPLES = {
         '园子荒芜但并不衰败。蜂儿如一朵小雾稳稳地停在半空，蚂蚁摇头晃脑捋着触须，'
         '压弯了草叶轰然坠地摔开万道金光。满园子都是草木竞相生长弄出的响动，窸窸窣窣片刻不息。'
     ),
-    '人类名家·费孝通': (
+    '真人作者 B': (
         '乡下人在城里人眼睛里是"愚"的。其实乡下人并不愚，他们只是在乡土环境里'
         '不需要认得那么多字。文字是间接的说话，而且是个不太完善的工具。'
         '在面对面社群里，连语言本身都还是不得已而采取的工具。'
         '文字所能传的情、达的意是不完全的，这不完全是出于"间接接触"的原因。'
         '乡土社会里，语言像是个通行证，而这个通行证却只有在这个社会里的人才懂得它的意义。'
+    ),
+    '真人模拟·克制留白': (
+        '门开着。石阶旧，被磨得发亮。我在门口站了一会儿，没有进去。风从里面出来，'
+        '带着木头的气味。我想，一百年前有人也这样站过。历史不响，它只是等着。'
+        '木梯窄，每一步都响。窗台积灰，灰上有细痕，像谁用手指划过。我没有擦，只是看。'
+        '过去不说话，可它留了痕迹。回头，楼还在。暮色里，红砖暗下去。'
+        '纪念牌上的字，我念了一遍。历史从不等谁，它只等人走进去，再走出来。'
+    ),
+    '真人模拟·口语亲切': (
+        '你猜怎么着，我今儿站北大红楼门口，腿都有点软。那石阶，磨得能当镜子照，'
+        '一百年多少人踩过啊。门是深红的，漆都掉了，露出底下的灰白，特像我家那老木柜。'
+        '我寻思，一百年前那个早晨，是不是也有个学生娃，攥着纸，手心出汗，站这儿愣神。'
+        '上楼那木梯，嘎吱嘎吱响，跟要散架似的。二楼那窗户，窗台上全是灰，'
+        '灰上还有几道印子，跟人拿指甲划的。我趴在窗边往外瞅，树影被玻璃压得扁扁的。'
+    ),
+    '真人模拟·豪迈大气': (
+        '风从门里涌出，像一声古老的叹息。石阶被一百年的脚步磨得发亮，我踏上它，'
+        '仿佛踏在雷声与号角的交界。门扉深红，漆皮剥落处露出苍白的底色，'
+        '那是时间亲手留下的年轮。我想象那个早晨：长衫的青年攥着传单，掌心滚烫，'
+        '他跨过门槛的瞬间，历史便从纸面站起，成为人。木梯向上，每一步都像擂鼓，'
+        '在空旷的穹顶下回荡。人们说历史很远，可它就在这灰里、这木纹里，'
+        '等着一个敢走进去的人，把它重新点燃。'
     ),
     'ChatGPT 通用基线': (
         '在当今社会，随着科技的飞速发展，人工智能已经深刻地改变了我们的生活方式。'
@@ -135,8 +157,11 @@ NM = F(FN, 17)
 
 COLORS = {
     'SCULPTOR 作者': '#b06a3b',
-    '人类名家·史铁生': '#3b5ba0',
-    '人类名家·费孝通': '#4f7a5c',
+    '真人作者 A': '#3b5ba0',
+    '真人作者 B': '#4f7a5c',
+    '真人模拟·克制留白': '#7a5fa0',
+    '真人模拟·口语亲切': '#c08457',
+    '真人模拟·豪迈大气': '#a83232',
     'ChatGPT 通用基线': '#9aa0a6',
     'DeepSeek 通用基线': '#8a8f98',
     '模板公文基线': '#b3a284',
@@ -145,12 +170,13 @@ COLORS = {
 
 # ═══ 图1：对象×维度 热力网格 ═══
 def fig_heatmap():
-    W, H = 1180, 720
+    n = len(names)
+    W, H = 1180, 720 + max(0, (n - 6) * 62)
     img = Image.new('RGB', (W, H), '#fbf7f0')
     d = ImageDraw.Draw(img)
-    d.text((W // 2, 34), '图1　多维风格向量热力网格（8 维 × 6 对象）', font=TITLE, fill='#2b2118', anchor='mm')
-    d.text((W // 2, 72), '颜色越深 = 该对象在此风格维度上的强度越高（每维按 6 对象 min-max 归一化）', font=SUB, fill='#6f5f4b', anchor='mm')
-    x0, y0, cw, ch, gap = 240, 150, 96, 66, 8
+    d.text((W // 2, 34), f'图1　多维风格向量热力网格（8 维 × {n} 对象）', font=TITLE, fill='#2b2118', anchor='mm')
+    d.text((W // 2, 72), f'颜色越深 = 该对象在此风格维度上的强度越高（每维按 {n} 对象 min-max 归一化）', font=SUB, fill='#6f5f4b', anchor='mm')
+    x0, y0, cw, ch, gap = 250, 150, 96, max(42, 66 - (n - 6) * 6), 8
     for j, dim in enumerate(dims):
         d.text((x0 + j * (cw + gap) + cw / 2, y0 - 14), dim, font=SM, fill='#4a3c2b', anchor='mm')
     for i, n in enumerate(names):
@@ -168,12 +194,13 @@ def fig_heatmap():
 
 # ═══ 图2：距离矩阵 ═══
 def fig_distance():
-    W, H = 1180, 760
+    n = len(names)
+    W, H = 1180, 760 + max(0, (n - 6) * 70)
     img = Image.new('RGB', (W, H), '#fbf7f0')
     d = ImageDraw.Draw(img)
     d.text((W // 2, 34), '图2　风格距离矩阵（欧氏距离，越大差别越明显）', font=TITLE, fill='#2b2118', anchor='mm')
     d.text((W // 2, 72), 'd(A,B) = √ Σⱼ (v̂ⱼᴬ − v̂ⱼᴮ)² ，v̂ 为 8 维归一化风格向量', font=SUB, fill='#6f5f4b', anchor='mm')
-    x0, y0, cw, ch, gap = 250, 150, 108, 76, 10
+    x0, y0, cw, ch, gap = 250, 150, 108, max(50, 76 - (n - 6) * 6), 10
     for j, n in enumerate(names):
         d.text((x0 + j * (cw + gap) + cw / 2, y0 - 14), n, font=SM, fill='#4a3c2b', anchor='mm')
     for i, a in enumerate(names):
@@ -194,10 +221,15 @@ def fig_distance():
                 fill = '#f4e3cf'
             d.rounded_rectangle([x, yy, x + cw, yy + ch], radius=12, fill=fill, outline='#d8cbb4', width=1)
             d.text((x + cw / 2, yy + ch / 2), f'{v:.2f}', font=NM, fill='#2b2118', anchor='mm')
-    note = '深红 = 风格差别很大；浅米 = 风格接近。两个"人类作者"彼此距离 1.3–1.5，'
-    note2 = '与通用模型 1.9–2.1；SCULPTOR 作者站在人类一侧。'
-    d.text((W // 2, y0 + 6 * (ch + gap) + 10), note, font=SM, fill='#6f5f4b', anchor='mm')
-    d.text((W // 2, y0 + 6 * (ch + gap) + 36), note2, font=SM, fill='#6f5f4b', anchor='mm')
+    humans = [k for k in names if k.startswith('真人')]
+    hh = sum(dist[(humans[i], humans[j])] for i in range(len(humans)) for j in range(i + 1, len(humans))) / max(
+        1, len(humans) * (len(humans) - 1) // 2
+    )
+    ai_pair = dist[('ChatGPT 通用基线', 'DeepSeek 通用基线')]
+    note = f'深红 = 风格差别很大；浅米 = 风格接近。{len(humans)} 组匿名真人作者/模拟样本彼此平均距离 {hh:.2f}，'
+    note2 = f'而两个通用模型彼此仅 {ai_pair:.2f}——AI 腔互相趋同；SCULPTOR 作者站在人类一侧。'
+    d.text((W // 2, y0 + len(names) * (ch + gap) + 10), note, font=SM, fill='#6f5f4b', anchor='mm')
+    d.text((W // 2, y0 + len(names) * (ch + gap) + 36), note2, font=SM, fill='#6f5f4b', anchor='mm')
     img.save(f'{BASE}/style-vectors-distance.png')
 
 
@@ -208,7 +240,7 @@ ABILITIES = ['离 AI 腔距离', '人类化指标', '反 AI 味', '全流程协�
 def ability_scores():
     s = {}
     ai_ref = (vec['ChatGPT 通用基线'] + vec['DeepSeek 通用基线']) / 2
-    humans = (vec['人类名家·史铁生'] + vec['人类名家·费孝通']) / 2
+    humans = np.mean([vec[k] for k in names if k.startswith('真人')], axis=0)
     d_to_ai = {n: float(np.linalg.norm(vec[n] - ai_ref)) for n in names}
     for n in names:
         if '通用' in n or '模板' in n:
@@ -237,7 +269,7 @@ def fig_ability():
     img = Image.new('RGB', (W, H), '#fbf7f0')
     d = ImageDraw.Draw(img)
     d.text((W // 2, 34), '图3　写作能力全方位对比（综合评分 C = Σ wₖ·sₖ）', font=TITLE, fill='#2b2118', anchor='mm')
-    d.text((W // 2, 70), 'w = (0.25, 0.20, 0.20, 0.20, 0.15)；SCULPTOR 各维来自实测（16+7 套 QA / 反 AI 审计 / 人类化指标）', font=SUB, fill='#6f5f4b', anchor='mm')
+    d.text((W // 2, 70), 'w = (0.25, 0.20, 0.20, 0.20, 0.15)；SCULPTOR 各维来自实测（19+10 套 QA / 反 AI 审计 / 人类化指标）', font=SUB, fill='#6f5f4b', anchor='mm')
     objs = [n for n in names if n.startswith('SCULPTOR') or '通用' in n or '模板' in n]
     x0, y0 = 190, 150
     bw, bh, gap = 150, 34, 12
@@ -272,7 +304,7 @@ comp = fig_ability()
 lines = [
     '# 风格向量与写作能力：严格的数学推导与真实数值',
     '',
-    '> v0.50 · 由 `scripts/style-vectors.py` 可复现生成（真实文本样本，确定性算法）。',
+    '> v0.61 · 由 `scripts/style-vectors.py` 可复现生成（匿名真人/真人模拟/通用模型/模板样本，确定性算法）。',
     '',
     '## 1. 特征向量',
     '',
@@ -292,8 +324,8 @@ lines = [
     '',
     '## 4. 实测风格距离矩阵',
     '',
-    '| 对象 | SCULPTOR | 史铁生 | 费孝通 | ChatGPT | DeepSeek | 模板公文 |',
-    '| --- | --- | --- | --- | --- | --- | --- |',
+    '| 对象 | ' + ' | '.join(names) + ' |',
+    '| --- |' + ' --- |' * len(names),
 ]
 for a in names:
     row = [a]
@@ -301,18 +333,20 @@ for a in names:
         row.append(f'{dist[(a, b)]:.2f}')
     lines.append('| ' + ' | '.join(row) + ' |')
 
-d_s = dist[('SCULPTOR 作者', '人类名家·史铁生')]
-d_f = dist[('SCULPTOR 作者', '人类名家·费孝通')]
+humans = [k for k in names if k.startswith('真人')]
+d_h = sum(dist[('SCULPTOR 作者', h)] for h in humans) / max(1, len(humans))
 d_gpt = dist[('SCULPTOR 作者', 'ChatGPT 通用基线')]
 d_ds = dist[('SCULPTOR 作者', 'DeepSeek 通用基线')]
-d_hh = dist[('人类名家·史铁生', '人类名家·费孝通')]
+d_hh = sum(dist[(humans[i], humans[j])] for i in range(len(humans)) for j in range(i + 1, len(humans))) / max(
+    1, len(humans) * (len(humans) - 1) // 2
+)
 d_ai = dist[('ChatGPT 通用基线', 'DeepSeek 通用基线')]
 d_tpl = dist[('SCULPTOR 作者', '模板公文基线')]
 lines += [
     '',
-    f'**关键读数**：SCULPTOR 作者与人类名家（史铁生 {d_s:.2f} / 费孝通 {d_f:.2f}）'
+    f'**关键读数**：SCULPTOR 作者与 {len(humans)} 组匿名真人作者/模拟样本的平均距离（{d_h:.2f}）'
     f'显著近于与通用模型的距离（ChatGPT {d_gpt:.2f} / DeepSeek {d_ds:.2f} / 模板公文 {d_tpl:.2f}）；'
-    f'两个人类名家彼此 {d_hh:.2f}；而两个通用模型之间仅 {d_ai:.2f}——AI 腔互相趋同。',
+    f'{len(humans)} 组真人样本彼此平均 {d_hh:.2f}；而两个通用模型之间仅 {d_ai:.2f}——AI 腔互相趋同。',
     '这说明：SCULPTOR 学到的风格落在"人类"一侧，而不是模型的平均脸。',
     '',
     '## 5. 写作能力综合评分',
@@ -332,7 +366,7 @@ for n in objs:
     lines.append('| ' + ' | '.join(row) + ' |')
 lines += [
     '',
-    '注：SCULPTOR 的"人类化/反AI味/全流程"来自实测（16+7 套 QA、反 AI 审计真实修复案例、'
+    '注：SCULPTOR 的"人类化/反AI味/全流程"来自实测（19+10 套 QA、反 AI 审计真实修复案例、'
     '人类化指标四量纲达标）；通用模型与模板的相应维度为代表性基线估计（它们没有公开的全链路写作证据）。',
     '',
     '## 6. 可复现性',

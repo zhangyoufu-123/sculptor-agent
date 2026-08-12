@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""风格建模空间（MDS 投影）可复现生成（v0.56）。
-对 6 类文本的风格距离矩阵做经典 MDS 降维到 2D，报告 Kruskal Stress-1，
+"""风格建模空间（MDS 投影）可复现生成（v0.61）。
+对 9 类文本的风格距离矩阵做经典 MDS 降维到 2D，报告 Kruskal Stress-1，
 并重绘 docs/competition/style-space.png（人类与机器分域可视化）。
 """
 import os
@@ -12,14 +12,17 @@ BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(BASE, 'docs', 'competition', 'style-space.png')
 FONT = '/System/Library/Fonts/Hiragino Sans GB.ttc'
 
-labels = ['SCULPTOR', '史铁生', '费孝通', 'ChatGPT', 'DeepSeek', '模板公文']
+labels = ['SCULPTOR', '真人A', '真人B', '模拟·克制', '模拟·口语', '模拟·豪迈', 'ChatGPT', 'DeepSeek', '模板公文']
 D = np.array([
-    [0.00, 1.11, 1.54, 1.46, 1.49, 1.98],
-    [1.11, 0.00, 1.67, 1.71, 1.77, 2.30],
-    [1.54, 1.67, 0.00, 1.49, 1.60, 2.08],
-    [1.46, 1.71, 1.49, 0.00, 0.65, 1.45],
-    [1.49, 1.77, 1.60, 0.65, 0.00, 1.26],
-    [1.98, 2.30, 2.08, 1.45, 1.26, 0.00],
+    [0.00, 1.07, 1.32, 0.90, 1.10, 0.41, 1.24, 1.10, 1.68],
+    [1.07, 0.00, 1.46, 1.28, 1.42, 0.93, 1.50, 1.43, 1.98],
+    [1.32, 1.46, 0.00, 1.47, 1.15, 1.50, 1.43, 1.37, 1.91],
+    [0.90, 1.28, 1.47, 0.00, 1.27, 1.05, 1.51, 1.51, 1.73],
+    [1.10, 1.42, 1.15, 1.27, 0.00, 1.10, 1.74, 1.65, 2.20],
+    [0.41, 0.93, 1.50, 1.05, 1.10, 0.00, 1.44, 1.31, 1.88],
+    [1.24, 1.50, 1.43, 1.51, 1.74, 1.44, 0.00, 0.47, 1.35],
+    [1.10, 1.43, 1.37, 1.51, 1.65, 1.31, 0.47, 0.00, 1.20],
+    [1.68, 1.98, 1.91, 1.73, 2.20, 1.88, 1.35, 1.20, 0.00],
 ], dtype=float)
 n = D.shape[0]
 J = np.eye(n) - np.ones((n, n)) / n
@@ -43,7 +46,7 @@ def f(sz):
 W, H = 1500, 1000
 img = Image.new('RGB', (W, H), 'white')
 d = ImageDraw.Draw(img)
-d.text((W / 2, 52), f'风格建模空间：6 类文本的 MDS 投影（Stress-1 = {stress:.3f}）',
+d.text((W / 2, 52), f'风格建模空间：9 类文本的 MDS 投影（Stress-1 = {stress:.3f}）',
        font=f(40), fill='#1a2333', anchor='mm')
 x0, x1, y0, y1 = 140, W - 140, 130, H - 90
 xs, ys = coords[:, 0], coords[:, 1]
@@ -63,9 +66,9 @@ d.line([x0, y0, x0, y1], fill='#5c6b7a', width=2)
 d.text(((x0 + x1) / 2, y1 + 38), 'MDS 维度 1（风格主成分）', font=f(24), fill='#5c6b7a', anchor='mm')
 d.text((x0 - 46, (y0 + y1) / 2), 'MDS 维度 2', font=f(24), fill='#5c6b7a', anchor='rm')
 groups = [
-    ([0, 1, 2], '#8fb8e8', '#2f6fb0', '人类侧（SCULPTOR 与名家同域）'),
-    ([3, 4], '#f2b8b8', '#c0504d', '通用模型（AI 腔趋同域）'),
-    ([5], '#d8d8d8', '#8a8a8a', '模板公文（机械域）'),
+    ([0, 1, 2, 3, 4, 5], '#8fb8e8', '#2f6fb0', '人类侧（SCULPTOR 与匿名真人作者/模拟样本同域）'),
+    ([6, 7], '#f2b8b8', '#c0504d', '通用模型（AI 腔趋同域）'),
+    ([8], '#d8d8d8', '#8a8a8a', '模板公文（机械域）'),
 ]
 for gidx, gcol, gout, glabel in groups:
     gx = [pts[i][0] for i in gidx]; gy = [pts[i][1] for i in gidx]
@@ -75,7 +78,7 @@ for gidx, gcol, gout, glabel in groups:
     d.text((cx, cy), glabel, font=f(22), fill=gout, anchor='mm')
 for i in range(n):
     r = 22 if i == 0 else 15
-    col = '#2f6fb0' if i in (0, 1, 2) else ('#c0504d' if i in (3, 4) else '#8a8a8a')
+    col = '#2f6fb0' if i <= 5 else ('#c0504d' if i in (6, 7) else '#8a8a8a')
     d.ellipse([pts[i][0] - r, pts[i][1] - r, pts[i][0] + r, pts[i][1] + r], fill=col)
     d.text((pts[i][0], pts[i][1] - r - 18), labels[i] + ('（本系统）' if i == 0 else ''),
            font=f(26), fill='#1a2333', anchor='mm')
