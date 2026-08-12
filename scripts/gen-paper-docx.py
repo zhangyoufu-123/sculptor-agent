@@ -61,7 +61,7 @@ def acc(e):
 
 
 def build_equations():
-    """论文四个公式的 OMML（式 1–4），序号随公式右置。"""
+    """论文八个公式的 OMML（式 1–8），序号随公式右置。"""
     vhat = acc(run('v'))
     vjA = ssubsup(acc(run('v')), run('j'), run('(A)'))
     vjB = ssubsup(acc(run('v')), run('j'), run('(B)'))
@@ -95,8 +95,41 @@ def build_equations():
         run(' + '), run('0.20'), run(' '), s3,
         run(' + '), run('0.20'), run(' '), s4,
         run(' + '), run('0.15'), run(' '), s5,
+        run('　(8)'))
+
+    # 式 4：token 级 surprisal 判别式
+    r_rare = ssub(run('r'), run('rare'))
+    v_sent = ssub(run('v'), run('sent'))
+    r_ai = ssub(run('r'), run('ai'))
+    f5 = seq(
+        run('S'), delim(run('x')), run(' = '),
+        run('0.5'), run(' '), r_rare, delim(run('x')),
+        run(' + '), run('0.3'), run(' '), v_sent, delim(run('x')),
+        run(' + '), run('0.2'), run(' '),
+        delim(seq(run('1'), run(' − '), r_ai, delim(run('x')))),
         run('　(4)'))
-    return [f1, f2, f3, f4]
+
+    # 式 5：困惑度代理
+    f6 = seq(
+        run('PP'), delim(run('x')), run(' = '), run('2'), run(' + '), run('6'),
+        run('·'), run('S'), delim(run('x')), run('　(5)'))
+
+    # 式 6：EMA 增量更新
+    f7 = seq(
+        ssub(run('v'), run('t')), run(' = '), run('α'), run(' '),
+        ssub(run('v'), run('t−1')), run(' + '), delim(run('1−α')), run(' '),
+        run('φ'), delim(ssub(run('x'), run('t'))), run('　(6)'))
+
+    # 式 7：风格偏离方向（归一化）
+    v_author = ssub(run('v'), run('author'))
+    v_base = ssub(run('v'), run('base'))
+    diff78 = seq(v_author, run(' − '), v_base)
+    f8 = seq(
+        run('s'), run(' = '),
+        frac(delim(diff78), seq(run('‖'), delim(diff78), run('‖'))),
+        run('　(7)'))
+
+    return [f1, f2, f3, f4, f5, f6, f7, f8]
 
 
 EQUATIONS = build_equations()
@@ -179,6 +212,10 @@ MATH_KEYS = [
     (r'\frac{v_j', 1),
     (r'\sqrt{\sum', 2),
     ('0.25', 3),
+    (r'PP(x)', 5),
+    (r'S(x)', 4),
+    (r'v_t', 6),
+    (r'v_{\mathrm{author}}', 7),
 ]
 
 
