@@ -1673,11 +1673,148 @@ async function openWork(sid, file) {
     workCtx = { sessionId: sid, file };
     $('workModalTitle').textContent = title || '作品';
     $('workModalPaper').innerHTML = mdToHtml(text);
+    $('workAnnPanel').hidden = true;
     $('workModal').hidden = false;
   } catch (e) {
     toast('打开作品失败：' + e.message);
   }
 }
+
+/* ── 批注（v0.61）：选段批注 → 落库 → 查看/删除 → 一键 AI 按批注修改 ── */
+let annFloat = null;
+
+async function renderAnnPanel(file, sid, listId, titleId) {
+  if (!sid) return;
+  const el = $(listId);
+  try {
+    const list = await annListFor(sid, file);
+    if (!list.length) {
+      el.innerHTML = '<div class="empty">还没有批注。在正文里选中一段文字，就会出现批注入口。</div>';
+    } else {
+      el.innerHTML = list
+        .map(
+          (a) => `
+      <div class="ann-item ${a.status === 'done' ? 'done' : ''}" data-id="${esc(a.id)}">
+        <div class="ann-quote">“${esc(a.quote)}”</div>
+        <div class="ann-comment">${esc(a.comment)}</div>
+        <div class="ann-meta">${a.status === 'done' ? '已应用 ✓' : '待处理'} · ${fmtDate(a.ts)}</div>
+        <div class="ops"><button class="icon-btn" data-op="jump">定位</button><button class="icon-btn danger" data-op="del">删除</button></div>
+      </div>`,
+        )
+        .join('');
+    }
+    if (titleId) $(titleId).textContent = `批注（${list.length}）`;
+    el.querySelectorAll('[data-op]').forEach((b) => {
+      b.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const item = b.closest('.ann-item');
+        const id = item.dataset.id;
+        if (b.dataset.op === 'del') {
+          apiDelete('/api/annotations', { sessionId: sid, id })
+            .then(() => { toast('批注已删除'); renderAnnPanel(file, sid, listId, titleId); })
+            .catch((e) => toast(e.message));
+        } else {
+          annJump(item.querySelector('.ann-quote').textContent.replace(/^“|”$/g, ''));
+        }
+      });
+    });
+  } catch {
+    el.innerHTML = '<div class="empty">批注读取失败</div>';
+  }
+}
+
+async function annListFor(sid, file) {
+  const q = new URLSearchParams({ sessionId: sid });
+  if (file) q.set('file', file);
+  const r = await apiGet(`/api/annotations?${q.toString()}`);
+  return r.annotations || [];
+}
+
+function annJump(quote) {
+  const container = document.querySelector('#draftPaper:not([hidden]), #workModalPaper:not([hidden])');
+  if (!container) return;
+  const nodes = [...container.querySelectorAll('p, h1, h2, h3, li')];
+  const p = nodes.find((x) => (x.textContent || '').includes(quote));
+  if (p) {
+    p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    p.classList.remove('ann-flash');
+    void p.offsetWidth;
+    p.classList.add('ann-flash');
+    setTimeout(() => p.classList.remove('ann-flash'), 1500);
+  } else {
+    toast('原文中找不到该片段（可能已被修改）');
+  }
+}
+
+function hideAnnInput() {
+  if (annFloat) { annFloat.remove(); annFloat = null; }
+}
+
+function showAnnInput(x, y, sid, file, quote) {
+  hideAnnInput();
+  const card = document.createElement('div');
+  card.className = 'ann-input';
+  card.style.left = Math.min(x, window.innerWidth - 300) + 'px';
+  card.style.top = Math.min(y, window.innerHeight - 170) + 'px';
+  card.innerHTML = `
+    <div class="ann-input-quote">“${esc(quote.slice(0, 80))}”</div>
+    <textarea rows="3" placeholder="写批注，例如：这段太 AI 腔，改成短句；这句公式渲染有问题…"></textarea>
+    <div class="ops"><button class="btn btn-gold btn-sm" id="annInputSave">保存批注</button><button class="btn btn-ghost btn-sm" id="annInputCancel">取消</button></div>`;
+  document.body.appendChild(card);
+  card.querySelector('#annInputSave').addEventListener('click', async () => {
+    const comment = card.querySelector('textarea').value.trim();
+    if (!comment) { toast('批注内容不能为空'); return; }
+    try {
+      await apiPost('/api/annotations', { sessionId: sid, file, quote, comment });
+      toast('批注已保存');
+      hideAnnInput();
+      if (file === 'draft.md' && !$('annPanel').hidden) renderAnnPanel('draft.md', sid, 'annList', 'annTitle');
+      else if ($('workAnnPanel') && !$('workAnnPanel').hidden && workCtx) renderAnnPanel(workCtx.file, workCtx.sessionId, 'workAnnList');
+    } catch (e) { toast(e.message); }
+  });
+  card.querySelector('#annInputCancel').addEventListener('click', hideAnnInput);
+  annFloat = card;
+}
+
+document.addEventListener('mouseup', (e) => {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) { hideAnnInput(); return; }
+  const text = String(sel.toString() || '').trim();
+  const node = sel.anchorNode;
+  const container = node && node.nodeType === 3 ? node.parentElement : node;
+  const inDraft = container && container.closest('#draftPaper');
+  const inWork = container && container.closest('#workModalPaper');
+  if ((!inDraft && !inWork) || text.length < 2) { hideAnnInput(); return; }
+  const sid = sessionId || (workCtx && workCtx.sessionId) || '';
+  const file = inDraft ? 'draft.md' : (workCtx && workCtx.file) || '';
+  if (!sid || !file) { hideAnnInput(); return; }
+  showAnnInput(e.clientX + 8, e.clientY + 14, sid, file, text);
+});
+
+$('draftAnn')?.addEventListener('click', async () => {
+  const show = $('annPanel').hidden;
+  $('annPanel').hidden = !show;
+  if (show && sessionId) renderAnnPanel('draft.md', sessionId, 'annList', 'annTitle');
+});
+$('annClose')?.addEventListener('click', () => { $('annPanel').hidden = true; });
+$('annApply')?.addEventListener('click', async () => {
+  try {
+    const r = await apiPost('/api/annotations/apply', { sessionId });
+    toast(`已应用 ${r.applied.length} 条${r.failed.length ? `，失败 ${r.failed.length} 条` : ''}`);
+    if (r.applied.length) {
+      const d = await apiGet(`/api/draft?sessionId=${sessionId}`);
+      if (d.text) renderDraft(d.text);
+    }
+    renderAnnPanel('draft.md', sessionId, 'annList', 'annTitle');
+  } catch (e) { toast(e.message); }
+});
+$('workModalAnn')?.addEventListener('click', async () => {
+  if (!workCtx) return;
+  const show = $('workAnnPanel').hidden;
+  $('workAnnPanel').hidden = !show;
+  if (show) renderAnnPanel(workCtx.file, workCtx.sessionId, 'workAnnList');
+});
+$('workAnnClose')?.addEventListener('click', () => { $('workAnnPanel').hidden = true; });
 
 /* ── 事件绑定 ─────────────────────────────────────── */
 $('send').addEventListener('click', send);

@@ -136,10 +136,21 @@
             <button class="btn btn-ghost" id="draftExportMd">导出 md</button>
             <button class="btn btn-ghost" id="draftExportDocx">导出 docx</button>
             <button class="btn btn-ghost" id="draftExportPptx">导出 pptx</button>
+            <button class="btn btn-ghost" id="draftAnn">批注</button>
           </div>
         </div>
         <article class="paper" id="draftPaper"></article>
         <textarea class="editor" id="draftEditor" rows="24" hidden></textarea>
+        <div class="ann-panel" id="annPanel" hidden>
+          <div class="ann-head">
+            <span id="annTitle">批注（选中文字即可批注）</span>
+            <span class="ops">
+              <button class="icon-btn" id="annApply">AI 按批注修改</button>
+              <button class="icon-btn" id="annClose">收起</button>
+            </span>
+          </div>
+          <div class="ann-list" id="annList"></div>
+        </div>
         <div class="draft-actions">
           <button class="btn btn-ghost" id="draftBack">回到写作</button>
           <button class="btn btn-gold" id="draftAudit">查看审计报告</button>
@@ -290,11 +301,19 @@
     <div class="modal-card">
       <div class="modal-head">
         <h3 id="workModalTitle">作品</h3>
+        <button class="btn btn-ghost" id="workModalAnn">批注</button>
         <button class="btn btn-ghost" id="workModalExportMd">导出 md</button>
         <button class="btn btn-ghost" id="workModalExportDocx">导出 docx</button>
         <button class="btn btn-ghost" id="workModalClose">关闭</button>
       </div>
       <article class="paper modal-paper" id="workModalPaper"></article>
+      <div class="ann-panel" id="workAnnPanel" hidden>
+        <div class="ann-head">
+          <span>作品批注</span>
+          <span class="ops"><button class="icon-btn" id="workAnnClose">收起</button></span>
+        </div>
+        <div class="ann-list" id="workAnnList"></div>
+      </div>
     </div>
   </div>
 

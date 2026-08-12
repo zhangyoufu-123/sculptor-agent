@@ -674,6 +674,91 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // ── 批注（v0.61）：选段批注 → 落库 → 查看/删除 → 一键 AI 按批注修改 ──
+  const annFile = (dir) => path.join(dir, 'vault', 'annotations.jsonl');
+  const readAnn = (dir) => {
+    try {
+      return fs
+        .readFileSync(annFile(dir), 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map((l) => JSON.parse(l));
+    } catch {
+      return [];
+    }
+  };
+  const writeAnn = (dir, list) => {
+    fs.mkdirSync(path.join(dir, 'vault'), { recursive: true });
+    fs.writeFileSync(annFile(dir), list.map((a) => JSON.stringify(a)).join('\n') + (list.length ? '\n' : ''));
+  };
+  if (req.method === 'POST' && p === '/api/annotations') {
+    const { sessionId = '', file = 'draft.md', quote = '', comment = '' } = await body(req);
+    const id = String(sessionId || '');
+    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    if (!String(quote || '').trim() || !String(comment || '').trim()) {
+      return json(res, 400, { error: '缺少选中原文或批注内容' });
+    }
+    const dir = sessionDir(id);
+    const list = readAnn(dir);
+    const entry = {
+      id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+      ts: ws.nowIso(),
+      file: String(file).slice(0, 120),
+      quote: String(quote).slice(0, 300),
+      comment: String(comment).slice(0, 600),
+      status: 'open',
+    };
+    list.push(entry);
+    writeAnn(dir, list);
+    return json(res, 200, { ok: true, annotation: entry });
+  }
+  if (req.method === 'GET' && p === '/api/annotations') {
+    const id = String(url.searchParams.get('sessionId') || '');
+    const file = String(url.searchParams.get('file') || '');
+    const dir = sessionDir(id);
+    let list = readAnn(dir);
+    if (file) list = list.filter((a) => a.file === file);
+    return json(res, 200, { annotations: list.sort((a, b) => String(a.ts).localeCompare(String(b.ts))) });
+  }
+  if (req.method === 'DELETE' && p === '/api/annotations') {
+    const { sessionId = '', id: annId = '' } = await body(req);
+    const dir = sessionDir(String(sessionId || ''));
+    const list = readAnn(dir).filter((a) => a.id !== annId);
+    writeAnn(dir, list);
+    return json(res, 200, { ok: true, removed: annId });
+  }
+  if (req.method === 'POST' && p === '/api/annotations/apply') {
+    const { sessionId = '' } = await body(req);
+    const id = String(sessionId || '');
+    const dir = sessionDir(id);
+    if (!fs.existsSync(path.join(dir, 'draft.md'))) return json(res, 400, { error: '还没有成稿，无法按批注修改' });
+    const list = readAnn(dir);
+    const draftFile = path.join(dir, 'draft.md');
+    const applied = [];
+    const failed = [];
+    for (const a of list) {
+      if (a.status === 'done' || (a.file && a.file !== 'draft.md')) continue;
+      const attempts = [a.quote, `**${a.quote}**`, `\`${a.quote}\``];
+      let out = null;
+      for (const q of attempts) {
+        try {
+          out = await pointEdit(cfg, dir, { quote: q, instruction: a.comment, dir, file: draftFile });
+          break;
+        } catch (e) {
+          out = null;
+        }
+      }
+      if (out) {
+        a.status = 'done';
+        applied.push({ id: a.id, quote: a.quote.slice(0, 60) });
+      } else {
+        failed.push({ id: a.id, quote: a.quote.slice(0, 60), error: '未在原文中找到该片段，或修改失败' });
+      }
+    }
+    writeAnn(dir, list);
+    return json(res, 200, { ok: true, applied, failed, total: applied.length + failed.length });
+  }
+
   // ── 候选改写（v0.46）：选中片段 → 3 个方向不同的候选（不落盘）──
   if (req.method === 'POST' && p === '/api/rewrite') {
     const { sessionId, quote, instruction } = await body(req);
