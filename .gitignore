@@ -19,3 +19,6 @@ draft.html
 draft-*.docx
 sculptor-profile.json
 *.log
+
+__pycache__/
+*.pyc
