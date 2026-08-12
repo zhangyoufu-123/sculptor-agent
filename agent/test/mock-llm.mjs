@@ -165,6 +165,15 @@ const DISSECT = {
 
 export function respond(messages) {
   const userMsg = (messages || []).map((m) => m.content || '').join('\n');
+  if (userMsg.includes('思想对话者')) {
+    return JSON.stringify({
+      claim: '烂梗不是没素质，而是语言简化切断了交流的共同意义',
+      premise: '《乡土中国·文字下乡》：语言简化是文化发展的结果',
+      inference: '因为简化走到极端，所以交流的共同意义消失',
+      source: '《乡土中国》',
+      openQuestion: '那这种简化是语言本身的问题，还是共享语境的消失？',
+    });
+  }
   if (/\[\[[A-Z]\d+(?:_[A-Z]\d+)*\]\]/.test(userMsg)) {
     // 块级 docx 翻译/重写：按 [[ID]] 标记逐块返回，前缀标记模式（EN=翻译 / RS=重写）
     const prefix = userMsg.includes('写作风格执行器') ? 'RS:' : 'EN:';
