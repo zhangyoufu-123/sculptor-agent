@@ -22,3 +22,8 @@ sculptor-profile.json
 
 __pycache__/
 *.pyc
+
+# 比赛/论文/个人分析材料不入仓库（核心 agent 与 README 优先）
+docs/competition/
+docs/legacy/
+docs/experiments/

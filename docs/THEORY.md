@@ -183,13 +183,9 @@ translate（"翻译过来就是"式解释代替呈现）/ ending（金句收尾�
 语言新鲜度）对 6 类文本做归一化向量与欧氏距离推导（`scripts/style-vectors.py`，样本：
 SCULPTOR 作者、人类名家史铁生与费孝通、ChatGPT 与 DeepSeek 通用基线、模板公文基线）：
 
-![图1 多维风格向量热力网格](competition/style-vectors-heatmap.png)
-![图2 风格距离矩阵](competition/style-vectors-distance.png)
-![图3 写作能力全方位对比](competition/style-vectors-ability.png)
-
-严格数学推导见 [STYLE-MATH.md](competition/STYLE-MATH.md)：特征向量 $\hat v \in \mathbb R^8$、
-逐维 min-max 归一化、欧氏距离 $d(A,B)=\sqrt{\sum_j(\hat v_j^A-\hat v_j^B)^2}$、
-综合能力评分 $C=\sum_k w_k s_k$。
+复现：`python3 scripts/style-vectors.py`（确定性生成热力网格/距离矩阵/能力对比三图）。
+严格数学推导：特征向量 $\hat v \in \mathbb R^8$、逐维 min-max 归一化、
+欧氏距离 $d(A,B)=\sqrt{\sum_j(\hat v_j^A-\hat v_j^B)^2}$、综合能力评分 $C=\sum_k w_k s_k$。
 
 实测读数：**SCULPTOR 作者 ↔ 史铁生 1.11、↔ 费孝通 1.54；↔ ChatGPT 1.46、↔ DeepSeek 1.49、
 ↔ 模板公文 1.98**；两个人类名家彼此 1.67，而两个通用模型之间仅 0.65——**AI 腔互相趋同，

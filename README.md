@@ -1,6 +1,6 @@
 # Sculptor
 
-**一个会先读懂你、再陪你写好的深度协作写作 Agent（v0.51）。**
+**一个会先读懂你、再陪你写好的深度协作写作 Agent（v0.60）。**
 
 装上它之后，你不需要会写提示词——说出一个念头，剩下的澄清、大纲、成稿、修改、审计，它陪你走完。
 装进 Codex / Claude Code / OpenCode，它是你的写作合伙人；打开 Web 工作台，它是你的伴随式写作台。
@@ -67,6 +67,16 @@ Sculptor 只负责"写作"这一件事，但在这件事里它主导：问什么
 - **翻译与回译校验**：原意优先翻译 + 回译校验闭环（信息不丢、风格可测）。
 - **任何文体**：扩写、缩写、润色、古文风、脱敏改写；版本可回滚；导出 docx / pdf / html / 字幕 / LaTeX。
 
+## 最近的关键升级
+
+- **外溢优先（v0.59）**：你主动说出的高价值信息（参照系/私人网络/红线/推理线），系统当轮
+  接住、回显、深挖、入档，而不是当普通素材归档；种子与红线全程校验。
+- **实时大纲（v0.57）**：大纲随对话逐轮生长，对话内联卡片 + 右侧面板实时可视化，可手动编辑。
+- **联网查验 + AI 知识库（v0.58）**："帮我查一查"内置免费检索（必应/百度/B站/维基）并回灌
+  素材；看过的书/视频/新闻由 AI 筛选进个人知识库，跨会话聚合。
+- **全流程互操作（v0.60）**：作品导入分片、作品库同步、成品文档导入续写、按阶段导出
+  （大纲/成稿/审计报告/风格肖像/知识库）。
+
 ## 它怎么做到"写得像我"
 
 1. **四层风格向量**：连续向量（方向差）+ 动态维度 + 语言新鲜度 + 亲手修改记录；"太文艺了""结尾
@@ -92,15 +102,12 @@ cd web && npm start        # → http://localhost:5177
 cd web && npm run mock     # 离线 mock 模式，无 API 也能体验
 ```
 
-## 数学与证据（比赛/论文用）
+## 理论与证据
 
-- [STYLE-MATH.md](docs/competition/STYLE-MATH.md)：8 维风格向量、min-max 归一化、欧氏距离、
-  综合评分公式与真实数值；核心公式渲染成 PNG（`scripts/formula-render.py`）。
-- 风格向量三图（`scripts/style-vectors.py`）：热力网格 / 距离矩阵 / 写作能力对比——
-  SCULPTOR 作者 vs 人类名家 vs ChatGPT/DeepSeek vs 模板公文；实测 SCULPTOR 与名家的距离
-  （1.11/1.54）远小于与通用模型的距离（1.46/1.49），两个通用模型彼此仅 0.65（AI 腔趋同）；
-  综合写作能力 SCULPTOR 87.4 vs 38.6/38.6/34.0。
 - [docs/THEORY.md](docs/THEORY.md)：Agent / 人工智能 / 数学 / 工程四维理论架构与竞品对照。
+- [docs/UNIFIED-TOKEN-FRAMEWORK.md](docs/UNIFIED-TOKEN-FRAMEWORK.md)：统一 Token 对比框架
+  （风格/知识/缺陷/阻抗在 token 概率空间融合）的现状审计与升级路线。
+- 风格向量与作者识别/续写实验脚本：`scripts/style-vectors.py` / `author-id.py` / `author-predict.py`。
 
 ## 安装
 
@@ -115,12 +122,15 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/
 ## 文档
 
 - [使用手册（命令大全）](docs/GUIDE.md)
-- [产品介绍（比赛/评审用）](docs/competition/PRODUCT-README.md)
-- [参赛论文（按科技论文模板撰写，md + docx）](docs/competition/科技论文-SCULPTOR.md)
-- [参赛过程档案（选题/时间线/问题复盘/实验数据）](docs/competition/PROCESS.md)
-- [理论架构（Agent/AI/数学/工程四维）](docs/THEORY.md)
-- [风格向量与数学推导](docs/competition/STYLE-MATH.md)
-- [行业调研与超越方案](docs/competition/BEYOND-PLAN.md)
+- [理论架构](docs/THEORY.md)
+- [文档互通管线（全流程文件进出）](docs/INTEROP.md)
+- [问询系统升级设计](docs/问询系统升级-v1.md)
+
+## 仓库结构
+
+本仓库只保留产品本体：`agent/`（核心引擎）、`skills/`（可安装技能）、`web/`（写作工作台）、
+`scripts/`（实验与工具）、`install.sh`、`README.md`。比赛论文、过程档案等材料不提交到本仓库
+（见 `.gitignore` 的 `docs/competition|legacy|experiments`）。
 - [Web 人机交互规划](docs/UX-PLAN.md)
 - [Web 接口自检报告](docs/WEB-API-AUDIT.md)
 - [Web 演示版部署指南](docs/DEPLOY.md)
@@ -128,7 +138,7 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/
 
 ## 质量与可信
 
-- **agent 17 套 + web 7 套自动化 QA 全绿**：一次一问、实时大纲、字数达标、红队 8 文体 × 6 对抗输入、
+- **agent 19 套 + web 10 套自动化 QA 全绿**：一次一问、实时大纲、字数达标、红队 8 文体 × 6 对抗输入、
   十种用户说法、风格差异对照、12000 字长文端到端、回译校验、全格式导出、前端接线静态检查。
 - **确定性兜底**：任何 LLM 或网络不可用时，流程降级但不崩溃；真实模型不守规则时（大纲截断、
   澄清不收尾）有确定性护栏兜底。
