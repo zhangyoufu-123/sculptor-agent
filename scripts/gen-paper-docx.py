@@ -148,7 +148,32 @@ def build_equations():
         run(' + '), run('0.15'), run(' '), s5,
         run('　(10)'))
 
-    return [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10]
+    # 式 11：统一 Token 对比解码评分函数（v0.60 新增）
+    pbase = ssub(run('p'), run('base'))
+    ppers = ssub(run('p'), run('personal'))
+    sk = ssub(run('S'), run('knowledge'))
+    sd = ssub(run('S'), run('defect'))
+    si = ssub(run('S'), run('impedance'))
+    f11 = seq(
+        run('S'), delim(run('w | c, t')), run(' = '),
+        ssub(run('β'), run('1')), run(' log '), pbase, delim(run('w | c')),
+        run(' + '),
+        ssub(run('β'), run('2')), run(' log '), ppers, delim(run('w | c')),
+        run(' + '),
+        ssub(run('λ'), run('K')), sk, delim(run('w, c')),
+        run(' + '),
+        ssub(run('λ'), run('D')), sd, delim(run('w')),
+        run(' + '),
+        run('R'), delim(run('t')), si, delim(run('w, t')),
+        run('　(11)'))
+
+    # 式 12：softmax 采样（v0.60 新增）
+    f12 = seq(
+        run('P'), delim(run('w | c, t')), run(' = '), run('softmax'),
+        delim(frac(delim(seq(run('S'), delim(run('w | c, t')))), run('τ'))),
+        run('　(12)'))
+
+    return [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12]
 
 
 EQUATIONS = build_equations()
@@ -258,6 +283,8 @@ MATH_KEYS = [
     (r'v_t', 6),
     (r'v_{\mathrm{author}}', 7),
     ('0.25', 9),
+    (r'S(w \mid c, t) =', 10),
+    (r'\operatorname{softmax}', 11),
 ]
 
 
