@@ -74,20 +74,20 @@ def build_equations():
                   run('，'), run('口语度'), run('，'), run('意象密度'), run('，'),
                   run('情绪浓度'), run('，'), run('词汇丰富度'), run('，'),
                   run('语言新鲜度'))),
-        run(' ∈ '), ssup(run('ℝ'), run('8')), run('　(1)'))
+        run(' ∈ '), ssup(run('ℝ'), run('8')), run('　(5)'))
 
     f2 = seq(
         vjA, run(' = '),
         frac(delim(seq(vjA, run(' − '), ssub(run('min'), run('i')), vji)),
              delim(seq(ssub(run('max'), run('i')), vji))),
         run(' ∈ '), delim(seq(run('0'), run(','), run('1')), '[', ']'),
-        run('　(2)'))
+        run('　(6)'))
 
     f3 = seq(
         run('d'), delim(run('A,B')), run(' = '),
         rad(nary('∑', run('j=1'), run('8'),
                  ssup(delim(seq(vjA, run(' − '), vjB)), run('2')))),
-        run('　(3)'))
+        run('　(7)'))
 
     # 式 4：token 级 surprisal 判别式
     r_rare = ssub(run('r'), run('rare'))
@@ -99,12 +99,12 @@ def build_equations():
         run(' + '), run('0.3'), run(' '), v_sent, delim(run('x')),
         run(' + '), run('0.2'), run(' '),
         delim(seq(run('1'), run(' − '), r_ai, delim(run('x')))),
-        run('　(4)'))
+        run('　(8)'))
 
     # 式 5：困惑度代理
     f5 = seq(
         run('PP'), delim(run('x')), run(' = '), run('2'), run(' + '), run('6'),
-        run('·'), run('S'), delim(run('x')), run('　(5)'))
+        run('·'), run('S'), delim(run('x')), run('　(9)'))
 
     # 式 6：KL 散度（人机 token 分布差异）
     ph = ssub(run('P'), run('H'))
@@ -115,13 +115,13 @@ def build_equations():
         ssub(run('∑'), run('g')), run(' '),
         ph, delim(run('g')), run(' '), run('log'),
         frac(delim(seq(ph, delim(run('g')))), delim(seq(pm, delim(run('g'))))),
-        run('　(6)'))
+        run('　(1)'))
 
     # 式 7：EMA 增量更新
     f7 = seq(
         ssub(run('v'), run('t')), run(' = '), run('α'), run(' '),
         ssub(run('v'), run('t−1')), run(' + '), delim(run('1−α')), run(' '),
-        run('φ'), delim(ssub(run('x'), run('t'))), run('　(7)'))
+        run('φ'), delim(ssub(run('x'), run('t'))), run('　(2)'))
 
     # 式 8：风格偏离方向（归一化）
     v_author = ssub(run('v'), run('author'))
@@ -130,14 +130,14 @@ def build_equations():
     f8 = seq(
         run('s'), run(' = '),
         frac(delim(diff78), seq(run('‖'), delim(diff78), run('‖'))),
-        run('　(8)'))
+        run('　(3)'))
 
     # 式 9：回译保真度
     f9 = seq(
         ssub(run('F'), run('rt')), run(' = '),
         frac(seq(run('|'), ssub(run('K'), run('kept')), run('|')),
              seq(run('|'), ssub(run('K'), run('orig')), run('|'))),
-        run(' × '), run('100%'), run('　(9)'))
+        run(' × '), run('100%'), run('　(4)'))
 
     # 式 10：写作能力综合评分
     f10 = seq(
@@ -215,7 +215,7 @@ def add_table(rows):
         for j, cell in enumerate(row):
             c = t.cell(i, j)
             c.text = ''
-            r = c.paragraphs[0].add_run(cell)
+            r = c.paragraphs[0].add_run(clean_inline(cell))
             set_font(r, size=10.5, bold=(i == 0))
 
 
