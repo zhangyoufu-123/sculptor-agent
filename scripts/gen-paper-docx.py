@@ -61,7 +61,7 @@ def acc(e):
 
 
 def build_equations():
-    """论文八个公式的 OMML（式 1–8），序号随公式右置。"""
+    """论文十个公式的 OMML（式 1–10），序号随公式右置。"""
     vhat = acc(run('v'))
     vjA = ssubsup(acc(run('v')), run('j'), run('(A)'))
     vjB = ssubsup(acc(run('v')), run('j'), run('(B)'))
@@ -89,19 +89,11 @@ def build_equations():
                  ssup(delim(seq(vjA, run(' − '), vjB)), run('2')))),
         run('　(3)'))
 
-    f4 = seq(
-        run('C'), run(' = '), run('0.25'), run(' '), s1,
-        run(' + '), run('0.20'), run(' '), s2,
-        run(' + '), run('0.20'), run(' '), s3,
-        run(' + '), run('0.20'), run(' '), s4,
-        run(' + '), run('0.15'), run(' '), s5,
-        run('　(8)'))
-
     # 式 4：token 级 surprisal 判别式
     r_rare = ssub(run('r'), run('rare'))
     v_sent = ssub(run('v'), run('sent'))
     r_ai = ssub(run('r'), run('ai'))
-    f5 = seq(
+    f4 = seq(
         run('S'), delim(run('x')), run(' = '),
         run('0.5'), run(' '), r_rare, delim(run('x')),
         run(' + '), run('0.3'), run(' '), v_sent, delim(run('x')),
@@ -110,26 +102,53 @@ def build_equations():
         run('　(4)'))
 
     # 式 5：困惑度代理
-    f6 = seq(
+    f5 = seq(
         run('PP'), delim(run('x')), run(' = '), run('2'), run(' + '), run('6'),
         run('·'), run('S'), delim(run('x')), run('　(5)'))
 
-    # 式 6：EMA 增量更新
+    # 式 6：KL 散度（人机 token 分布差异）
+    ph = ssub(run('P'), run('H'))
+    pm = ssub(run('P'), run('M'))
+    f6 = seq(
+        ssub(run('D'), run('KL')),
+        delim(seq(ph, run(' ‖ '), pm)), run(' = '),
+        ssub(run('∑'), run('g')), run(' '),
+        ph, delim(run('g')), run(' '), run('log'),
+        frac(delim(seq(ph, delim(run('g')))), delim(seq(pm, delim(run('g'))))),
+        run('　(6)'))
+
+    # 式 7：EMA 增量更新
     f7 = seq(
         ssub(run('v'), run('t')), run(' = '), run('α'), run(' '),
         ssub(run('v'), run('t−1')), run(' + '), delim(run('1−α')), run(' '),
-        run('φ'), delim(ssub(run('x'), run('t'))), run('　(6)'))
+        run('φ'), delim(ssub(run('x'), run('t'))), run('　(7)'))
 
-    # 式 7：风格偏离方向（归一化）
+    # 式 8：风格偏离方向（归一化）
     v_author = ssub(run('v'), run('author'))
     v_base = ssub(run('v'), run('base'))
     diff78 = seq(v_author, run(' − '), v_base)
     f8 = seq(
         run('s'), run(' = '),
         frac(delim(diff78), seq(run('‖'), delim(diff78), run('‖'))),
-        run('　(7)'))
+        run('　(8)'))
 
-    return [f1, f2, f3, f4, f5, f6, f7, f8]
+    # 式 9：回译保真度
+    f9 = seq(
+        ssub(run('F'), run('rt')), run(' = '),
+        frac(seq(run('|'), ssub(run('K'), run('kept')), run('|')),
+             seq(run('|'), ssub(run('K'), run('orig')), run('|'))),
+        run(' × '), run('100%'), run('　(9)'))
+
+    # 式 10：写作能力综合评分
+    f10 = seq(
+        run('C'), run(' = '), run('0.25'), run(' '), s1,
+        run(' + '), run('0.20'), run(' '), s2,
+        run(' + '), run('0.20'), run(' '), s3,
+        run(' + '), run('0.20'), run(' '), s4,
+        run(' + '), run('0.15'), run(' '), s5,
+        run('　(10)'))
+
+    return [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10]
 
 
 EQUATIONS = build_equations()
@@ -207,15 +226,33 @@ def add_image(path, caption=None):
         set_font(r, size=10.5, bold=True)
 
 
+def add_code(text):
+    """伪代码块：等宽字体 + 浅灰底 + 左缩进。"""
+    xml = (
+        f'<w:p xmlns:w="{W_NS}"><w:pPr>'
+        f'<w:shd w:val="clear" w:color="auto" w:fill="F4F4F4"/>'
+        f'<w:spacing w:line="260" w:lineRule="auto" w:after="0" w:before="40"/>'
+        f'<w:ind w:left="240"/>'
+        f'</w:pPr>'
+        f'<w:r><w:rPr>'
+        f'<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="宋体"/>'
+        f'<w:sz w:val="20"/><w:szCs w:val="20"/>'
+        f'</w:rPr><w:t xml:space="preserve">{_esc(text)}</w:t></w:r></w:p>'
+    )
+    doc.element.body.append(parse_xml(xml))
+
+
 MATH_KEYS = [
     (r'\hat{v} =', 0),
     (r'\frac{v_j', 1),
     (r'\sqrt{\sum', 2),
-    ('0.25', 3),
-    (r'PP(x)', 5),
-    (r'S(x)', 4),
+    (r'D_{\mathrm{KL}}', 5),
+    (r'F_{\mathrm{rt}}', 8),
+    (r'PP(x)', 4),
+    (r'S(x)', 3),
     (r'v_t', 6),
     (r'v_{\mathrm{author}}', 7),
+    ('0.25', 9),
 ]
 
 
@@ -230,9 +267,18 @@ lines = open(SRC, encoding='utf-8').read().split('\n')
 i = 0
 table_buf = []
 in_table = False
+in_code = False
 while i < len(lines):
     line = lines[i].rstrip()
     if not line.strip():
+        i += 1
+        continue
+    if line.strip().startswith('```'):
+        in_code = not in_code
+        i += 1
+        continue
+    if in_code:
+        add_code(line)
         i += 1
         continue
     if line.startswith('|'):
