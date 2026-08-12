@@ -1,0 +1,27 @@
+# Render Blueprint：Sculptor Studio（web 服务，Docker 运行时，含 python3+python-docx）
+# 由 Render Codex 插件（render-blueprints / render-docker 技能）规范编写。
+services:
+  - type: web
+    name: sculptor-studio
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: SCULPTOR_WEB_DATA
+        value: /var/data
+      - key: SCULPTOR_LLM_API_KEY
+        sync: false
+      - key: SCULPTOR_WEB_PASSWORD
+        sync: false
+      - key: SCULPTOR_LLM_BASE_URL
+        sync: false
+      - key: SCULPTOR_LLM_MODEL
+        sync: false
+    disk:
+      name: sculptor-data
+      mountPath: /var/data
+      sizeGB: 1
