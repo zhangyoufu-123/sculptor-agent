@@ -35,6 +35,12 @@ if (process.env.SCULPTOR_MOCK_LLM === '1') {
 const { loadConfig } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'config.js')).href
 );
+const { academicNorm } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'academic-norm.js')).href
+);
+const { docTranslate, docRestyle } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'doc-pipeline.js')).href
+);
 const { agentStep } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'director.js')).href
 );
@@ -100,6 +106,40 @@ const {
 } = await import(pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'rag.js')).href);
 
 const cfg = loadConfig();
+
+// ── 生产级鉴权（SCULPTOR_WEB_PASSWORD 设置后启用；未设置时保持单机免登录兼容）──
+const WEB_PASSWORD = process.env.SCULPTOR_WEB_PASSWORD || '';
+const AUTH_TOKENS = new Map(); // token -> expiry
+
+function cookieOf(req) {
+  const raw = String(req.headers.cookie || '');
+  const out = {};
+  for (const part of raw.split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0) out[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+  }
+  return out;
+}
+
+function authOk(req) {
+  if (!WEB_PASSWORD) return true;
+  const tok = cookieOf(req).sculptor_auth;
+  const exp = tok ? AUTH_TOKENS.get(tok) : 0;
+  if (!exp) return false;
+  if (exp < Date.now()) {
+    AUTH_TOKENS.delete(tok);
+    return false;
+  }
+  return true;
+}
+
+function jsonAuth(res, code, data, cookie) {
+  res.writeHead(code, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Set-Cookie': cookie,
+  });
+  res.end(JSON.stringify(data));
+}
 const IO_SCRIPTS = path.resolve(HERE, '..', 'agent', 'scripts', 'io');
 
 const GENRE_CATEGORY = {
@@ -366,6 +406,31 @@ async function runStepAndRespond(res, id, message) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const p = url.pathname;
+
+  // ── 鉴权 ────────────────────────────────────────────
+  if (req.method === 'GET' && p === '/api/auth/status') {
+    return json(res, 200, { required: Boolean(WEB_PASSWORD), ok: authOk(req) });
+  }
+  if (req.method === 'POST' && p === '/api/auth/login') {
+    const { password } = await body(req);
+    if (!WEB_PASSWORD || String(password || '') === WEB_PASSWORD) {
+      const tok = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+      AUTH_TOKENS.set(tok, Date.now() + 12 * 3600 * 1000);
+      return jsonAuth(
+        res,
+        200,
+        { ok: true },
+        `sculptor_auth=${tok}; HttpOnly; Path=/; Max-Age=43200; SameSite=Lax`,
+      );
+    }
+    return json(res, 401, { error: '密码错误' });
+  }
+  if (req.method === 'POST' && p === '/api/auth/logout') {
+    return jsonAuth(res, 200, { ok: true }, 'sculptor_auth=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
+  }
+  if (p.startsWith('/api/') && WEB_PASSWORD && !authOk(req)) {
+    return json(res, 401, { error: '未登录：请先通过 /api/auth/login 获取会话' });
+  }
 
   if (req.method === 'GET' && (p === '/' || p.startsWith('/assets/'))) {
     staticFile(p, res);
@@ -952,6 +1017,67 @@ const server = http.createServer(async (req, res) => {
     } catch (e) {
       return json(res, 200, { score: 100, total: 0, recovered: [], unrecovered: [], note: String(e.message || '校验失败') });
     }
+  }
+
+  // ── 工具：学术规范审计 / 文档翻译 / 文档重写（v0.56）──
+  if (req.method === 'POST' && p === '/api/norm') {
+    const { sessionId } = await body(req);
+    const dir = sessionDir(String(sessionId || ''));
+    if (!fs.existsSync(path.join(dir, 'draft.md'))) {
+      return json(res, 400, { error: '该会话还没有成稿，无法执行学术规范审计' });
+    }
+    let genre = '';
+    try {
+      genre = ws.readState(dir)?.confirmed?.genre || '';
+    } catch {}
+    const r = await academicNorm(cfg, dir, { genre });
+    return json(res, 200, {
+      score: r.score,
+      items: r.items,
+      summary: r.summary,
+      llmMode: r.llmMode,
+      reason: r.llmReason || '',
+    });
+  }
+  if (req.method === 'POST' && (p === '/api/doc/translate' || p === '/api/doc/restyle')) {
+    const { sessionId = '', filename = 'upload.md', dataBase64 = '', lang = 'en', style = '' } = await body(req);
+    const dir = sessionDir(String(sessionId || ''));
+    fs.mkdirSync(dir, { recursive: true });
+    const upDir = path.join(dir, 'uploads');
+    fs.mkdirSync(upDir, { recursive: true });
+    const name = path.basename(String(filename || 'upload.md')).slice(0, 80) || 'upload.md';
+    const src = path.join(upDir, `tool-${Date.now()}-${name}`);
+    fs.writeFileSync(src, Buffer.from(String(dataBase64 || ''), 'base64'));
+    const toolsDir = path.join(dir, 'tools');
+    fs.mkdirSync(toolsDir, { recursive: true });
+    const outBase = path.join(toolsDir, `out-${Date.now()}`);
+    const r = p === '/api/doc/translate'
+      ? await docTranslate(cfg, dir, { file: src, lang: String(lang || 'en'), out: outBase })
+      : await docRestyle(cfg, dir, { file: src, style: String(style || ''), out: outBase });
+    return json(res, 200, {
+      ok: r.ok,
+      mode: r.mode,
+      blocks: r.blocks,
+      replaced: r.replaced,
+      missing: r.missing || [],
+      interpretation: r.interpretation || null,
+      summary: r.summary || '',
+      roundtrip: r.roundtrip || null,
+      reason: r.reason || '',
+      files: (r.files || []).map((f) => path.relative(dir, f)),
+    });
+  }
+  if (req.method === 'GET' && p === '/api/doc/download') {
+    const id = String(url.searchParams.get('sessionId') || '');
+    const dir = sessionDir(id);
+    const f = safeInside(dir, String(url.searchParams.get('file') || ''));
+    if (!f || !fs.existsSync(f)) return json(res, 404, { error: '文件不存在' });
+    const type = f.endsWith('.docx')
+      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      : f.endsWith('.html')
+        ? 'text/html; charset=utf-8'
+        : 'text/markdown; charset=utf-8';
+    return sendFile(res, f, path.basename(f), type);
   }
 
   res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });

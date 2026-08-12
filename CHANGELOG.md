@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-08-12（v0.56 Web 升级：工具面板 + 生产级鉴权）
+
+- **Web 新增"工具"面板**：学术规范审计（对当前会话成稿执行，LLM 深审 + 确定性兜底）、
+  文档翻译与文档风格重写（上传 docx/md/txt，docx 自动走块级回填保留 run 级格式），
+  产物可下载 md / docx / html；
+- **生产级鉴权**：设置 `SCULPTOR_WEB_PASSWORD` 后启用登录保护（HttpOnly Cookie，
+  12h 会话，/api 全部拦截，前端自动显示登录遮罩）；未设置保持单机免登录兼容；
+- **部署文档**：docs/INTEROP.md 新增 Web 部署章节（环境变量、HTTPS、数据备份、密钥安全）；
+- 测试：新增 web/test/tools-qa.mjs（鉴权流程 / norm / doc translate+下载 / doc restyle / 登出拦截），
+  web 套件由 7 套增至 8 套、303 项断言全绿；真实端口冒烟（登录 401/放行、翻译导出）通过。
+
 ## 2026-08-12（v0.56：文档互通管线——全流程"文件进、文件出"，与其他产品衔接）
 
 调研行业最佳实践（Pandoc DOCX↔Markdown 往返、MCP 文档工具生态、MinerU/Docling 高保真解析）后落地：

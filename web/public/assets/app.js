@@ -3,12 +3,12 @@
    设计标准：所有视图切换统一走 showView()（同一条 viewIn 动画）；阶段条状态规范不变。 */
 const $ = (id) => document.getElementById(id);
 
-const VIEWS = ['home', 'sessions', 'session', 'outline', 'draft', 'report', 'persona', 'knowledge', 'works'];
+const VIEWS = ['home', 'sessions', 'session', 'outline', 'draft', 'report', 'persona', 'knowledge', 'works', 'tools'];
 const STAGES = ['home', 'clarify', 'outline', 'write', 'audit', 'deliver'];
-const NAVS = ['home', 'sessions', 'works', 'persona', 'knowledge'];
+const NAVS = ['home', 'sessions', 'works', 'persona', 'knowledge', 'tools'];
 const CRUMB = {
   home: '启程', sessions: '项目', session: '写作', outline: '大纲',
-  draft: '成稿', report: '审计', persona: '风格肖像', knowledge: '知识库', works: '作品库',
+  draft: '成稿', report: '审计', persona: '风格肖像', knowledge: '知识库', works: '作品库', tools: '工具',
 };
 
 let sessionId = null;
@@ -53,7 +53,7 @@ function showView(name, { keepStage = false } = {}) {
     if (el) el.classList.toggle('is-active', n === name);
   });
   $('crumb').textContent = CRUMB[name] || 'Sculptor';
-  if (!keepStage && ['home', 'sessions', 'works', 'persona', 'knowledge'].includes(name)) setStage('home');
+  if (!keepStage && ['home', 'sessions', 'works', 'persona', 'knowledge', 'tools'].includes(name)) setStage('home');
   updateContextVisibility();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -1587,6 +1587,7 @@ document.querySelectorAll('.nav-item').forEach((b) => {
     if (n === 'works') renderWorks();
     if (n === 'persona') renderPersona();
     if (n === 'knowledge') renderKnowledge();
+    if (n === 'tools') renderTools();
     showView(n);
   });
 });
@@ -1665,6 +1666,142 @@ document.querySelectorAll('.stage-item').forEach((b) => {
   });
 });
 
+/* ── 工具：学术规范审计 / 文档翻译 / 文档重写 ─────────── */
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+function toolSessionId() {
+  return $('normSession').value || sessionId || '';
+}
+
+async function renderTools() {
+  try {
+    const { sessions } = await apiGet('/api/sessions');
+    const sel = $('normSession');
+    sel.innerHTML = '';
+    for (const s of sessions) {
+      const o = document.createElement('option');
+      o.value = s.id;
+      o.textContent = `${s.title || s.id}（${s.id.slice(0, 8)}）`;
+      sel.appendChild(o);
+    }
+    if (!sessions.length) {
+      const o = document.createElement('option');
+      o.value = '';
+      o.textContent = '（暂无项目：先创建并完成写作）';
+      sel.appendChild(o);
+    }
+  } catch (e) { toast(e.message); }
+}
+
+function toolLinks(session, files) {
+  if (!files || !files.length) return '<p class="session-sub">（无产物）</p>';
+  return files
+    .map(
+      (f) =>
+        `<a class="btn btn-ghost" href="/api/doc/download?sessionId=${encodeURIComponent(session)}&file=${encodeURIComponent(f)}" download>下载 ${f.split('/').pop()}</a>`,
+    )
+    .join(' ');
+}
+
+$('normRun').addEventListener('click', async () => {
+  const sid = toolSessionId();
+  if (!sid) { toast('请先选择项目'); return; }
+  $('normResult').innerHTML = '<p class="session-sub">审计中…（LLM 深审可能需要一点时间）</p>';
+  try {
+    const r = await apiPost('/api/norm', { sessionId: sid });
+    const rows = (r.items || [])
+      .map(
+        (i) =>
+          `<tr><td>${esc(i.severity)}</td><td>${esc(i.type)}</td><td>${esc(i.evidence)}</td><td>${esc(i.issue)}</td><td>${esc(i.suggestion)}</td></tr>`,
+      )
+      .join('');
+    $('normResult').innerHTML =
+      `<p><b>综合评分：${r.score ?? '—'}/100</b>（LLM 模式：${r.llmMode}${r.reason ? '，' + esc(r.reason) : ''}）</p>` +
+      `<p class="session-sub">${esc(r.summary || '')}</p>` +
+      (rows ? `<table class="qa-table"><thead><tr><th>级别</th><th>类型</th><th>证据</th><th>问题</th><th>建议</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="session-sub">未发现确定性问题。</p>');
+  } catch (e) {
+    $('normResult').innerHTML = `<p style="color:#c0504d">${esc(e.message)}</p>`;
+  }
+});
+
+$('trRun').addEventListener('click', async () => {
+  const f = $('trFile').files[0];
+  if (!f) { toast('请先选择要翻译的文档'); return; }
+  $('trResult').innerHTML = '<p class="session-sub">翻译中…（原意解读 → 逐块翻译 → 回填格式）</p>';
+  try {
+    const dataBase64 = await fileToBase64(f);
+    const r = await apiPost('/api/doc/translate', {
+      sessionId: toolSessionId(),
+      filename: f.name,
+      dataBase64,
+      lang: $('trLang').value.trim() || 'en',
+    });
+    const it = r.interpretation || {};
+    $('trResult').innerHTML =
+      `<p><b>状态：${r.ok ? '成功' : '未完成'}</b>${r.mode === 'docx-block' ? `（docx 块级回填，run 级格式保留：块 ${r.blocks ?? '—'} / 替换 ${r.replaced ?? '—'}${r.missing?.length ? ` / 未覆盖 ${r.missing.length}` : ''}）` : ''}</p>` +
+      (it.intent ? `<p class="session-sub">原意解读：意图「${esc(it.intent)}」｜语气「${esc(it.tone)}」｜文体「${esc(it.genre)}」｜易损点「${esc((it.pitfalls || []).join('、'))}」</p>` : '') +
+      (r.roundtrip ? `<p class="session-sub">回译校验：保留 ${r.roundtrip.kept ?? '—'} / 丢失 ${r.roundtrip.lost ?? '—'} / 漂移 ${r.roundtrip.drifted ?? '—'}</p>` : '') +
+      (r.reason ? `<p style="color:#c0504d">${esc(r.reason)}</p>` : '') +
+      `<p>${toolLinks(toolSessionId(), r.files)}</p>`;
+  } catch (e) {
+    $('trResult').innerHTML = `<p style="color:#c0504d">${esc(e.message)}</p>`;
+  }
+});
+
+$('rsRun').addEventListener('click', async () => {
+  const f = $('rsFile').files[0];
+  if (!f) { toast('请先选择要重写的文档'); return; }
+  $('rsResult').innerHTML = '<p class="session-sub">重写中…</p>';
+  try {
+    const dataBase64 = await fileToBase64(f);
+    const r = await apiPost('/api/doc/restyle', {
+      sessionId: toolSessionId(),
+      filename: f.name,
+      dataBase64,
+      style: $('rsStyle').value.trim(),
+    });
+    $('rsResult').innerHTML =
+      `<p><b>状态：${r.ok ? '成功' : '未完成'}</b>${r.mode === 'docx-block' ? `（docx 块级回填，run 级格式保留：块 ${r.blocks ?? '—'} / 替换 ${r.replaced ?? '—'}${r.missing?.length ? ` / 未覆盖 ${r.missing.length}` : ''}）` : ''}</p>` +
+      (r.summary ? `<p class="session-sub">${esc(r.summary)}</p>` : '') +
+      (r.reason ? `<p style="color:#c0504d">${esc(r.reason)}</p>` : '') +
+      `<p>${toolLinks(toolSessionId(), r.files)}</p>`;
+  } catch (e) {
+    $('rsResult').innerHTML = `<p style="color:#c0504d">${esc(e.message)}</p>`;
+  }
+});
+
+/* ── 生产级鉴权（服务端设置 SCULPTOR_WEB_PASSWORD 后启用）── */
+async function initAuth() {
+  try {
+    const s = await apiGet('/api/auth/status');
+    if (s.required && !s.ok) {
+      $('loginOverlay').hidden = false;
+      $('loginPassword').focus();
+    }
+  } catch {}
+}
+$('loginSubmit').addEventListener('click', async () => {
+  try {
+    await apiPost('/api/auth/login', { password: $('loginPassword').value });
+    $('loginOverlay').hidden = true;
+    $('loginError').hidden = true;
+    location.reload();
+  } catch (e) {
+    $('loginError').textContent = e.message;
+    $('loginError').hidden = false;
+  }
+});
+$('loginPassword').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('loginSubmit').click();
+});
+
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     $('workModal').hidden = true;
@@ -1678,6 +1815,7 @@ document.addEventListener('keydown', (e) => {
 /* ── 初始化 ───────────────────────────────────────── */
 renderDash();
 ensureSplitBtn();
+initAuth();
 $('worksCompare')?.addEventListener('click', () => {
   worksCompareMode = !worksCompareMode;
   worksCompareSel = [];

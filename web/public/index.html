@@ -22,6 +22,7 @@
       <button class="nav-item" data-nav="works">作品库</button>
       <button class="nav-item" data-nav="persona">风格肖像</button>
       <button class="nav-item" data-nav="knowledge">知识库</button>
+      <button class="nav-item" data-nav="tools">⚙ 工具</button>
     </nav>
     <div class="side-foot">
       <span class="ver">Sculptor Studio v0.48.1</span>
@@ -211,6 +212,49 @@
         </div>
         <div class="works-body" id="worksBody"></div>
       </section>
+
+      <!-- 工具：学术规范审计 / 文档翻译 / 文档重写 -->
+      <section class="view" id="view-tools">
+        <div class="page-head">
+          <div>
+            <p class="kicker">TOOLS · 全流程文件互通</p>
+            <h2>审计 · 翻译 · 风格重写</h2>
+          </div>
+        </div>
+        <p class="session-sub">每个工具都"文件进、文件出"：docx 输入自动走块级回填（run 级格式保留），可下载 md / docx / html。</p>
+
+        <div class="tool-card">
+          <h3>① 学术规范审计</h3>
+          <p class="session-sub">对当前会话成稿执行：标点混用 / 口语化 / 摘要长度 / 引用顺序 / 关键词检查（LLM 深审 + 确定性兜底），只报告不改稿。</p>
+          <div class="filter-bar">
+            <select class="search" id="normSession"></select>
+            <button class="btn" id="normRun">开始审计</button>
+          </div>
+          <div id="normResult" class="tool-result"></div>
+        </div>
+
+        <div class="tool-card">
+          <h3>② 文档翻译</h3>
+          <p class="session-sub">导入 docx / md / txt，先做原意解读，再逐块结构保留翻译并回填原格式，附回译校验。</p>
+          <div class="filter-bar">
+            <input class="search" id="trFile" type="file" accept=".docx,.md,.txt" />
+            <input class="search" id="trLang" value="en" placeholder="目标语言，如 en / ja" style="max-width:140px" />
+            <button class="btn" id="trRun">翻译并导出</button>
+          </div>
+          <div id="trResult" class="tool-result"></div>
+        </div>
+
+        <div class="tool-card">
+          <h3>③ 文档风格重写</h3>
+          <p class="session-sub">导入成品文档，按作者风格（旧稿文件或方向描述）重写，结构保留、格式回填。</p>
+          <div class="filter-bar">
+            <input class="search" id="rsFile" type="file" accept=".docx,.md,.txt" />
+            <input class="search" id="rsStyle" placeholder="风格方向，如：克制、短句、具体细节（可留空用风格档案）" style="flex:1" />
+            <button class="btn" id="rsRun">重写并导出</button>
+          </div>
+          <div id="rsResult" class="tool-result"></div>
+        </div>
+      </section>
     </main>
 
     <footer class="foot">
@@ -252,6 +296,18 @@
   </div>
 
   <div class="toast" id="toast" hidden></div>
+
+  <!-- 登录遮罩（服务端设置 SCULPTOR_WEB_PASSWORD 后显示） -->
+  <div class="login-overlay" id="loginOverlay" hidden>
+    <div class="login-card">
+      <div class="brand"><span class="brand-mark">S</span><span class="brand-name">Sculptor</span></div>
+      <p class="session-sub">此实例已启用访问保护，请输入密码继续。</p>
+      <input class="search" id="loginPassword" type="password" placeholder="访问密码" />
+      <button class="btn" id="loginSubmit" style="width:100%">进入工作台</button>
+      <p class="login-error" id="loginError" hidden style="color:#c0504d"></p>
+    </div>
+  </div>
+
   <script src="/assets/app.js"></script>
 </body>
 </html>

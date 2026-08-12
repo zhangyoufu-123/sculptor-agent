@@ -1334,3 +1334,29 @@ body.panel-open .shell { padding-right: 360px; }
   body.panel-open .shell { padding-right: 0; }
   .context-panel { width: min(360px, 88vw); }
 }
+
+/* 工具面板与登录遮罩（v0.56） */
+.tool-card {
+  background: #fff;
+  border: 1px solid #e5e9f0;
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin: 14px 0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.tool-card h3 { margin: 0 0 6px; font-size: 16px; }
+.tool-result { margin-top: 10px; line-height: 1.6; }
+.qa-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+.qa-table th, .qa-table td { border: 1px solid #e5e9f0; padding: 6px 8px; text-align: left; vertical-align: top; }
+.qa-table th { background: #f6f8fb; }
+.login-overlay {
+  position: fixed; inset: 0; z-index: 999;
+  background: rgba(248, 250, 252, 0.92);
+  display: flex; align-items: center; justify-content: center;
+}
+.login-card {
+  width: min(360px, 90vw); background: #fff; border: 1px solid #e5e9f0;
+  border-radius: 16px; padding: 28px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.login-error { margin: 0; font-size: 13px; }

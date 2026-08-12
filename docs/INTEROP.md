@@ -75,3 +75,27 @@ sculptor doc restyle  老文章.md --style 我的旧稿.md --out 老文章.sculp
 ```bash
 cd agent && node test/doc-pipeline.test.mjs
 ```
+
+## Web 端部署（v0.56+，含鉴权）
+
+零依赖 Node 服务 + 纯静态前端，任何 Node 主机可直接运行（无构建步骤）：
+
+```bash
+cd sculptor-agent/web
+SCULPTOR_LLM_API_KEY=sk-xxx \
+SCULPTOR_WEB_PASSWORD=your-password \   # 设置后启用登录保护（未设置则单机免登录）
+SCULPTOR_WEB_DATA=/path/to/web-data \   # 会话/作品库数据目录（建议挂持久盘）
+PORT=8080 node server.mjs
+```
+
+验证（web 8 套 QA 共 303 项断言）：
+
+```bash
+cd sculptor-agent/web && npm test
+```
+
+生产注意：
+- **HTTPS**：由部署平台提供（Render/Vercel/反向代理终止 TLS）；自建服务器用 caddy/nginx 反代；
+- **数据备份**：`SCULPTOR_WEB_DATA` 目录即全部数据（会话/作品库/风格档案/知识库），定期打包即可；
+- **密钥安全**：`SCULPTOR_LLM_API_KEY` 仅存服务端环境变量，前端不接触；`SCULPTOR_WEB_PASSWORD` 用于访问保护；
+- **公开对外**：务必设置 `SCULPTOR_WEB_PASSWORD`；如需多用户隔离，当前版本为单用户设计，需再接入账号体系。
