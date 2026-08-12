@@ -1,0 +1,27 @@
+# 构建上下文排除：避免把本机凭据、运行数据、文档和无关目录打进云端镜像
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+web-data
+node_modules
+.sculptor
+.codex
+.codex-plugin
+.claude-plugin
+docs
+examples
+extras
+site
+skills
+scripts
+CHANGELOG.md
+*.log
+draft*.docx
+draft*.pdf
+draft*.html
+draft*.srt
+**/__pycache__
+*.pyc
+.DS_Store
