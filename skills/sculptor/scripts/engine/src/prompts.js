@@ -20,6 +20,8 @@ ${ctx.knowledgeContext ? `【你了解到的用户知识背景（检索自用户
 ${ctx.intentBrief ? `【我的理解与核心诉求（先对齐，再追问）】\n${ctx.intentBrief}` : ''}
 ${ctx.thinking ? `【用户的思想脉络（累积：主张/前提/推理/理论来源）】\n${ctx.thinking}` : ''}
 ${ctx.styleNote ? `【用户风格底稿/自述: ${ctx.styleNote}】` : ''}
+${ctx.seeds ? `【已确认的种子（用户主动给的高价值信息，优先于清单；未确认的标注"待确认"）】\n${ctx.seeds}` : ''}
+${ctx.constraints ? `【红线（用户定死不许改的：台词/情节/格式/修辞）】\n${ctx.constraints}` : ''}
 ${ctx.blueprintText ? `【目前我理解的整篇文章蓝图】\n${ctx.blueprintText}` : ''}
 ${ctx.liveOutline ? `【当前实时大纲（你从对话中总结给用户看的呈现物——每轮根据新信息更新它，它是总结不是约束；立意/素材/风格/知识库才是真源）】\n${ctx.liveOutline}` : ''}
 ${ctx.outlineGap ? `【本问聚焦】${ctx.outlineGap}——问题就围绕这一处缺口自然生长，沿用用户原词；
@@ -90,6 +92,19 @@ ${ctx.userMeta ? `【用户刚反问/质疑】"${ctx.userMeta}"——先直接�
 10.13 **加速授权（v0.58）**：用户说"你直接开始写吧/差不多就写/剩下的你定"是主动
      授权推进，不是低意愿。系统会记录加速信号并停止追问；你可以把剩余可选维度
      按建议默认（不必再逐条问），并在回复里说明"其余按你的建议默认，写时缺了再补"。
+12. **外溢优先（v0.59，最高优先级）**：用户主动说出、你本来不准备问的高价值信息，
+    一律优先于当前问题与清单——不要把它当普通素材归档，而是当"种子"：
+    ① 参照系外溢（作品/作者/视频/播客/书/节目）→ 先复述它，再问"这个参照系里，
+       哪一点击中了你"（intent: trigger）；
+    ② 私人网络外溢（家庭/师承/代际/口传/圈层）→ 问"这条线怎么传到你、对你意味着什么"
+       （intent: connection）；
+    ③ 红线外溢（用户定死的台词/情节/修辞/格式）→ 这一轮就确认并复述红线，
+       不再问"要不要改"，只问它出现的位置与节奏；在 overflow.constraint 里原样记录；
+    ④ 推理线外溢（理论/因果推理/引书论述）→ 按 10.5/10.6 复述＋顺推一层＋请确认。
+    深挖连续最多 2 轮，之后回到主线清单（【蓝图状态】里剩下的牌）。
+    每次外溢都在 overflow 字段里输出：type（reference/personal/constraint/reasoning）、
+    seedText（种子原文，尽量用用户原词）、constraint（红线原文，仅红线时）、
+    coreThesis（若这条外溢直接给出了立意，用用户原词概括）。没有外溢则 overflow 输出 null。
 11. **用户反问/质疑时（v0.57）**：如果【用户刚反问/质疑】有内容，这一轮的任务是
     "回答他的疑问 + 重新问同一个缺口"，而不是换一个新维度。用一两句话正面回答
     （解释该维度对文章的实际影响，别用"这对写作很重要"这种空话），然后像没事发生一样、
@@ -103,6 +118,11 @@ ${ctx.userMeta ? `【用户刚反问/质疑】"${ctx.userMeta}"——先直接�
 - 从用户刚说的话里挑最亮的画面/悖论追问（"这份痛苦里，最扎心的是失去还是从未拥有"），
   不跳回清单式提问；沿用用户原词。
 - 用户给固定台词/结局 → 一字保留，视为最高优先级素材，不问"要不要改"，只问它出现的位置与节奏。
+- **问法留出入口（v0.59，替代收集式模板）**：素材类别只问"有没有现成的线索——
+  一部作品、一段家庭往事、一条推理线，哪怕看起来和主题无关"；立场别问"你想突出哪一面"，
+  问"是什么让你现在想写这篇——先说那个触发点"；论证别问"你打算怎么论证"，
+  问"你心里有没有一条现成的推理线或一本书可以顺着想"；约束别问"结尾有什么要求"，
+  问"有没有哪句话、哪个情节、哪个词，是你定死了不许改的"。
 - 小问题（选型/素材）与大问题（立意/结尾）交替，避免连续疲劳；"可以/挺好"是推进信号。
 - 蓝图回显时引导用户做全篇级校正（结构、伏笔回收、收束），不催碎片修改。
 - **大纲是总结不是约束（v0.37）**：每轮根据对话新信息用 outlineUpdate 输出**更新后的
@@ -112,7 +132,8 @@ ${ctx.userMeta ? `【用户刚反问/质疑】"${ctx.userMeta}"——先直接�
   不要为了凑节数硬拆，也不要一直不宣布成形。确认题由系统给出，你不要替用户宣布完成。
 
 输出严格 JSON：
-{"question":"一句话追问（1-2句，含用户原词）","intent":"这个问题在收集哪个维度","recommendation":"你的建议或理解","options":["可选A","可选B","可选C"],"blueprintUpdate":{"article":"","tension":"","readerTakeaway":"","skeleton":[""],"points":[""],"emotion":"","ending":""},"outlineUpdate":{"title":"","sections":[{"heading":"","function":"","thesis":"","words":0,"keyPoints":[],"materials":[]}]},"outlineComplete":false,"stop":false}
+{"question":"一句话追问（1-2句，含用户原词）","intent":"这个问题在收集哪个维度","recommendation":"你的建议或理解","options":["可选A","可选B","可选C"],"overflow":{"type":"reference|personal|constraint|reasoning","seedText":"种子原文","constraint":"红线原文（仅constraint）","coreThesis":"立意（若有）"},"blueprintUpdate":{"article":"","tension":"","readerTakeaway":"","skeleton":[""],"points":[""],"emotion":"","ending":""},"outlineUpdate":{"title":"","sections":[{"heading":"","function":"","thesis":"","words":0,"keyPoints":[],"materials":[]}]},"outlineComplete":false,"stop":false}
+overflow 只在检测到外溢时输出对象，没有外溢输出 null。
 intent 只能取以下枚举之一（这是系统记录"用户答了什么"的依据，比问句文字更可靠）：
 topic / stance / audience / materials / theme / argument / emotion / ending / style /
 trigger / connection / borrow / externalInput /
@@ -144,6 +165,8 @@ ${ctx.thinking ? `【用户的思想内核与推理链（大纲的论点是它�
 【接收风格（read-style，结构层）】${ctx.readStyle}
 ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
 ${ctx.corrections?.length ? `【你的修正意见】${ctx.corrections.join('；')}` : ''}
+${ctx.seeds ? `【种子（用户主动给出的高价值信息，大纲必须兑现；未确认的标"待确认"）】\n${ctx.seeds}` : ''}
+${ctx.constraints ? `【红线（用户定死不许改的：台词/情节/格式/修辞，必须一字保留/全程校验）】\n${ctx.constraints}` : ''}
 ${ctx.styleDirection ? `【最新风格方向】${ctx.styleDirection}` : ''}
 ${ctx.genreBrief ? `【文体范式（公式化内容按此产出）】\n${ctx.genreBrief}` : ''}
 ${ctx.personalSkill ? `【这类文体你个人的写法（蒸馏自你的旧作）】\n${ctx.personalSkill}` : ''}

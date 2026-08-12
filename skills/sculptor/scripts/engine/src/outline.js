@@ -130,6 +130,10 @@ export async function generateOutline(cfg, wsDir) {
       genre: state.confirmed.genre || '',
     }),
     corrections: state.blueprint?.corrections || [],
+    seeds: (state.seeds || [])
+      .map((s) => `- [${s.type}${s.confirmed ? '✓' : '·待确认'}] ${s.text}`)
+      .join('\n'),
+    constraints: (state.constraints || []).map((c, i) => `${i + 1}. ${c}`).join('\n'),
     liveOutline: state.liveOutline?.sections?.length
       ? `《${state.liveOutline.title || ''}》\n${state.liveOutline.sections
           .map((s, i) => `${i + 1}. ${s.heading}（${s.function || ''}${s.words ? `，约${s.words}字` : ''}）${s.thesis ? `｜${s.thesis}` : ''}`)

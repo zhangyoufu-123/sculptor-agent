@@ -81,6 +81,19 @@ function normalizeIntent(raw) {
   return VALID_INTENTS.has(v) ? v : null;
 }
 
+/** 外溢种子（v0.59）：用户主动给出、系统没准备问的高价值信息。
+ *  分类与深挖由 LLM 动态决定（overflow 字段），这里只做清洗与兜底。 */
+const OVERFLOW_TYPES = new Set(['reference', 'personal', 'constraint', 'reasoning']);
+function normalizeOverflow(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const type = OVERFLOW_TYPES.has(raw.type) ? raw.type : null;
+  const seedText = String(raw.seedText || '').trim().slice(0, 300);
+  const constraint = String(raw.constraint || '').trim().slice(0, 300);
+  const coreThesis = String(raw.coreThesis || '').trim().slice(0, 200);
+  if (!type || (!seedText && !constraint && !coreThesis)) return null;
+  return { type, seedText, constraint, coreThesis };
+}
+
 /** 低意愿精确判定（v0.57 修复）：只有整句就是"够了/你决定/就这样"等短句才算低意愿，
  *  绝不因为句子中恰好出现"够了"两个字（如"站一会儿就够了"）就把用户的回答吞掉。 */
 function isLowWill(text) {
@@ -858,6 +871,10 @@ async function askOnce(state, cfg, workspace) {
       `${state.confirmed?.topic || ''} ${state.lastInput || ''}`,
     ),
     styleNote: state.confirmed.styleNote || '',
+    seeds: (state.seeds || [])
+      .map((s) => `- [${s.type}${s.confirmed ? '✓' : '·待确认'}] ${s.text}`)
+      .join('\n'),
+    constraints: (state.constraints || []).map((c, i) => `${i + 1}. ${c}`).join('\n'),
     blueprintText: state.blueprint && renderBlueprint(state),
     liveOutline: liveOutlineText(state),
     intentBrief: intentBrief(state),
@@ -950,6 +967,7 @@ async function askOnce(state, cfg, workspace) {
       ready: materialGate(state),
       question,
       askedField: normalizeIntent(q.intent),
+      overflow: q.overflow || null,
       recommendation: q.recommendation,
       options: q.options || [],
       blueprintUpdate: q.blueprintUpdate || null,
@@ -1254,6 +1272,14 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
         if (upgraded.length) {
           ws.logContext(workspace, 'knowledge', `用户确认，${upgraded.length} 条知识升级为已查验`);
         }
+        // 顺带：把待确认的种子标记为"已确认"（用户短句确认 = 种子成立）
+        const seeds = state.seeds || [];
+        if (seeds.some((s) => !s.confirmed)) {
+          seeds.forEach((s) => {
+            s.confirmed = true;
+          });
+          ws.logContext(workspace, 'clarify', `用户确认，${seeds.length} 个种子已确认`);
+        }
       }
     } catch {}
     // 显式检索请求（"帮我查一查《乡土中国》中…"）→ 立即排队/直连检索，并把提示回给用户。
@@ -1272,6 +1298,79 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
   }
   const next = await askOnce(state, cfg, workspace);
   state.metaQuestion = ''; // 反问已交给 LLM 处理，只生效一轮，防止残留重复解释
+  // ── 外溢优先（v0.59）：用户主动给出的高价值信息，当轮入档 ──────────
+  const overflow = normalizeOverflow(next.overflow);
+  const appendOverflowLog = (type, seed, constraint, coreThesis) => {
+    try {
+      const logDir = path.join(workspace, 'vault');
+      fs.mkdirSync(logDir, { recursive: true });
+      fs.appendFileSync(
+        path.join(logDir, 'overflow-log.jsonl'),
+        JSON.stringify({
+          ts: ws.nowIso(),
+          task: state.confirmed?.topic || '',
+          asked: state.lastQuestion || '',
+          userSaid: String(state.lastInput || '').slice(0, 200),
+          overflowType: type,
+          seed: String(seed || '').slice(0, 200),
+          constraint: String(constraint || '').slice(0, 200),
+          coreThesis: String(coreThesis || '').slice(0, 200),
+          lesson: '',
+        }) + '\n',
+      );
+    } catch {}
+  };
+  if (overflow) {
+    state.seeds = state.seeds || [];
+    state.constraints = state.constraints || [];
+    state.overflowLog = state.overflowLog || [];
+    if (overflow.seedText && !state.seeds.some((s) => s.text === overflow.seedText)) {
+      state.seeds.push({ text: overflow.seedText, type: overflow.type, confirmed: false, ts: ws.nowIso() });
+    }
+    if (overflow.constraint && !state.constraints.includes(overflow.constraint)) {
+      state.constraints.push(overflow.constraint);
+    }
+    if (overflow.coreThesis) state.coreThesis = overflow.coreThesis;
+    state.overflowDeepCount = (state.overflowDeepCount || 0) + 1;
+    state.overflowLog.push({
+      ts: ws.nowIso(),
+      overflowType: overflow.type,
+      seed: overflow.seedText,
+      constraint: overflow.constraint,
+      coreThesis: overflow.coreThesis,
+    });
+    if (state.overflowLog.length > 12) state.overflowLog = state.overflowLog.slice(-12);
+    appendOverflowLog(overflow.type, overflow.seedText, overflow.constraint, overflow.coreThesis);
+    ws.logContext(
+      workspace,
+      'clarify',
+      `外溢种子[${overflow.type}]：${(overflow.seedText || overflow.constraint || '').slice(0, 60)}`,
+    );
+  } else {
+    state.overflowDeepCount = 0;
+    // 确定性兜底（LLM 未识别时）：只抓最明确的书名/红线，分类和深挖仍交给 LLM。
+    const t = String(state.lastInput || '').trim();
+    if (t && !isLowWill(t) && /《[^》]{1,30}》|父母|家人|师承|导师|台词|一字|不许改|不能改|必须保留|定死了|不许动|推理线/.test(t)) {
+      const b = t.match(/《([^》]{1,30})》/)?.[1];
+      const seedText = b ? `《${b}》` : '';
+      if (seedText && !(state.seeds || []).some((s) => s.text === seedText)) {
+        const type = /父母|家人|师承|导师/.test(t) ? 'personal' : /推理线|推理/.test(t) ? 'reasoning' : 'reference';
+        state.seeds = state.seeds || [];
+        state.seeds.push({ text: seedText, type, confirmed: false, ts: ws.nowIso(), auto: true });
+        appendOverflowLog(type, seedText, '', '');
+        ws.logContext(workspace, 'clarify', `外溢种子（兜底识别）[${type}]：${seedText}`);
+      }
+      if (/台词|一字|不许改|不能改|必须保留|定死了|不许动/.test(t)) {
+        state.constraints = state.constraints || [];
+        const c = t.trim().slice(0, 200);
+        if (!state.constraints.includes(c)) {
+          state.constraints.push(c);
+          appendOverflowLog('constraint', '', c, '');
+          ws.logContext(workspace, 'clarify', `红线（兜底识别）：${c.slice(0, 50)}`);
+        }
+      }
+    }
+  }
   // 实时大纲生长：LLM 每轮可输出 outlineUpdate（节列表），面板随之逐轮变化。
   if (next.outlineUpdate) mergeLiveOutline(state, next.outlineUpdate);
   // LLM 没给结构（或只给空节）时，用已确认内容生成内容节，保证大纲每轮可见地长大。

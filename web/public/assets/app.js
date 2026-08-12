@@ -683,6 +683,16 @@ function renderPaneContext(c) {
   if (c.materials?.length) {
     parts.push(ctxSection(`素材 ×${c.materials.length}`, c.materials.map((m) => `<div class="ctx-material">${esc(m.slice(0, 90))}</div>`).join('')));
   }
+  // 种子与红线（v0.59）：用户主动给出的高价值信息，当轮可见、后续兑现
+  if (c.seeds?.length || c.constraints?.length) {
+    const seedHtml = (c.seeds || [])
+      .map((s) => `<div class="ctx-row"><span class="vchip">${esc(s.type || 'seed')}${s.confirmed ? '✓' : '·'}</span>${esc(s.text)}</div>`)
+      .join('');
+    const conHtml = (c.constraints || [])
+      .map((x) => `<div class="ctx-row"><span class="vchip">红线</span>${esc(x)}</div>`)
+      .join('');
+    parts.push(ctxSection('种子与红线（你主动给的，AI 已当轮接住）', seedHtml + conHtml));
+  }
   // 思想脉络（v0.43/0.45 可视化）：AI 理解到的用户主张/前提/推理/来源
   if (c.thinking) {
     const lines = c.thinking
