@@ -187,6 +187,107 @@ def add_equation(content):
     doc.element.body.append(parse_xml(xml))
 
 
+# ---------------- 行内公式（v0.61）：$...$ → Word 原生行内数学 ----------------
+
+def render_inline_math(latex):
+    """把行内 LaTeX 子集渲染为 OMML：标识符 + 下标/上标 + 括号 + 希腊字母 + 运算符。
+    支持：p_{\\mathrm{base}}、S_{\\text{defect}}、\\beta_1、R(t)、S(w|c,t)、\\varphi(x) 等。"""
+    s = str(latex).strip()
+    s = re.sub(r'\\(?:mathrm|text|operatorname)\{([^{}]*)\}', r'\1', s)
+    for k, v in {
+        '\\mid': '|', '\\cdot': '·', '\\log': 'log ', '\\beta': 'β', '\\lambda': 'λ',
+        '\\tau': 'τ', '\\alpha': 'α', '\\varphi': 'φ', '\\phi': 'φ', '\\sigma': 'σ',
+        '\\mu': 'μ', '\\gamma': 'γ', '\\Delta': 'Δ', '\\|': '|',
+    }.items():
+        s = s.replace(k, v)
+
+    def parse(sub):
+        return render_inline_math(sub) if '$' not in str(sub) else render_inline_math(str(sub).strip('$'))
+
+    out = []
+    i = 0
+    while i < len(s):
+        ch = s[i]
+        if ch == ' ':
+            i += 1
+            continue
+        if ch in '+-·×/=,|':
+            out.append(run(f' {ch} '))
+            i += 1
+            continue
+        if ch in '([':
+            close = ')' if ch == '(' else ']'
+            depth, j = 1, i + 1
+            while j < len(s) and depth > 0:
+                if s[j] in '([':
+                    depth += 1
+                elif s[j] in ')]':
+                    depth -= 1
+                j += 1
+            inner = render_inline_math(s[i + 1 : max(i + 1, j - 1)])
+            out.append(delim(inner, o=ch, c=close))
+            i = j
+            continue
+        m = re.match(r'[A-Za-zα-ωΑ-Ω]+', s[i:])
+        if m:
+            name = m.group(0)
+            i += len(name)
+            sub = sup = None
+            if i < len(s) and s[i] == '_':
+                j = i + 1
+                if j < len(s) and s[j] == '{':
+                    k = s.index('}', j)
+                    sub = s[j + 1 : k]
+                    i = k + 1
+                else:
+                    m2 = re.match(r'[A-Za-z0-9]+', s[j:])
+                    sub = m2.group(0)
+                    i = j + len(sub)
+            if i < len(s) and s[i] == '^':
+                j = i + 1
+                if j < len(s) and s[j] == '{':
+                    k = s.index('}', j)
+                    sup = s[j + 1 : k]
+                    i = k + 1
+                else:
+                    m2 = re.match(r'[A-Za-z0-9]+', s[j:])
+                    sup = m2.group(0)
+                    i = j + len(sup)
+            if sub and sup:
+                out.append(ssubsup(run(name), parse(sub), parse(sup)))
+            elif sub:
+                out.append(ssub(run(name), parse(sub)))
+            elif sup:
+                out.append(ssup(run(name), parse(sup)))
+            else:
+                out.append(run(name))
+            continue
+        m = re.match(r'\d+', s[i:])
+        if m:
+            out.append(run(m.group(0)))
+            i += len(m.group(0))
+            continue
+        out.append(run(ch))
+        i += 1
+    return seq(*out)
+
+
+def add_rich_text(p, text, cn='宋体', en='Times New Roman', size=12, bold=False):
+    """段落内按 $...$ 交替渲染普通文字与行内数学公式。"""
+    for part in re.split(r'(\$[^$]+\$)', str(text)):
+        if not part:
+            continue
+        if part.startswith('$') and part.endswith('$') and len(part) > 2:
+            try:
+                omml = render_inline_math(part[1:-1])
+                p._p.append(parse_xml(f'<m:oMath xmlns:m="{M_NS}" xmlns:w="{W_NS}">{omml}</m:oMath>'))
+                continue
+            except Exception:
+                pass
+        r = p.add_run(clean_inline(part))
+        set_font(r, cn=cn, en=en, size=size, bold=bold)
+
+
 # ---------------- 文档排版 ----------------
 
 doc = Document()
@@ -216,8 +317,7 @@ def para(text, cn='宋体', size=12, bold=False, align=None, indent=True, space=
         pf.first_line_indent = Pt(size * 2)
     pf.line_spacing = space
     pf.space_after = Pt(4)
-    r = p.add_run(clean_inline(text))
-    set_font(r, cn=cn, size=size, bold=bold)
+    add_rich_text(p, text, cn=cn, size=size, bold=bold)
     return p
 
 
@@ -240,8 +340,7 @@ def add_table(rows):
         for j, cell in enumerate(row):
             c = t.cell(i, j)
             c.text = ''
-            r = c.paragraphs[0].add_run(clean_inline(cell))
-            set_font(r, size=10.5, bold=(i == 0))
+            add_rich_text(c.paragraphs[0], cell, size=10.5, bold=(i == 0))
 
 
 def add_image(path, caption=None):
@@ -352,8 +451,7 @@ while i < len(lines):
         p = doc.add_paragraph()
         p.paragraph_format.space_after = Pt(4)
         p.paragraph_format.line_spacing = 1.3
-        r = p.add_run(clean_inline(line[2:].strip()))
-        set_font(r, size=12)
+        add_rich_text(p, line[2:].strip(), size=12)
     elif line.startswith('**关键词**'):
         p = doc.add_paragraph()
         p.paragraph_format.line_spacing = 1.5
@@ -365,8 +463,7 @@ while i < len(lines):
         p.paragraph_format.line_spacing = 1.4
         p.paragraph_format.space_after = Pt(3)
         p.paragraph_format.left_indent = Pt(18)
-        r = p.add_run(clean_inline(line[2:].strip()))
-        set_font(r, size=12)
+        add_rich_text(p, line[2:].strip(), size=12)
     else:
         para(line.strip())
     i += 1
