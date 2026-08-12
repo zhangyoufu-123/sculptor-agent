@@ -59,20 +59,13 @@ function check(name, cond, extra = '') {
 
 const b64 = (s) => Buffer.from(s, 'utf8').toString('base64');
 
-// 1) 鉴权：未登录被拦；错误密码被拒；正确密码发放 cookie
+// 1) 鉴权（v0.58 已移除登录）：默认开放访问，旧接口返回 required:false
 {
   const st = JSON.parse((await call('/api/auth/status')).body);
-  check('auth/status 要求登录', st.required === true && st.ok === false);
+  check('auth/status 无需登录', st.required === false && st.ok === true);
   const denied = await call('/api/sessions');
-  check('未登录访问 API 返回 401', denied.res.statusCode === 401);
-  const bad = await call('/api/auth/login', 'POST', { password: 'wrong' });
-  check('错误密码返回 401', bad.res.statusCode === 401);
-  const ok = await call('/api/auth/login', 'POST', { password: 'secret123' });
-  check('正确密码返回 200 并带 Set-Cookie', ok.res.statusCode === 200 && /sculptor_auth=/.test(ok.res._headers['Set-Cookie'] || ''));
-  const cookie = ok.res._headers['Set-Cookie'].split(';')[0];
-  const sessions = await call('/api/sessions', 'GET', undefined, { cookie });
-  check('带 cookie 访问 API 正常', sessions.res.statusCode === 200);
-  console.log('PASS 鉴权流程（未登录 401 / 错误密码 401 / 登录发 cookie / 放行）');
+  check('未登录直接访问 API 正常', denied.res.statusCode === 200);
+  console.log('PASS 开放访问（登录已移除）');
 }
 
 // 2) 学术规范审计：构造带问题的会话成稿
@@ -84,47 +77,31 @@ const b64 = (s) => Buffer.from(s, 'utf8').toString('base64');
   fs.mkdirSync(path.join(dir, 'protocol'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'protocol', 'state.json'), JSON.stringify({ confirmed: { genre: '学术论文' } }));
   fs.writeFileSync(path.join(dir, 'draft.md'), '## 摘要\n' + '这是一段用于测试摘要长度的文字。'.repeat(40) + '\n\n个人知识库(Personal Knowledge Base, PKB)。\n', 'utf8');
-  const login = await call('/api/auth/login', 'POST', { password: 'secret123' });
-  const cookie = login.res._headers['Set-Cookie'].split(';')[0];
-  const r = JSON.parse((await call('/api/norm', 'POST', { sessionId: sid }, { cookie })).body);
+  const r = JSON.parse((await call('/api/norm', 'POST', { sessionId: sid })).body);
   check('norm 返回评分与问题', typeof r.score === 'number' && Array.isArray(r.items) && r.items.length >= 2, `items=${r.items.length}`);
   console.log('PASS 学术规范审计（web 端点）');
 }
 
 // 3) 文档翻译（md 输入）与下载
 {
-  const login = await call('/api/auth/login', 'POST', { password: 'secret123' });
-  const cookie = login.res._headers['Set-Cookie'].split(';')[0];
   const r = JSON.parse(
-    (await call('/api/doc/translate', 'POST', { sessionId: 'n1', filename: 'doc.md', dataBase64: b64('# Title\n\n你好，世界。'), lang: 'en' }, { cookie })).body,
+    (await call('/api/doc/translate', 'POST', { sessionId: 'n1', filename: 'doc.md', dataBase64: b64('# Title\n\n你好，世界。'), lang: 'en' })).body,
   );
   check('doc translate 成功并产出文件', r.ok === true && Array.isArray(r.files) && r.files.some((f) => f.endsWith('.md')), JSON.stringify(r.files));
   check('doc translate 含原意解读', r.interpretation && r.interpretation.intent);
   const mdFile = r.files.find((f) => f.endsWith('.md'));
-  const dl = await call(`/api/doc/download?sessionId=n1&file=${encodeURIComponent(mdFile)}`, 'GET', undefined, { cookie });
+  const dl = await call(`/api/doc/download?sessionId=n1&file=${encodeURIComponent(mdFile)}`, 'GET');
   check('doc download 可下载译文', dl.res.statusCode === 200 && dl.body.includes('This is a translated paragraph'));
   console.log('PASS 文档翻译与下载（web 端点）');
 }
 
 // 4) 文档风格重写与回译/产物
 {
-  const login = await call('/api/auth/login', 'POST', { password: 'secret123' });
-  const cookie = login.res._headers['Set-Cookie'].split(';')[0];
   const r = JSON.parse(
-    (await call('/api/doc/restyle', 'POST', { sessionId: 'n1', filename: 'doc.md', dataBase64: b64('# T\n\n旧石阶。'), style: '克制短句' }, { cookie })).body,
+    (await call('/api/doc/restyle', 'POST', { sessionId: 'n1', filename: 'doc.md', dataBase64: b64('# T\n\n旧石阶。'), style: '克制短句' })).body,
   );
   check('doc restyle 成功并产出文件', r.ok === true && Array.isArray(r.files) && r.files.some((f) => f.endsWith('.md')));
   console.log('PASS 文档风格重写（web 端点）');
-}
-
-// 5) 登出后再次拦截
-{
-  const login = await call('/api/auth/login', 'POST', { password: 'secret123' });
-  const cookie = login.res._headers['Set-Cookie'].split(';')[0];
-  await call('/api/auth/logout', 'POST', {}, { cookie });
-  const after = await call('/api/sessions');
-  check('登出后恢复 401', after.res.statusCode === 401);
-  console.log('PASS 登出拦截');
 }
 
 console.log(`\n${failures === 0 ? '✓ 全部通过' : `✗ ${failures} 项失败`}`);

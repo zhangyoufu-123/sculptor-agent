@@ -58,7 +58,7 @@ export async function understandIntent(cfg, workspace, state) {
           { role: 'system', content: '你是写作意图分析师，只依据给出的发言提炼，不臆测。' },
           { role: 'user', content: INTENT_PROMPT({ utterances, confirmed, materials }) },
         ],
-        { json: true, temperature: 0.3, maxTokens: 900 },
+        { json: true, temperature: 0.3, maxTokens: 1400 },
       );
       intent = parseJsonContent(content, '意图');
     } catch {

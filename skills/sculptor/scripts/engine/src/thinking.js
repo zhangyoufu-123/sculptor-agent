@@ -64,7 +64,7 @@ export async function extractThinkingWithLLM(cfg, text, existing = '') {
         { role: 'system', content: '你是思想对话者，只输出严格 JSON，不成形的字段留空。' },
         { role: 'user', content: THINKING_PROMPT({ text, existing }) },
       ],
-      { json: true, temperature: 0.3, maxTokens: 500 },
+      { json: true, temperature: 0.3, maxTokens: 1200 },
     );
     const r = parseJsonContent(content, '思想');
     if (!r || typeof r !== 'object') return null;

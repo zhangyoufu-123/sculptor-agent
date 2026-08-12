@@ -44,16 +44,21 @@ function seedCore(state) {
   state.materials = ['石阶', '窗台积灰', '木楼梯的声响', '纪念牌上的字'];
 }
 
-// 1) 实时大纲从空开始，不预造"开头/主体/结尾"骨架；文本渲染不带完成度/状态机字样
+// 1) 实时大纲从空开始，不预造"开头/主体/结尾"固定骨架（v0.57 后主题预填会立即长出
+//    "素材/主题归纳"等内容节——内容是总结，不是骨架）；文本渲染不带完成度/状态机字样
 {
   const w = ws.ensureWorkspace(path.join(tmp, 'w1'), { create: true });
   const r = await clarifyStep(cfg, w, { lastInput: '我想写一篇关于北大红楼的散文' });
   const st = ws.readState(w);
   assert(st.liveOutline && Array.isArray(st.liveOutline.sections), '实时大纲必然存在');
-  assert.strictEqual(st.liveOutline.sections.length, 0, '开局不预造骨架');
+  const heads = st.liveOutline.sections.map((s) => s.heading);
+  assert(
+    !heads.some((h) => /^(开头|主体|结尾|引言|正文|结论)$/.test(String(h).trim())),
+    '不预造固定骨架（只允许内容节：素材/立意/主题归纳等）',
+  );
   assert(r.liveOutline && Array.isArray(r.liveOutline.sections), 'clarifyStep 返回实时大纲');
   assert(!liveOutlineText(st).includes('完成度'), '文本不展示机器完成度');
-  console.log('PASS 实时大纲从空开始、无骨架、无完成度');
+  console.log('PASS 实时大纲只长内容节、无固定骨架、无完成度');
 }
 
 // 2) 核心字段齐 + LLM 判定 outlineComplete → 大纲由 LLM 总结（mock 返回 3 部分）+ 确认题出现

@@ -139,15 +139,35 @@ const SEARCH_PHRASES = [
 function buildSearchQuery(input, state = {}) {
   let q = String(input || '');
   for (const p of SEARCH_PHRASES) q = q.split(p).join(' ');
+  // 优先保留《书名号》里的实体，作为查询的核心词（v0.58 查询清洗）。
+  const book = q.match(/《([^》]{1,30})》/)?.[1] || '';
+  q = q.replace(/[《》]/g, ' ');
   q = q
     .replace(/[吗呢吧啊呀。！？，,.]/g, ' ')
+    .replace(
+      /(我在|我|你|请|麻烦|帮我|帮忙|可以|能不能|记得|有|这个|那个|一些|一个|讲|讲过|说到|说到过|看过|读过|在B站|B站|b站|纪录片|视频|里面|里面说|中说到|中讲过|上|里|的|关于|学术讨论|论述|相关内容|资料|信息|方面|问题)/g,
+      ' ',
+    )
     .replace(/\s+/g, ' ')
     .trim();
+  if (book) q = `${book} ${q}`.trim();
+  // 去重相邻同词（书名提取与原文残留可能重复出现）。
+  {
+    const seen = new Set();
+    q = q
+      .split(' ')
+      .filter((w) => {
+        if (!w || seen.has(w)) return false;
+        seen.add(w);
+        return true;
+      })
+      .join(' ');
+  }
   if (q.length < 6) {
     const topic = String(state?.confirmed?.topic || '').trim();
     q = topic ? `${topic} ${String(input || '').slice(0, 60)}` : String(input || '').slice(0, 60);
   }
-  return q;
+  return q.slice(0, 60);
 }
 
 /**
@@ -247,6 +267,152 @@ async function searchSerper(key, queries) {
   return { searched: true, results: out };
 }
 
+function stripHtml(s) {
+  return String(s || '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+}
+
+/** 内置免费检索 A：DuckDuckGo HTML（无需密钥；被限流时由 Wikipedia 兜底）。 */
+async function searchDuckDuckGo(queries) {
+  const out = [];
+  for (const q of queries.slice(0, 3)) {
+    const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120 Safari/537.36' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) throw new Error(`DDG ${res.status}`);
+    const html = await res.text();
+    const results = [];
+    const re = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+    let m;
+    while ((m = re.exec(html)) && results.length < 5) {
+      let url = stripHtml(m[1]);
+      const uddg = url.match(/uddg=([^&]+)/);
+      if (uddg) {
+        try { url = decodeURIComponent(uddg[1]); } catch {}
+      }
+      results.push({ title: stripHtml(m[2]), url, source: url, snippet: '' });
+    }
+    const snips = [...html.matchAll(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g)].map((x) => stripHtml(x[1]));
+    results.forEach((r, i) => {
+      if (snips[i]) r.snippet = snips[i];
+    });
+    if (results.length) out.push({ query: q, results });
+  }
+  if (!out.some((o) => o.results.length)) throw new Error('DDG 返回空结果');
+  return { searched: true, results: out };
+}
+
+/** 内置免费检索 B：必应中国（中国大陆可达，无需密钥）。 */
+async function searchBingCN(queries) {
+  const out = [];
+  for (const q of queries.slice(0, 3)) {
+    const res = await fetch(`https://cn.bing.com/search?q=${encodeURIComponent(q)}&setlang=zh-hans`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120 Safari/537.36' },
+    });
+    if (!res.ok) throw new Error(`Bing ${res.status}`);
+    const html = await res.text();
+    const results = [];
+    const re = /<li class="b_algo"[\s\S]*?<h2[^>]*><a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a><\/h2>([\s\S]*?)<\/li>/g;
+    let m;
+    while ((m = re.exec(html)) && results.length < 5) {
+      const snip = m[3].match(/class="b_lineclamp2"[^>]*>([\s\S]*?)<\/p>/);
+      results.push({
+        title: stripHtml(m[2]),
+        url: String(m[1] || '').split(' ')[0],
+        source: 'bing',
+        snippet: snip ? stripHtml(snip[1]) : '',
+      });
+    }
+    if (results.length) out.push({ query: q, results });
+  }
+  if (!out.some((o) => o.results.length)) throw new Error('Bing 返回空结果');
+  return { searched: true, results: out };
+}
+
+/** 内置免费检索 C：B站视频搜索（中国大陆可达；用于"视频/B站/纪录片"类查询）。 */
+async function searchBilibili(queries) {
+  const out = [];
+  for (const q of queries.slice(0, 3)) {
+    const res = await fetch(
+      `https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=${encodeURIComponent(q)}`,
+      { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' } },
+    );
+    if (!res.ok) throw new Error(`Bilibili ${res.status}`);
+    const data = await res.json();
+    const hits = data?.data?.result || [];
+    if (hits.length) {
+      out.push({
+        query: q,
+        results: hits.slice(0, 5).map((h) => ({
+          title: stripHtml(String(h.title || '')),
+          url: `https://www.bilibili.com/video/${String(h.bvid || h.aid || '')}`,
+          source: 'bilibili',
+          snippet: stripHtml(String(h.description || h.author || '')).slice(0, 200),
+        })),
+      });
+    }
+  }
+  if (!out.some((o) => o.results.length)) throw new Error('B站返回空结果');
+  return { searched: true, results: out };
+}
+
+/** 内置免费检索 D：百度（中国大陆可达；跟随重定向 + 宽松解析）。 */
+async function searchBaidu(queries) {
+  const out = [];
+  for (const q of queries.slice(0, 2)) {
+    const res = await fetch(`https://www.baidu.com/s?wd=${encodeURIComponent(q)}&ie=utf-8`, {
+      redirect: 'follow',
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120 Safari/537.36' },
+    });
+    if (!res.ok) throw new Error(`Baidu ${res.status}`);
+    const html = await res.text();
+    const results = [];
+    const re = /<h3[^>]*>\s*<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+    let m;
+    while ((m = re.exec(html)) && results.length < 5) {
+      const title = stripHtml(m[2]);
+      if (!title || title.length < 4) continue;
+      results.push({ title, url: String(m[1] || '').split(' ')[0], source: 'baidu', snippet: '' });
+    }
+    if (results.length) out.push({ query: q, results });
+  }
+  if (!out.some((o) => o.results.length)) throw new Error('Baidu 返回空结果');
+  return { searched: true, results: out };
+}
+
+/** 内置免费检索 B：中文维基百科 API（无需密钥，适合书/理论/事件查证）。 */
+async function searchWikipedia(queries) {
+  const out = [];
+  for (const q of queries.slice(0, 3)) {
+    const url = `https://zh.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&format=json&origin=*&srlimit=5`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`Wiki ${res.status}`);
+    const data = await res.json();
+    const hits = data?.query?.search || [];
+    if (hits.length) {
+      out.push({
+        query: q,
+        results: hits.map((h) => ({
+          title: String(h.title || ''),
+          url: `https://zh.wikipedia.org/wiki/${encodeURIComponent(String(h.title || '').replace(/ /g, '_'))}`,
+          source: 'wikipedia',
+          snippet: stripHtml(String(h.snippet || '')),
+        })),
+      });
+    }
+  }
+  if (!out.some((o) => o.results.length)) throw new Error('Wiki 返回空结果');
+  return { searched: true, results: out };
+}
+
 export async function searchOnline(cfg, queries) {
   if (!queries?.length) return { searched: false, hint: '没有查询' };
   const provider = String(cfg.searchProvider || '').toLowerCase();
@@ -254,6 +420,11 @@ export async function searchOnline(cfg, queries) {
   try {
     if (provider === 'tavily' && key) return await searchTavily(key, queries);
     if (provider === 'serper' && key) return await searchSerper(key, queries);
+    if (['ddg', 'duckduckgo'].includes(provider)) return await searchDuckDuckGo(queries);
+    if (provider === 'wikipedia') return await searchWikipedia(queries);
+    if (provider === 'bing') return await searchBingCN(queries);
+    if (provider === 'bilibili') return await searchBilibili(queries);
+    if (provider === 'baidu') return await searchBaidu(queries);
     if (cfg.ragEndpoint && cfg.ragApiKey) {
       const res = await fetch(`${cfg.ragEndpoint}/search`, {
         method: 'POST',
@@ -268,6 +439,33 @@ export async function searchOnline(cfg, queries) {
       const results = Array.isArray(data.results) ? data.results : [];
       if (!results.length) throw new Error('检索返回空 results');
       return { searched: true, results };
+    }
+    // 内置检索（v0.58）：无需密钥。链路按"中国大陆可达性"排序：
+    // 视频类查询 → B站；否则必应中国 → 百度 → DDG → 维基（海外环境也能用）。
+    if (provider === 'builtin') {
+      const firstQ = String(queries[0] || '');
+      if (/视频|B站|b站|纪录片|up主|弹幕|番剧|观影/.test(firstQ)) {
+        try {
+          return await searchBilibili(queries);
+        } catch {}
+      }
+      try {
+        return await searchBingCN(queries);
+      } catch {}
+      try {
+        return await searchBaidu(queries);
+      } catch {}
+      try {
+        return await searchDuckDuckGo(queries);
+      } catch {
+        try {
+          return await searchWikipedia(queries);
+        } catch {}
+      }
+      return {
+        searched: false,
+        hint: '内置检索暂不可达（网络受限）——可以直接粘贴资料片段给我回灌',
+      };
     }
     return {
       searched: false,

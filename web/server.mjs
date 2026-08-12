@@ -71,7 +71,7 @@ const { readVector, vectorSummary } = await import(
 const { readPersona } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'persona.js')).href
 );
-const { listEntries, removeEntry } = await import(
+const { listEntries, removeEntry, normTitle } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'knowledge.js')).href
 );
 const { checklistOf } = await import(
@@ -109,42 +109,12 @@ const {
 // CLI/Agent 端不受影响（保持默认 300s / 4 次重试）。
 if (!process.env.SCULPTOR_LLM_TIMEOUT_MS) process.env.SCULPTOR_LLM_TIMEOUT_MS = '120000';
 if (!process.env.SCULPTOR_LLM_RETRIES) process.env.SCULPTOR_LLM_RETRIES = '2';
+// Web 端默认开启内置免费检索（DuckDuckGo → 维基兜底），"帮我查一查"在部署即能用；
+// CLI 端不设默认（保持"未配置→排队宿主代检"的原行为）。
+if (!process.env.SCULPTOR_SEARCH_PROVIDER) process.env.SCULPTOR_SEARCH_PROVIDER = 'builtin';
 
 const cfg = loadConfig();
 
-// ── 生产级鉴权（SCULPTOR_WEB_PASSWORD 设置后启用；未设置时保持单机免登录兼容）──
-const WEB_PASSWORD = process.env.SCULPTOR_WEB_PASSWORD || '';
-const AUTH_TOKENS = new Map(); // token -> expiry
-
-function cookieOf(req) {
-  const raw = String(req.headers.cookie || '');
-  const out = {};
-  for (const part of raw.split(';')) {
-    const i = part.indexOf('=');
-    if (i > 0) out[part.slice(0, i).trim()] = part.slice(i + 1).trim();
-  }
-  return out;
-}
-
-function authOk(req) {
-  if (!WEB_PASSWORD) return true;
-  const tok = cookieOf(req).sculptor_auth;
-  const exp = tok ? AUTH_TOKENS.get(tok) : 0;
-  if (!exp) return false;
-  if (exp < Date.now()) {
-    AUTH_TOKENS.delete(tok);
-    return false;
-  }
-  return true;
-}
-
-function jsonAuth(res, code, data, cookie) {
-  res.writeHead(code, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Set-Cookie': cookie,
-  });
-  res.end(JSON.stringify(data));
-}
 const IO_SCRIPTS = path.resolve(HERE, '..', 'agent', 'scripts', 'io');
 
 const GENRE_CATEGORY = {
@@ -413,29 +383,9 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const p = url.pathname;
 
-  // ── 鉴权 ────────────────────────────────────────────
+  // ── 鉴权（v0.58 已移除登录：个人/演示实例默认开放；如需防护请走反向代理）──
   if (req.method === 'GET' && p === '/api/auth/status') {
-    return json(res, 200, { required: Boolean(WEB_PASSWORD), ok: authOk(req) });
-  }
-  if (req.method === 'POST' && p === '/api/auth/login') {
-    const { password } = await body(req);
-    if (!WEB_PASSWORD || String(password || '') === WEB_PASSWORD) {
-      const tok = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
-      AUTH_TOKENS.set(tok, Date.now() + 12 * 3600 * 1000);
-      return jsonAuth(
-        res,
-        200,
-        { ok: true },
-        `sculptor_auth=${tok}; HttpOnly; Path=/; Max-Age=43200; SameSite=Lax`,
-      );
-    }
-    return json(res, 401, { error: '密码错误' });
-  }
-  if (req.method === 'POST' && p === '/api/auth/logout') {
-    return jsonAuth(res, 200, { ok: true }, 'sculptor_auth=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
-  }
-  if (p.startsWith('/api/') && WEB_PASSWORD && !authOk(req)) {
-    return json(res, 401, { error: '未登录：请先通过 /api/auth/login 获取会话' });
+    return json(res, 200, { required: false, ok: true });
   }
 
   if (req.method === 'GET' && (p === '/' || p.startsWith('/assets/'))) {
@@ -445,7 +395,17 @@ const server = http.createServer(async (req, res) => {
 
   // ── 会话管理 ──────────────────────────────────────────
   if (req.method === 'GET' && p === '/api/sessions') {
-    return json(res, 200, { sessions: listSessions() });
+    // v0.58：会话列表附带各自进度（阶段/大纲节数/素材/风格底稿），
+    // 便于"检查项目进展"——每个对话是独立工作流，互不影响。
+    const sessions = listSessions().map((m) => {
+      try {
+        const state = ws.readState(sessionDir(m.id));
+        return { ...m, ...stateBrief(state, m) };
+      } catch {
+        return m;
+      }
+    });
+    return json(res, 200, { sessions });
   }
   if (req.method === 'POST' && p === '/api/start') {
     const { topic } = await body(req);
@@ -851,8 +811,22 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'GET' && p === '/api/knowledge') {
     const id = String(url.searchParams.get('sessionId') || '');
-    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
-    return json(res, 200, { entries: listEntries(sessionDir(id)) });
+    if (id) {
+      if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+      return json(res, 200, { entries: listEntries(sessionDir(id)) });
+    }
+    // 个人知识库聚合视图（v0.58）：跨会话按标题去重合并，作为"你的个人知识库"。
+    const byTitle = new Map();
+    for (const s of listSessions()) {
+      for (const e of listEntries(sessionDir(s.id))) {
+        const key = normTitle(e.title);
+        const prev = byTitle.get(key);
+        if (!prev || Number(e.confidence || 0) > Number(prev.confidence || 0)) {
+          byTitle.set(key, { ...e, sessionId: s.id });
+        }
+      }
+    }
+    return json(res, 200, { entries: [...byTitle.values()], shared: true });
   }
   if (req.method === 'DELETE' && p === '/api/knowledge') {
     const { sessionId, id } = await body(req);

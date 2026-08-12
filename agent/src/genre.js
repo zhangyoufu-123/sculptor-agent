@@ -280,6 +280,17 @@ export const GENRES = {
     rules: ['口语化但不失庄重', '层次用"首先/其次/最后"或场景切换推进', '每段有具体的人、事、引文'],
     forbidden: ['书面长句', '无对象感的空话'],
   },
+  悼念词: {
+    aliases: ['悼念词', '祭文', '追悼词', '纪念词', '送别词'],
+    skeleton: [
+      '对象与渊源（立起"他是谁、与你有什么关系"）',
+      '一生的重要现场（用史料/原话/场景，不空喊悲痛）',
+      '转折与余味（传奇落回平凡，或恩怨归于平静）',
+      '收束（按用户价值取向定调：释怀/留白/传承）',
+    ],
+    rules: ['对象与渊源先立', '引语只用品行出处', '关键情感处用史料与场景支撑', '不拔高、不煽情'],
+    forbidden: ['讣告式生平罗列', '口号堆砌', '空喊悲痛'],
+  },
   记叙文: {
     aliases: ['记叙文', '叙事', '回忆录'],
     skeleton: ['时间地点人物缘起', '经过（有细节、有波折）', '结果', '感触（点到即止）'],
@@ -557,6 +568,7 @@ export function genreBlueprint(name, opts = {}) {
         { key: 'topic', label: '主题/研究问题', required: true },
         { key: 'stance', label: '立场/研究结论', required: true },
         { key: 'theme', label: '核心论点/贡献', required: true },
+        { key: 'trigger', label: '写作触发点/参考理论（哪部作品、哪条思路让你想写，可选）', required: false },
         { key: 'argument', label: '支撑论点（≥2 个）', required: true, count: 2, list: 'arguments' },
         { key: 'materials', label: '论据/文献/数据（≥2 条）', required: true, count: 2, list: 'materials' },
         { key: 'known', label: '已知共识/现状（可选）', required: false },
@@ -630,9 +642,24 @@ export function genreBlueprint(name, opts = {}) {
         { key: 'plot', label: '情节架构（伏笔/冲突/反转设计）', required: true },
         { key: 'materials', label: '人物/场景/素材（≥2 条）', required: true, count: 2, list: 'materials' },
         { key: 'character', label: '角色（谁、想要什么、怕什么）', required: false },
+        { key: 'trigger', label: '写作触发点（哪部作品/哪个人让你想写，可选）', required: false },
+        { key: 'connection', label: '私人连线（家人/师长/经历与主题的间接关系，可选）', required: false },
         { key: 'recipient', label: '读者与题材定位', required: true },
         { key: 'emotion', label: '情感曲线', required: false },
         { key: 'ending', label: '结局/反转落点', required: false },
+        { key: 'styleSample', label: '风格底稿（可选）', required: false },
+      ]);
+    case '悼念词':
+      return F([
+        { key: 'topic', label: '悼念对象', required: true },
+        { key: 'stance', label: '基调/想留下的东西', required: true },
+        { key: 'trigger', label: '写作触发点（哪部作品/哪个画面让你想写，可选）', required: false },
+        { key: 'connection', label: '私人连线（与对象/时代的渊源，家人、师长、经历，可选）', required: false },
+        { key: 'materials', label: '事实/原话/场景（≥2 条）', required: true, count: 2, list: 'materials' },
+        { key: 'borrow', label: '想借用的现成讲述（书/播客/视频，可选）', required: false },
+        { key: 'emotion', label: '情感曲线', required: false },
+        { key: 'ending', label: '结尾姿态', required: false },
+        { key: 'audience', label: '场合与用途（留存/朗读/发布）', required: true },
         { key: 'styleSample', label: '风格底稿（可选）', required: false },
       ]);
     default:
@@ -642,6 +669,10 @@ export function genreBlueprint(name, opts = {}) {
         { key: 'stance', label: '立场/目的', required: true },
         { key: 'theme', label: '核心立意', required: true },
         { key: 'materials', label: '具体素材（≥2 条）', required: true, count: 2, list: 'materials' },
+        { key: 'trigger', label: '写作触发点（哪部作品/哪个人让你想写，可选）', required: false },
+        { key: 'connection', label: '私人连线（家人/师长/经历与主题的间接关系，可选）', required: false },
+        { key: 'borrow', label: '想借用的现成讲述（书/播客/视频，可选）', required: false },
+        { key: 'externalInput', label: '外部意见（别人给过你的建议，哪些你认同，可选）', required: false },
         { key: 'emotion', label: '情感曲线', required: false },
         { key: 'ending', label: '结尾姿态', required: false },
         { key: 'audience', label: '读者与场合', required: true },

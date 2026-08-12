@@ -155,6 +155,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       return {
         kind: 'ask',
         question: r.question,
+        warn: r.warn || '',
         recommendation: r.recommendation,
         options: r.options,
         knowledgeSuggestion: r.knowledgeSuggestion || '',
@@ -207,6 +208,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
           return {
             kind: 'ask',
             question: cr.question,
+            warn: cr.warn || '',
             recommendation: cr.recommendation,
             options: cr.options,
             checklist: cr.checklist || null,

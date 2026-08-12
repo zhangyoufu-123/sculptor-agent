@@ -14,6 +14,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as ws from './workspace.js';
 import { recommendWorks } from './asset.js';
+import { chatWithRetry, parseJsonContent } from './llm.js';
 
 const KB_DIR = 'knowledge';
 const ASKED_FILE = 'asked.jsonl';
@@ -114,6 +115,85 @@ export function updateEntry(workspace, id, patch = {}) {
   const next = { ...cur, ...patch, id, updatedAt: ws.nowIso() };
   writeEntry(workspace, next);
   return next;
+}
+
+/** 低置信知识是否已可升级为"已查验"：用户确认过（读过/看过/就是那个）即升级。 */
+export function confirmLowConfidenceEntries(workspace) {
+  const upgraded = [];
+  for (const e of listEntries(workspace)) {
+    if (e.confidence >= 0.9 && e.verified) continue;
+    if (['web-rag', 'user-referenced', 'user-stated-ai'].includes(String(e.source || ''))) {
+      const next = updateEntry(workspace, e.id, {
+        confidence: 0.95,
+        verified: true,
+        source: String(e.source || '').includes('web') ? 'web-confirmed' : 'user-confirmed',
+      });
+      upgraded.push(next.id);
+    }
+  }
+  return upgraded;
+}
+
+/** AI 知识筛选触发信号（有这些字眼才值得花一次 LLM 调用去提炼）。 */
+const KB_AI_GATE =
+  /《[^》]{1,30}》|看过|读过|在B站|B站|b站|视频|纪录片|新闻|报道|文章|参观|去过|到过|采访|讲座|听过|学到一个|知道了|研究了|关注了|刷到|刷过/;
+
+/** LLM 主导的知识筛选（v0.58）：从用户原话提炼 书/视频(B站)/新闻/文章/地方/观点，
+ *  只收明确提及、高置信的条目；LLM 不可用时返回空（由正则兜底路径继续）。 */
+export async function extractKnowledgeWithLLM(cfg, text) {
+  const prompt = `从用户发言中提取值得记入个人知识库的条目——用户明确提到"看过/读过/刷到/去过/听过的"书籍、B站等视频、
+新闻/报道、文章、地方，以及 TA 明确认可的重要观点或人物。
+只提取明确提及的条目；泛泛的"我看了个视频"不提取。
+每条输出：title（条目名，如视频/新闻的标题或主题）、type（book/video/news/article/place/idea/person）、
+note（一句话说明来源与内容，如"在B站看过，讲宋朝饮食"）、tags（2-4 个标签）、confidence（0-1）。
+输出严格 JSON：{"items":[{"title":"","type":"","note":"","tags":[],"confidence":0.9}]}
+
+用户发言：${String(text || '').slice(0, 400)}`;
+  const content = await chatWithRetry(
+    cfg,
+    [
+      { role: 'system', content: '你是个人知识库管理员，只收录明确提及的条目，输出严格 JSON。' },
+      { role: 'user', content: prompt },
+    ],
+    { json: true, temperature: 0.2, maxTokens: 900 },
+  );
+  const r = parseJsonContent(content, '知识筛选');
+  const items = Array.isArray(r?.items) ? r.items : [];
+  return items
+    .filter((x) => x && String(x.title || '').trim() && Number(x.confidence || 0) >= 0.6)
+    .map((x) => ({
+      title: String(x.title).trim().slice(0, 60),
+      type: ['book', 'video', 'news', 'article', 'place', 'idea', 'person'].includes(x.type)
+        ? x.type
+        : 'idea',
+      note: String(x.note || '').trim().slice(0, 300),
+      tags: Array.isArray(x.tags) ? x.tags.map(String).slice(0, 6) : [],
+      confidence: Math.max(0.6, Math.min(Number(x.confidence) || 0.6, 0.95)),
+    }));
+}
+
+/** AI 主导入库（v0.58）：命中信号才调用 LLM；新增条目直接写库并返回 id 列表。 */
+export async function captureKnowledgeAI(cfg, workspace, text) {
+  if (!cfg?.apiKey || !KB_AI_GATE.test(String(text || ''))) return { added: [], skipped: 0 };
+  try {
+    const items = await extractKnowledgeWithLLM(cfg, text);
+    const added = [];
+    for (const it of items) {
+      if (!it.title) continue;
+      const { entry, created } = addEntry(workspace, {
+        title: it.title,
+        type: it.type,
+        note: it.note,
+        tags: it.tags,
+        source: 'user-stated-ai',
+        confidence: it.confidence,
+      });
+      if (created) added.push(entry.id);
+    }
+    return { added, skipped: items.length - added.length };
+  } catch {
+    return { added: [], skipped: 0 };
+  }
 }
 
 // ── 匹配（BM25 字符二元组 + 标签/关联词兜底）──────────────────────

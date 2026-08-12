@@ -1239,6 +1239,13 @@ async function renderSessions() {
       <div class="session-card" data-id="${esc(s.id)}">
         <h3>${esc(s.title)}</h3>
         <div class="meta">${[s.category, s.status, fmtDate(s.updatedAt)].filter(Boolean).join(' · ')}</div>
+        <div class="meta prog">
+          ${s.genre ? `<span class="vchip">${esc(s.genre)}</span>` : ''}
+          ${typeof s.sections === 'number' ? `<span class="vchip">大纲 ${s.sections} 节</span>` : ''}
+          ${typeof s.materials === 'number' ? `<span class="vchip">素材 ${s.materials} 条</span>` : ''}
+          ${typeof s.confirmed === 'number' ? `<span class="vchip">已确认 ${s.confirmed} 项</span>` : ''}
+          ${s.styleNote ? `<span class="vchip">风格底稿 ✓</span>` : ''}
+        </div>
         <div class="ops">
           <button class="icon-btn" data-act="open">继续</button>
           <button class="icon-btn" data-act="rename">改名</button>
@@ -1461,12 +1468,12 @@ function applyKnowledgeFilter() {
       </div>
       ${e.note ? `<div class="kb-note">${esc(e.note.slice(0, 160))}</div>` : ''}
       <div class="kb-meta">来源 ${esc(e.source || 'user-stated')} · 置信 ${Math.round((e.confidence || 0) * 100)}% · 用过 ${e.usageCount || 0} 次 · ${fmtDate(e.createdAt)}</div>
-      <div class="ops" style="margin-top:10px"><button class="icon-btn danger" data-id="${esc(e.id)}" data-title="${esc(e.title)}">删除</button></div>
+      <div class="ops" style="margin-top:10px"><button class="icon-btn danger" data-session="${esc(e.sessionId || sessionId || '')}" data-id="${esc(e.id)}" data-title="${esc(e.title)}">删除</button></div>
     </div>`).join('');
   $('knowledgeList').querySelectorAll('[data-id]').forEach((b) => {
     b.addEventListener('click', () => {
       if (confirm(`从知识库删除「${b.dataset.title}」？`)) {
-        apiDelete('/api/knowledge', { sessionId, id: b.dataset.id })
+        apiDelete('/api/knowledge', { sessionId: b.dataset.session || sessionId, id: b.dataset.id })
           .then(() => { toast('已删除'); renderKnowledge(); renderDash(); })
           .catch((e) => toast(e.message));
       }
@@ -1475,19 +1482,13 @@ function applyKnowledgeFilter() {
 }
 
 async function renderKnowledge() {
-  if (!sessionId) {
-    toast('请先打开或创建一个项目');
-    showView('sessions');
-    renderSessions();
-    return;
-  }
   $('knowledgeList').innerHTML = '<div class="working"><span class="spinner"></span>读取知识库…</div>';
   try {
-    const { entries } = await apiGet(`/api/knowledge?sessionId=${sessionId}`);
+    const { entries } = await apiGet('/api/knowledge');
     kbCache = entries;
     if (!entries.length) {
       $('knowledgeFilter').innerHTML = '';
-      $('knowledgeList').innerHTML = '<div class="empty">知识库还是空的。<br>在对话里提到《书名》、去过的地方、认同的理论，它会归纳收录——只收你确认过的。</div>';
+      $('knowledgeList').innerHTML = '<div class="empty">知识库还是空的。<br>在对话里提到看过的书/视频（如B站）、新闻、去过的地方、认同的观点，AI 会筛选收录。</div>';
       return;
     }
     applyKnowledgeFilter();
@@ -1845,31 +1846,6 @@ $('rsRun').addEventListener('click', async () => {
   }
 });
 
-/* ── 生产级鉴权（服务端设置 SCULPTOR_WEB_PASSWORD 后启用）── */
-async function initAuth() {
-  try {
-    const s = await apiGet('/api/auth/status');
-    if (s.required && !s.ok) {
-      $('loginOverlay').hidden = false;
-      $('loginPassword').focus();
-    }
-  } catch {}
-}
-$('loginSubmit').addEventListener('click', async () => {
-  try {
-    await apiPost('/api/auth/login', { password: $('loginPassword').value });
-    $('loginOverlay').hidden = true;
-    $('loginError').hidden = true;
-    location.reload();
-  } catch (e) {
-    $('loginError').textContent = e.message;
-    $('loginError').hidden = false;
-  }
-});
-$('loginPassword').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') $('loginSubmit').click();
-});
-
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     $('workModal').hidden = true;
@@ -1883,7 +1859,6 @@ document.addEventListener('keydown', (e) => {
 /* ── 初始化 ───────────────────────────────────────── */
 renderDash();
 ensureSplitBtn();
-initAuth();
 $('worksCompare')?.addEventListener('click', () => {
   worksCompareMode = !worksCompareMode;
   worksCompareSel = [];

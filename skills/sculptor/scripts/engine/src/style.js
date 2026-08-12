@@ -474,6 +474,28 @@ export function collectUserUtterances(workspace, { max = 30, maxChars = 120 } = 
       } catch {}
     }
   } catch {}
+  // 风格多面读取（v0.58）：把用户知识库里的条目（读过的书/看过的视频/去过的
+  // 地方/认可的观点）也并入风格提炼语料——"喜欢什么"同样是风格的一部分。
+  try {
+    const kbP = path.join(workspace, 'vault', 'knowledge');
+    if (fs.existsSync(kbP)) {
+      for (const f of fs.readdirSync(kbP)) {
+        if (!f.endsWith('.md')) continue;
+        try {
+          const raw = fs.readFileSync(path.join(kbP, f), 'utf8');
+          const fm = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+          const meta = fm ? JSON.parse(fm[1]) : null;
+          const title = String(meta?.title || '').trim();
+          if (title) {
+            const note = String(meta?.note || fm?.[2] || '')
+              .trim()
+              .slice(0, maxChars - title.length - 12);
+            out.push(`我接触过/喜欢：${title}${note ? `（${note}）` : ''}`.slice(0, maxChars));
+          }
+        } catch {}
+      }
+    }
+  } catch {}
   return out.slice(-max);
 }
 

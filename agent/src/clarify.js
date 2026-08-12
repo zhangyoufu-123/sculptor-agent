@@ -27,6 +27,8 @@ import {
 import {
   knowledgeSuggestion,
   captureKbMentions,
+  captureKnowledgeAI,
+  confirmLowConfidenceEntries,
   recommendReadings,
   listEntries,
   normTitle,
@@ -56,6 +58,10 @@ const VALID_INTENTS = new Set([
   'emotion',
   'ending',
   'style',
+  'trigger',
+  'connection',
+  'borrow',
+  'externalInput',
   'recipient',
   'basis',
   'items',
@@ -94,6 +100,10 @@ const NEED_LABELS = {
   argument: '支撑论点',
   emotion: '情感曲线',
   ending: '结尾姿态',
+  trigger: '写作触发点',
+  connection: '私人连线',
+  borrow: '可借用讲述',
+  externalInput: '外部意见',
   styleSample: '风格底稿',
   blueprintConfirm: '整篇文章蓝图确认',
   outlineConfirm: '大纲确认',
@@ -181,6 +191,30 @@ const FALLBACK_QUESTIONS = [
     need: 'plot',
     ask: '故事的情节架构想怎么走？有没有想要的伏笔或反转？',
     recommendation: '比如"欧亨利式：结尾反转，但前文有伏笔可回收"',
+  },
+  {
+    need: 'trigger',
+    ask: '是什么让你想写这个？哪句话、哪部作品、哪个人？',
+    recommendation:
+      '触发点往往就是全文的入口——比如某本书、某期播客、某个视频系列、某个人的一句话。说出来，我把它记成素材',
+  },
+  {
+    need: 'connection',
+    ask: '你和这个主题之间，有没有家人、师长或朋友提供的间接连线？',
+    recommendation:
+      '比如父母是相关领域的、老师讲过相关的事、某个长辈亲身经历过——这种"关系"比资料更私人，写出来最有辨识度',
+  },
+  {
+    need: 'borrow',
+    ask: '有没有你听过、看过的现成讲述，想借用它的内容或口吻？',
+    recommendation:
+      '比如某期播客对某段历史的讲述、某个视频系列的叙述方式。说出来，我去核对原样，借内容不借错',
+  },
+  {
+    need: 'externalInput',
+    ask: '有没有别人给过你意见？哪些你认同、哪些不认同？',
+    recommendation:
+      '老师、朋友、评委的话都算；认同的入库当最高优先级修改信号，不认同的我也记住，免得改回你不喜欢的方向',
   },
 ];
 
@@ -608,7 +642,11 @@ function fieldDone(state, f) {
 function blueprintNeed(state) {
   // 用户已明确放弃继续追问 → 不再问任何字段，直接进大纲（缺的写作时补）。
   if (state.deferred) return '';
+  // 对话性探测字段（表达欲望四件套）：可选中的可选，由 LLM 顺其自然地问，
+  // 绝不在确定性路径上强制追问（否则与"LLM 无缺口即停"配合会死循环）。
+  const PROBE_FIELDS = new Set(['trigger', 'connection', 'borrow', 'externalInput']);
   for (const f of activeBlueprint(state)) {
+    if (PROBE_FIELDS.has(f.key)) continue;
     if (!fieldDone(state, f)) return f.key;
   }
   // 用户刚说"再打磨"→ 先补一个打磨问题，确认题延后
@@ -1106,11 +1144,25 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     const field = state.lastField || 'material';
     // 大纲只是结构视图，用户有权随时拍板：任何一轮说"开始写作/大纲完成"→ 直接确认，
     // 且不把拍板话术误当素材/要点收进大纲。
-    const explicitStart =
-      !state.confirmed.outlineConfirmed &&
-      /^(好|可以|行|嗯|对|没问题|就这样|行吧|ok)?\s*(开始写作|开始吧|写吧|开写|进入写作|大纲完成[，,、\s]*开始写作|大纲可以了|大纲没问题|确认大纲|就按这个写|定稿)/.test(
-        lastInput.trim(),
-      );
+  const explicitStart =
+    !state.confirmed.outlineConfirmed &&
+    /^(好|可以|行|嗯|对|没问题|就这样|行吧|ok)?\s*(开始写作|开始吧|写吧|开写|进入写作|大纲完成[，,、\s]*开始写作|大纲可以了|大纲没问题|确认大纲|就按这个写|定稿)/.test(
+      lastInput.trim(),
+    );
+  // 加速信号（v0.58）：用户说"你直接梳理差不多就写吧/直接开始/剩下的你定"——
+  // 是主动授权推进，不是低意愿。识别并记录，剩余维度按建议默认，不再逐条追问。
+  const ACCELERATE_RE =
+    /(直接(开始|写|写吧|动手|来)|开始写吧|不用(再)?问了|剩下的你(定|看着办)|差不多就(开始|写)|你看着写吧)/;
+  const accelerate = Boolean(lastInput && ACCELERATE_RE.test(lastInput.trim()));
+  if (accelerate && !state.accelerated) {
+    state.accelerated = true;
+    ws.logContext(
+      workspace,
+      'clarify',
+      '加速信号：用户授权直接推进，剩余维度按建议默认（缺项写作时补）',
+    );
+    if (!materialGate(state)) markDeferred(state);
+  }
     if (explicitStart) {
       // 用户明确拍板开始写作 → 素材未齐也放行（缺失项占位，写作时再补）。
       if (!materialGate(state)) markDeferred(state);
@@ -1178,6 +1230,32 @@ export async function clarifyStep(cfg, wsDir, { lastInput = '' } = {}) {
     if (kbCaptured.length) {
       ws.logContext(workspace, 'knowledge', `从对话归纳收录 ${kbCaptured.length} 条个人知识`);
     }
+    // AI 主导知识筛选（v0.58）：用户提到看过/刷到/去过的 视频(B站)/新闻/文章/地方/观点
+    // → 由 LLM 提炼入库（正则只做入口判断，收什么由 LLM 决定）；失败静默。
+    try {
+      const aiKb = await captureKnowledgeAI(cfg, workspace, lastInput);
+      if (aiKb.added.length) {
+        ws.logContext(
+          workspace,
+          'knowledge',
+          `AI 筛选收录 ${aiKb.added.length} 条（书/视频/新闻/观点等）`,
+        );
+      }
+    } catch {}
+    // 用户确认/补充（短句："对，就是那个""看过"）→ 低置信条目升级为"已查验"。
+    // 只有短句确认才算数：长句开头带"对"（"对，我觉得…帮我查一查"）不是对结果的确认。
+    try {
+      const t = String(lastInput || '').trim();
+      const shortConfirm =
+        t.length <= 24 &&
+        /^(对|对的|是的|就是|嗯|没错|看过|读过|是那个|就是那个|对，就是|对，看过|确实看过)/.test(t);
+      if (shortConfirm) {
+        const upgraded = confirmLowConfidenceEntries(workspace);
+        if (upgraded.length) {
+          ws.logContext(workspace, 'knowledge', `用户确认，${upgraded.length} 条知识升级为已查验`);
+        }
+      }
+    } catch {}
     // 显式检索请求（"帮我查一查《乡土中国》中…"）→ 立即排队/直连检索，并把提示回给用户。
     // 之前 RAG 只在"论文/素材不足"时被动触发，用户主动要求查证却被跳过——这里补上显式通路。
     let userSearchSuggestion = '';
