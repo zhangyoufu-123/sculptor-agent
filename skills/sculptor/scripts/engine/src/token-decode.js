@@ -113,8 +113,9 @@ export async function decodeSection(
   let finalText = revised.text;
   const finalEdits = [...revised.applied];
   // 具体化拟改（正方向）：有 ≥2 条"抽象→具体"编辑对时，用作者 few-shot 改写最佳候选。
+  // SCULPTOR_CONCRETIZE=0 可关闭（省一次 LLM 调用）。
   const conPairs = detectConcretizationPairs(collectModulatorData(workspace).pairs);
-  if (conPairs.length >= 2) {
+  if (process.env.SCULPTOR_CONCRETIZE !== '0' && conPairs.length >= 2) {
     const c = await concretize(cfg, conPairs, revised.text, generate);
     if (c.ok) {
       finalText = c.text;
