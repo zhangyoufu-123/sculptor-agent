@@ -38,6 +38,29 @@ const OUTLINE_CORRECT_RE =
   /但|不过|改成|改为|换成|再加|删掉|不要|少点|多点|调整|修改|重来|结尾|开头|中间/;
 
 /**
+ * 脱轨检测（v1.1 半自由 agent）：判断用户这条输入是否"天马行空"、超出了
+ * 当前状态机阶段的预期。命中则切换到自由流程（LLM 动态规划），否则走状态机。
+ * 信号：长篇自由发挥 / 明显转向词 / 澄清阶段反复卡住。
+ */
+export function detectDeviation(state, lastInput) {
+  const t = String(lastInput || '').trim();
+  if (!t) return false;
+  const longRambling = [...t].length > 120;
+  const pivot = /等等|其实|突然|换个|不对|重新|我想说的是|另外|还有|不如|要不|等一下|慢着|且慢|扯远了|回到/.test(t);
+  const stuck = (state.extraRounds || 0) >= 2;
+  return longRambling || pivot || stuck;
+}
+
+const ACTION_STAGE = {
+  ask: 'clarify',
+  outline: 'outline',
+  write: 'write',
+  revise: 'revise',
+  audit: 'redteam',
+  deliver: 'deliver',
+};
+
+/**
  * 自主决策（v1.1）：让 LLM 读当前进度与用户输入，自己决定下一步动作，
  * 而不是走写死的状态机分支。返回 {action, phase, reason, source}；
  * LLM 不可用/失败时由调用方回退到确定性状态机。
@@ -181,6 +204,24 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     return { state, d };
   };
   let { state, d } = load();
+
+  // ── 半自由 agent（v1.1）：默认走确定性状态机；仅当用户输入"天马行空/脱轨"时，
+  //    才用 LLM 动态规划下一步（自由流程）。LLM 失败/非法动作 → 回退状态机。 ──
+  if (detectDeviation(state, lastInput)) {
+    const decision = await decideNextAction(cfg, wsDir, { lastInput });
+    if (decision.ok && decision.source === 'llm' && ACTION_STAGE[decision.action]) {
+      const target = ACTION_STAGE[decision.action];
+      const noOutline = !state.outline?.sections?.length;
+      const unsafe = (target === 'write' || target === 'deliver') && noOutline;
+      if (!unsafe && target !== d.stage) {
+        state.director = state.director || {};
+        state.director.stage = target;
+        state.nextStep = decision.reason || state.nextStep;
+        ws.writeState(workspace, state);
+        ({ state, d } = load());
+      }
+    }
+  }
 
   // ── 澄清：问完所有该问的 ─────────────────────────────
   if (d.stage === 'clarify') {
