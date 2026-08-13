@@ -31,10 +31,58 @@ import { archiveDraft, distillCategory } from './library.js';
 import { exportDocx } from './io.js';
 import { roundtripCheck } from './roundtrip.js';
 import { checkConsistency } from './consistency.js';
+import { chatWithRetry } from './llm.js';
 
 const OUTLINE_CONFIRM_RE = /^(对|对的|可以|可以的|没问题|就是这样|好的?|同意|ok|嗯|是|就这样)$/i;
 const OUTLINE_CORRECT_RE =
   /但|不过|改成|改为|换成|再加|删掉|不要|少点|多点|调整|修改|重来|结尾|开头|中间/;
+
+/**
+ * 自主决策（v1.1）：让 LLM 读当前进度与用户输入，自己决定下一步动作，
+ * 而不是走写死的状态机分支。返回 {action, phase, reason, source}；
+ * LLM 不可用/失败时由调用方回退到确定性状态机。
+ */
+export async function decideNextAction(cfg, wsDir, { lastInput = '' } = {}) {
+  const workspace = ws.ensureWorkspace(wsDir);
+  const state = ws.readState(workspace);
+  const brief = {
+    phase: state.phase || 'clarify',
+    stage: state.director?.stage || '',
+    hasOutline: Boolean(state.outline?.sections?.length),
+    outlineConfirmed: Boolean(state.confirmed?.outlineConfirmed),
+    hasDraft: fs.existsSync(path.join(workspace, 'draft.md')),
+    genre: state.confirmed?.genre || '',
+    topic: state.confirmed?.topic || state.outline?.title || '',
+    lastInput,
+  };
+  try {
+    const out = await chatWithRetry(
+      cfg,
+      [
+        {
+          role: 'system',
+          content:
+            '你是写作导演。根据当前进度与用户最新输入，从以下动作中选一个最合适的下一步：ask（继续澄清/追问）、outline（生成或调整大纲）、write（逐节写作）、revise（修订）、audit（审计）、deliver（交付）。只输出严格 JSON：{"action":"...","phase":"...","reason":"一句话"}',
+        },
+        { role: 'user', content: JSON.stringify(brief) },
+      ],
+      { temperature: 0, maxTokens: 300 },
+    );
+    const m = String(out).match(/\{[\s\S]*\}/);
+    const j = JSON.parse(m ? m[0] : out);
+    const allowed = new Set(['ask', 'outline', 'write', 'revise', 'audit', 'deliver']);
+    const action = String(j.action || '').trim();
+    return {
+      ok: allowed.has(action),
+      action: allowed.has(action) ? action : 'ask',
+      phase: String(j.phase || '').trim() || null,
+      reason: String(j.reason || '').slice(0, 100),
+      source: 'llm',
+    };
+  } catch (e) {
+    return { ok: false, action: '', phase: null, reason: String(e?.message || e).slice(0, 100), source: 'error' };
+  }
+}
 
 function initDirector(state) {
   state.director = state.director || {
