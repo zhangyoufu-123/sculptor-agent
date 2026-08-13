@@ -51,6 +51,10 @@ def nary(chr_, sub, sup, e):
     return (f'<m:nary><m:naryPr><m:chr m:val="{chr_}"/><m:limLoc m:val="undOvr"/></m:naryPr>'
             f'<m:sub>{sub}</m:sub><m:sup>{sup}</m:sup><m:e>{e}</m:e></m:nary>')
 
+def eqarr(*lines):
+    """多行方程数组：每行一个 <m:e>，用于超宽公式的排版换行。"""
+    return f'<m:eqArr>{seq(*[f"<m:e>{line}</m:e>" for line in lines])}</m:eqArr>'
+
 def delim(e, o='(', c=')'):
     return (f'<m:d><m:dPr><m:begChr m:val="{o}"/><m:endChr m:val="{c}"/></m:dPr>'
             f'<m:e>{e}</m:e></m:d>')
@@ -155,17 +159,18 @@ def build_equations():
     sd = ssub(run('S'), run('defect'))
     si = ssub(run('S'), run('impedance'))
     f11 = seq(
-        run('S'), delim(run('w | c, t')), run(' = '),
-        ssub(run('β'), run('1')), run(' log '), pbase, delim(run('w | c')),
-        run(' + '),
-        ssub(run('β'), run('2')), run(' log '), ppers, delim(run('w | c')),
-        run(' + '),
-        ssub(run('λ'), run('K')), sk, delim(run('w, c')),
-        run(' + '),
-        ssub(run('λ'), run('D')), sd, delim(run('w')),
-        run(' + '),
-        run('R'), delim(run('t')), si, delim(run('w, t')),
-        run('　(11)'))
+        eqarr(
+            seq(run('S'), delim(run('w | c, t')), run(' = '),
+                ssub(run('β'), run('1')), run(' log '), pbase, delim(run('w | c')),
+                run(' + '),
+                ssub(run('β'), run('2')), run(' log '), ppers, delim(run('w | c')),
+                run(' + '),
+                ssub(run('λ'), run('K')), sk, delim(run('w, c'))),
+            seq(run(' + '),
+                ssub(run('λ'), run('D')), sd, delim(run('w')),
+                run(' + '),
+                run('R'), delim(run('t')), si, delim(run('w, t')),
+                run('　(11)'))))
 
     # 式 12：softmax 采样（v0.60 新增）
     f12 = seq(

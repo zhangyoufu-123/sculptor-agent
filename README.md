@@ -128,6 +128,7 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/
 - [理论架构](docs/THEORY.md)
 - [文档互通管线（全流程文件进出）](docs/INTEROP.md)
 - [问询系统升级设计](docs/问询系统升级-v1.md)
+- [完整风格体系设计：从表层指纹到深层选择模式（含解码期控制路线）](docs/STYLE-SYSTEM.md)
 
 ## 仓库结构
 
@@ -141,8 +142,9 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/
 
 ## 质量与可信
 
-- **agent 19 套 + web 10 套自动化 QA 全绿**：一次一问、实时大纲、字数达标、红队 8 文体 × 6 对抗输入、
-  十种用户说法、风格差异对照、12000 字长文端到端、回译校验、全格式导出、前端接线静态检查。
+- **agent 20 套 + web 11 套自动化 QA 全绿**：一次一问、实时大纲、字数达标、红队 8 文体 × 6 对抗输入、
+  十种用户说法、风格差异对照、12000 字长文端到端、回译校验、全格式导出、前端接线静态检查，
+  以及统一 Token 解码（个人模型预测/缺陷与阻抗信号/对比选优/无语料降级）。
 - **确定性兜底**：任何 LLM 或网络不可用时，流程降级但不崩溃；真实模型不守规则时（大纲截断、
   澄清不收尾）有确定性护栏兜底。
 - **密钥安全**：自动发现宿主配置的 API，绝不打印；提交前自动扫描密钥（CI 内置）。
@@ -150,10 +152,13 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/
 
 ## 路线图
 
-已走到 v0.51：作者建模（四层风格向量/思想脉络/提问主次）、导演状态机与多 Agent 协作、
+已走到 v0.63：作者建模（四层风格体系：表层词汇句法 / 话语修辞 / 深层立场 / 元层选择偏好）、
+统一 Token 对比解码 V1 落地（个人 n-gram 模型 + 五路评分选优）、导演状态机与多 Agent 协作、
 Web 伴随式工作台（选区 AI/候选卡/版本回滚/并排/图谱）、真实 LLM 可靠性修复、翻译方法论、
 数学可视化与参赛论文。
-接下来：真人盲评样本与显著性检验、StyleVector 式激活层干预、跨语言语料验证、Web 一键部署。
+接下来：按 STYLE-SYSTEM.md 落地中层话语修辞特征入评分与权重学习（edits.jsonl → λ/β/R）、
+作者写作清单式深层风格读取、V2 logprobs / V3 本地 DExperts 与激活转向、显著性检验与盲评、
+跨语言语料验证。
 
 ---
 
