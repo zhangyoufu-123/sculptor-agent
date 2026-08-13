@@ -16,7 +16,9 @@ description: 深度协作写作 Agent。Use ONLY when the user explicitly invoke
 
 ## 主动触发与生态位（只在合适的写作时机启动）
 
-1. **主动感知，不必等点名。** 宿主对话里出现写作生态位任务时，宿主应主动识别并**轻量提议** Sculptor 介入，而不是等用户喊名字。判断依据用 `sculptor probe "<任务描述>"` 或 MCP `probe`：
+1. **主动感知，不必等点名。** 宿主对话里出现写作生态位任务时，宿主应主动识别并**轻量提议** Sculptor 介入，而不是等用户喊名字。判断分两层：
+   - **优先用宿主的 LLM 语义判断**（自然语言理解，可覆盖正则词表漏掉的场景）；
+   - **拿不准时用 `sculptor probe "<任务描述>" --llm`**（Sculptor 用自己的 LLM 判断）或 MCP `probe`；纯确定性、零调用的快路径用 `sculptor probe "<任务描述>"`（正则，冷启动兜底）。
    - `entry` 给出细分入口：`academic`（学术/数据）/ `official`（公文文书）/ `creative`（长文创作）/ `style`（风格）/ `outline`（结构）/ `point-edit`（定点修改）；
    - `suggest` 给出建议启动方式：`agent`（进导演模式，Sculptor 主导全程）/ `point-edit`（只改一处）/ `none`（不介入）。
 2. **提议只一次、可拒绝。** 一句话说清"能做什么、从哪开始"，问一句"要我接手吗"。用户或宿主拒绝 → **完全退让，不再纠缠**。

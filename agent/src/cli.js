@@ -17,7 +17,7 @@ import { runSetup } from './setup.js';
 import { pointEdit, rewriteVariants } from './point-edit.js';
 import { extractInstruction } from './point-edit.js';
 import { parseQuoteArg } from './point-edit.js';
-import { probeTask } from './observer.js';
+import { probeTask, probeTaskLLM } from './observer.js';
 import { interviewStep, interviewInteractive, interviewSummary } from './interview.js';
 import { runAudience, renderAudience, runDebate, renderDebate } from './reader-gallery.js';
 import { styleProgress, backfillFromContext, extractStyleFromSamples } from './style.js';
@@ -1598,8 +1598,9 @@ export async function runCli(argv, io = {}) {
       }
       case 'probe': {
         const text = flags.text || positional.join(' ');
-        if (!text) throw new Error('用法: sculptor probe "<任务描述>"');
-        console.log(JSON.stringify(probeTask(text), null, 2));
+        if (!text) throw new Error('用法: sculptor probe "<任务描述>" [--llm]');
+        const r = flags.llm ? await probeTaskLLM(cfg, text) : probeTask(text);
+        console.log(JSON.stringify(r, null, 2));
         break;
       }
       default:

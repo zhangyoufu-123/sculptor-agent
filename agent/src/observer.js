@@ -1,6 +1,7 @@
 // 生态位感知（Observer）：检测任务是否落在 Sculptor 的写作生态位，
 // 并生成"轻量提议"。主动，但可拒绝；被拒即完全退让。
 // 这是"主动触发"的确定性依据：宿主 AI 用 probe 判断该不该让 Sculptor 介入。
+import { chatWithRetry } from './llm.js';
 
 const POSITIVE = [
   {
@@ -95,4 +96,62 @@ export function probeTask(text) {
       }）。要我接手吗？一句话即可，不接也没关系。`
     : '';
   return { triggered, confidence, reasons, negatives, entry, suggest, offer };
+}
+
+const ENTRY_OFFER = {
+  academic: '按学术规范澄清研究问题/论点/文献数据，写带引用与参考文献的论文',
+  official: '按公文/文书范式澄清事由/对象/依据/事项，产出规范文稿',
+  creative: '先澄清立意与论点再成稿',
+  outline: '先搭立意-论点-节结构',
+  'point-edit': '只改你选中的那一处',
+  style: '按你的文风润色/改写',
+  clarify: '先提取你的风格',
+};
+
+/**
+ * LLM 语义探测（替代穷举正则）：让模型判断"这是不是写作任务、是哪类写作"。
+ * 覆盖正则词表无法穷举的场景；LLM 失败时回退到确定性正则（probeTask）。
+ */
+export async function probeTaskLLM(cfg, text) {
+  const t = String(text || '').trim();
+  if (!t) {
+    return { triggered: false, confidence: 0, reasons: [], negatives: [], entry: 'none', suggest: '', offer: '', source: 'empty' };
+  }
+  try {
+    const out = await chatWithRetry(
+      cfg,
+      [
+        {
+          role: 'system',
+          content:
+            '你是写作任务识别器。判断用户这句话是否属于"写作/文字创作"任务（长文、学术论文、公文文书、润色改写、定点修改、大纲立意等），而不属于编程、答疑、翻译、总结、闲聊、邮件。只输出严格 JSON：{"isWriting":true或false,"type":"creative|academic|official|style|point_edit|outline|clarify|none","confidence":0到1,"reason":"一句话"}',
+        },
+        { role: 'user', content: t },
+      ],
+      { temperature: 0, maxTokens: 300 },
+    );
+    const m = String(out).match(/\{[\s\S]*\}/);
+    const j = JSON.parse(m ? m[0] : out);
+    const isWriting = j.isWriting === true || j.isWriting === 'true';
+    const type = isWriting && ENTRY_OFFER[String(j.type || '')] ? String(j.type) : isWriting ? 'clarify' : 'none';
+    const confidence = Number(j.confidence) || 0.5;
+    const reasons = isWriting ? [String(j.reason || '写作任务').slice(0, 50)] : [];
+    const negatives = isWriting ? [] : [String(j.reason || '非写作任务').slice(0, 50)];
+    const entry = isWriting ? type : 'none';
+    const offer = isWriting
+      ? `这是写作任务，Sculptor 可以承接（从 ${entry} 起步：${ENTRY_OFFER[entry] || ENTRY_OFFER.clarify}）。要我接手吗？一句话即可，不接也没关系。`
+      : '';
+    return {
+      triggered: isWriting,
+      confidence: Number(confidence.toFixed(2)),
+      reasons,
+      negatives,
+      entry,
+      suggest: isWriting ? (type === 'point-edit' ? 'point-edit' : 'agent') : '',
+      offer,
+      source: 'llm',
+    };
+  } catch {
+    return { ...probeTask(t), source: 'regex-fallback' };
+  }
 }
