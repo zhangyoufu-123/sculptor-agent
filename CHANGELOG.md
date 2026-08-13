@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-08-13（v0.62 统一 Token 对比解码 V1 落地：签名 → 个人模型）
+
+回应"框架只是路线图、风格只是签名"：把统一解码框架 V1 真正实现，并把签名升级为
+可预测作者下一步选择的个人模型：
+
+- **个人模型（p_personal）**：`agent/src/personal-model.js`——基于作者本人语料
+  （风格样本/成稿/亲手修改后的文本）训练字符级 n-gram 条件模型（order=4，回退+加一平滑），
+  输出每字符对数概率；与知识库严格分离（"如何写"来自作者语料）；
+- **候选对比解码（V1）**：`agent/src/token-decode.js`——写作每节并行生成 2 个候选，
+  五路信号评分选优：S = 2.0·p_personal + 0.5·S_knowledge + 1.0·S_defect + 0.8·R(t)·S_impedance；
+  得分分解（personal/defect/knowledge/impedance）逐候选可追溯；
+- **写作节级接入**：writeSection 走 decodeSection，`SCULPTOR_DECODE_N` 可调；
+  无个人语料（<200 字符）自动降级为直接生成，不增加延迟与成本；
+- 回归：agent 20 套（新增 token-decode.test：个人模型可预测/缺陷与阻抗信号/对比选优/
+  无语料降级）+ web 11 套全绿；
+- 论文同步更新：3.1.1/5.7/6.2/7/8 的"解码层路线图"改为"V1 已落地"，逐 token 重排
+  （V2 logprobs / V3 本地 LoRA）如实保留为未来工作。
+
 ## 2026-08-12（v0.61 Web 批注：选段批注 → 收集 → 一键 AI 修改）
 
 把"在文档上选段写批注、批注被收集并交给 AI 处理"的注释体验搬进 Web 端：

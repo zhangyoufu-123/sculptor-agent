@@ -66,18 +66,17 @@ $$P(w \mid c, t) = \operatorname{softmax}\bigl(S(w \mid c, t) / \tau\bigr)$$
 
 ## 四、工程升级路线（不依赖"大模型给 logits"也能落地）
 
-### V1 · 候选对比解码（文本 API 即成立，本轮可做）
+### V1 · 候选对比解码（v0.62 已落地）
 
-生成不是一次采样，而是：生成 N 个候选（N=2~3，同一上文，不同温度）→ 对每个候选的
-每个句子用五路评分器打分 → 选择得分最高者 / 按概率混合。评分器全部本地、几十毫秒：
+生成不是一次采样，而是：并行生成 N 个候选（N=2，同一上文、不同温度）→ 五路评分选优
+→ 得分分解落盘。实现：`agent/src/personal-model.js`（本地字符级 n-gram 个人模型，
+作者语料训练，能预测"作者更可能怎么写"）+ `agent/src/token-decode.js`（五路评分
+S = 2.0·p_personal + 0.5·S_knowledge + 1.0·S_defect + 0.8·R(t)·S_impedance）；
+写作节级接入（writeSection，`SCULPTOR_DECODE_N` 可调，无个人语料自动降级直接生成）。
+单元测试（token-decode.test）验证：个人模型偏好作者风格文本、AI 腔缺陷分更低、
+对比选优选出更像作者的候选、得分分解可追溯。
 
-- `p_personal`：L1 向量 + 偏好对 + 双风格档案（已有）；
-- `S_defect`：redteam 黑名单 + 假思考判据（已有，转评分）；
-- `S_knowledge`：KB BM25 命中（已有 matchKb）；
-- `S_impedance`：进度 t → R(t) 缩放（新增，几十行）；
-- 输出"得分分解"卡片给用户看（新增，对应论文可解释性）。
-
-成本：每节 2~3 次 API 调用；换来的是一次真正"可追溯的偏置选择"。
+剩余：五路权重消融标定、候选数自适应；V2 logprobs（显式 β₁）、V3 本地 LoRA 全词表融合。
 
 ### V2 · 词级 logprobs 调制（API 支持时）
 

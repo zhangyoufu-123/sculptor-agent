@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { chatWithRetry } from './llm.js';
 import { WRITE_PROMPT, EXPAND_PROMPT } from './prompts.js';
+import { decodeSection } from './token-decode.js';
 import * as ws from './workspace.js';
 import { styleSummary } from './outline.js';
 import { buildStyleShot } from './style-memory.js';
@@ -169,15 +170,23 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
         ? `上一节「${prevPulse.section}」的风格脉搏建议：${prevPulse.suggestion || '（无）'}`
         : '',
     };
-    const body = await chatWithRetry(
-      cfg,
-      [
+    const dec = await decodeSection(cfg, workspace, {
+      messages: [
         { role: 'system', content: '你是人类风格的写作者，输出正文。' },
         { role: 'user', content: WRITE_PROMPT(clipInjects(ctx)) },
       ],
-      { temperature: 0.85, maxTokens: 3000 },
-    );
-    let text = body.trim();
+      temperature: 0.85,
+      maxTokens: 3000,
+      t: (i + 1) / Math.max(1, sections.length),
+    });
+    let text = dec.text;
+    state.lastDecode = {
+      section: section.heading,
+      mode: dec.mode,
+      reason: dec.reason || '',
+      n: dec.n,
+      breakdown: dec.breakdown || null,
+    };
     let actual = (text.match(/[\u4e00-\u9fff]/g) || []).length;
     let expanded = false;
     let expandTries = 0;
@@ -255,6 +264,8 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       target: words,
       actual,
       expanded,
+      decodeMode: dec.mode,
+      decodeReason: dec.reason || '',
       dataRequested,
       pulse: pulse.score,
       pulseNote: pulse.suggestion || '',
