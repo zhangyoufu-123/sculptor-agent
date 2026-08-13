@@ -74,6 +74,8 @@ $$S(x \mid c, t) = w_0 + \sum_i w_i\, f_i(x, c, t) + w_{\mathrm{personal}}\, \lo
 - `agent/test/embedding.test.mjs`：神经原型落盘/缓存/签名重算、第 9 维 embedding 特征、
   知识库语义混合检索、调制器增量在线更新；
 - `agent/test/author-sheet.test.mjs`：作者写作清单五问、红线强制保留、第 10 维 fineRead；
+- `agent/test/modulator.test.mjs` 另含姿态层细读（posture）第 11 维断言：表演式文本健康度低、
+  克制文本高、软性加权不拒绝生成；
 - agent 全量 23 套 + web 11 套回归全绿；
 - CLI：`sculptor modulator [--train] [--export] [工作区]` 查看状态/强制重训/导出权重。
 
@@ -83,13 +85,15 @@ $$S(x \mid c, t) = w_0 + \sum_i w_i\, f_i(x, c, t) + w_{\mathrm{personal}}\, \lo
 之间的 **V1.5 里程碑**：权重不再手调，而是从作者的偏好对中学出来——外层调制器
 成为一个**真正的、属于每个用户的轻量模型**，而不是一组经验系数。v0.65 加入可选
 embedding 神经原型（第 9 维）、知识库 BM25+语义混合检索与增量在线更新；v0.66 加入
-L3 作者写作清单 fineRead（第 10 维）——深层立场/红线/触发直接参与生成评分；
+L3 作者写作清单 fineRead（第 10 维）；v0.67 把姿态层细读判据（金句排比/路标转折/
+点题顿悟）前置为 posture 第 11 维——"表演式思考"从**事后审计**变成**事中选择**，
+全部特征软性加权，作者保留否决权，不引入拒绝生成式硬约束。
 V2/V3（logprobs 重排、本地 DExperts/激活转向）仍按 STYLE-SYSTEM.md 路线推进。
 
 ## 八、局限与下一步
 
 - 增量在线更新已落地（v0.65，`applyEditIncremental`）；仍待做批量与增量策略的自动权衡；
-- embedding 神经编码为可选（需配置 API）；L3 作者写作清单已落地（v0.66），
-  姿态层六层细读的结构化判据入特征待接入；
+- embedding 神经编码为可选（需配置 API）；L3 作者写作清单（v0.66）与姿态层确定性判据
+  前置（v0.67）已落地；LLM 六层细读的结构化判据作为可选精读特征待接入；
 - 权重学习的消融（默认权重 vs 学习权重 vs 逐模块关闭）与第三方盲评尚未完成；
 - 逐 token 级调制（V2 logprobs）需要模型接口支持，是下一步主攻方向。

@@ -28,6 +28,7 @@ import { listEntries } from './knowledge.js';
 import { readVector, embedSparse, cosineSparse } from './style-vector.js';
 import { readPrototype, cosineDenseVec } from './embedding.js';
 import { readAuthorSheet } from './author-sheet.js';
+import { deterministicFakeThinking } from './fake-thinking.js';
 
 export const FEATURES = [
   'personal',
@@ -40,6 +41,7 @@ export const FEATURES = [
   'vector',
   'embedding',
   'fineread',
+  'posture',
 ];
 
 // 经验默认权重（无编辑对时的兜底，等价 v0.62 V1 语义 + 新特征温和先验）
@@ -54,6 +56,7 @@ export const DEFAULT_WEIGHTS = {
   vector: 0.1,
   embedding: 0.2,
   fineread: 0.15,
+  posture: 0.2,
 };
 
 // ── 纯净数据收集 ───────────────────────────────────────────
@@ -290,7 +293,17 @@ export function fineReadFeature(workspace, text) {
 }
 
 /**
- * 提取十维特征（未归一化的原始值）。
+ * 姿态层细读特征（v0.67）：复用"假思考六层细读"的确定性判据
+ * （金句排比收束 / 路标式转折 / 点题式顿悟），转成 0~1 健康度——
+ * 越高越不像"表演思考"。软性加权（正偏置），不做硬约束、不拒绝生成。
+ */
+export function postureFeature(text) {
+  const det = deterministicFakeThinking(text);
+  return Math.max(0, Math.min(1, 1 - (det.score || 0) / 100));
+}
+
+/**
+ * 提取十一维特征（未归一化的原始值）。
  * embedding 为神经风格特征：需要作者稠密原型 + 候选稠密编码（decodeSection 预计算传入）；
  * fineread 为 L3 细读特征（作者写作清单命中）；均无则取中性 0.5，不破坏降级路径。
  */
@@ -313,6 +326,7 @@ export function extractFeatures(workspace, text, { t = 0.5, prototype = null, ca
     vector: vectorFeature(workspace, text),
     embedding,
     fineread: fineReadFeature(workspace, text),
+    posture: postureFeature(text),
   };
 }
 

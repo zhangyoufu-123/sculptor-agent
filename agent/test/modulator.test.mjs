@@ -17,6 +17,7 @@ const {
   FEATURES,
   surfaceFeature,
   discourseFeature,
+  postureFeature,
 } = await import(path.join(HERE, '..', 'src', 'modulator.js'));
 const { contrastiveScore } = await import(path.join(HERE, '..', 'src', 'token-decode.js'));
 
@@ -119,6 +120,26 @@ const edits = [
   const saved = JSON.parse(fs.readFileSync(weightsFile(w), 'utf8'));
   assert(saved.meta.signature === sig2, '权重文件签名与最新数据一致');
   console.log('PASS 数据不足降级 + 数据变化在线重训');
+}
+
+// 6) 姿态层细读特征（v0.67）：表演式文本健康度低、克制文本健康度高、软性加权无硬约束
+{
+  const performative =
+    '我绕了很久才绕出来，但这里头有个悖论。后来我想，我终于明白，原来生活的本质就是如此。' +
+    '话到嘴边，是话还在，是嘴还在，是我们还在。';
+  const restrained = '他最后笑了笑，没说话。我把那杯茶喝完，起身，门在身后轻轻合上。';
+  const low = postureFeature(performative);
+  const high = postureFeature(restrained);
+  assert(low < high, `表演式文本 posture 应更低（${low} < ${high}）`);
+  assert(high > 0.7, `克制文本 posture 应健康（${high}）`);
+  const m = modulate(w, restrained, {});
+  assert(typeof m.features.posture === 'number', 'modulate 特征含 posture');
+  const cs = contrastiveScore(null, w, restrained, {});
+  assert(typeof cs.posture === 'number', '得分分解含 posture');
+  // 软性：posture 只参与加权评分，不产生拒绝/硬失败
+  const bad = modulate(w, performative, {});
+  assert(typeof bad.score === 'number' && bad.score !== -Infinity, 'posture 软性加权，不拒绝生成');
+  console.log('PASS 姿态层细读特征（posture 健康度/软性加权/得分分解）');
 }
 
 console.log('\n✓ modulator.test.mjs 全部通过');
