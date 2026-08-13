@@ -247,6 +247,14 @@ write-read 差异（如"想写克制低气压，读者需要最后一点亮的�
 （配置 `SCULPTOR_FT_ENDPOINT/API_KEY` 走 API；否则本地
 `python3 scripts/finetune/style_lora.py --dataset <jsonl>`）。导演交付时自动蒸馏适配卡。
 
+### 外层调制器（v0.64：签名 → 可学习模型，推理时调制）
+
+`sculptor modulator [--train] [--export] [工作区]` 查看/重训/导出**外层调制器**：
+八维特征（个人 n-gram / 表层 / 话语 / 立场红线 / 知识 / 缺陷 / 阻抗 / 风格向量方向）
+统一承载个人知识库、风格向量与收集数据；权重由 edits.jsonl 的（原文，改后）偏好对
+经 pairwise hinge + SGD 学习——每个作者独有的轻量模型，写作节级候选评分自动使用，
+数据变化自动在线重训，无编辑对时降级经验默认权重（`vault/modulator-weights.json`）。
+
 ### 事实核查（交付前必看）
 
 把成稿里的**数字/年代/引文/人名/机构**分级：material（来自素材，放心）/

@@ -78,6 +78,7 @@ import {
   loadStyleAdapter,
   submitFineTune,
 } from './style-adapter.js';
+import { modulatorStatus, forceRetrain, weightsFile } from './modulator.js';
 import { factCheck, renderFactCheck } from './fact-check.js';
 import { recentPulses, renderPulse } from './style-pulse.js';
 import { rhythmCurve, renderRhythmCurve } from './style-pulse.js';
@@ -177,6 +178,8 @@ const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四�
   sculptor style-vector [--refresh] [工作区]  四层复合风格向量：连续向量(EMA) + 动态维度 + 困惑度签名 + 偏好对；--refresh 立即从档案重算
   sculptor style-adapter [--distill] [--dataset [out.jsonl]] [--lora] [工作区]
                                      风格持续微调：--distill 蒸馏风格适配卡（最高优先级注入）；--dataset 生成偏好对 JSONL；--lora 提交微调（未配置端点时给出本地 LoRA 指引）
+  sculptor modulator [--train] [--export] [工作区]
+                                     外层调制器：把签名升级为可学习模型——编辑对偏好学习八维权重，推理时调制候选评分；--train 强制重训；--export 输出权重文件路径
   sculptor genre [名称]               文体库：结构骨架 + 行文规范（公文/合同/通知/纪要/报告/议论文/散文/演讲稿/记叙文）
   sculptor library [工作区]           个人写作库：查看分类作品与蒸馏 skill
   sculptor library scan [工作区]      蒸馏每类作品的"个人写作 skill"（vault/skills/personal/）
@@ -718,6 +721,46 @@ export async function runCli(argv, io = {}) {
               `  数据集: ${st.hasDataset ? '✓ 已生成' : '（未生成，--dataset）'}`,
           );
         }
+        break;
+      }
+      case 'modulator': {
+        // 兼容两种写法：`modulator <工作区> --train` 与 `modulator --train <工作区>`
+        const wDir =
+          flags.workspace ||
+          (typeof flags.train === 'string' ? flags.train : null) ||
+          (typeof flags.export === 'string' ? flags.export : null) ||
+          positional[0] ||
+          '';
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, wDir));
+        if (Boolean(flags.train)) {
+          const r = forceRetrain(w);
+          if (r.ok) {
+            console.log(
+              `调制器已重训 → ${weightsFile(w)}\n` +
+                `  偏好对 ${r.meta.pairs} · 正例 ${r.meta.positives} · loss ${r.meta.loss}\n` +
+                `  权重: ${Object.entries(r.weights)
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join('  ')}`,
+            );
+          } else {
+            console.log(`调制器未训练：${r.reason}`);
+          }
+          break;
+        }
+        if (flags.export) {
+          console.log(weightsFile(w));
+          break;
+        }
+        const st = modulatorStatus(w);
+        console.log(
+          `外层调制器状态:\n` +
+            `  模式: ${st.mode === 'learned' ? '✓ 学习权重（签名→模型）' : '经验默认权重（偏好对不足）'}\n` +
+            `  数据: 正例 ${st.positives} · 编辑对 ${st.pairs} · 语料 ${st.chars} 字符\n` +
+            `  签名: ${st.signature}\n` +
+            `  权重表: ${Object.entries(st.weights)
+              .map(([k, v]) => `${k}=${v}`)
+              .join('  ')}`,
+        );
         break;
       }
       case 'profile': {

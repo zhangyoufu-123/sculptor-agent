@@ -77,9 +77,17 @@ $$\log P_{\mathrm{final}}(w \mid c, t) = \log P_{\mathrm{base}}(w \mid c) + \sum
 **V1（已落地，v0.62）**：候选对比解码——每节并行生成 2 候选，五路评分
 S = 2.0·p_personal + 0.5·S_knowledge + 1.0·S_defect + 0.8·R(t)·S_impedance，选优 + 得分分解。
 
-**近期升级**：
-1. **L2 特征入评分**：意象密度/修辞装置/叙事视角（现有词表 + LLM 细读输出）加入 f_i；
-2. **权重学习**：把 edits.jsonl 的（原文，改后）当偏好对，学 w_i（目标：作者改后的文本得分更高）；
+**已落地（v0.64，外层调制器）**：
+1. **权重学习**：`agent/src/modulator.js` 把 edits.jsonl 的（原文，改后）当偏好对，
+   用 pairwise hinge + SGD 学八维权重 w_i——签名正式升级为可学习模型（见 MODULATOR.md）；
+2. **八维特征入评分**：表层（surface）/话语（discourse）/立场红线（stance）/知识/缺陷/
+   阻抗/风格向量方向 + 个人 n-gram，全部进 `modulate()` 评分；
+3. **在线重训**：数据签名变化自动失效重训，权重落 `vault/modulator-weights.json`；
+4. **降级保底**：编辑对不足时回退经验默认权重，不阻塞写作。
+
+**下一步**：
+1. **L3 细读特征入评分**：把 LLM 六层细读的结构化输出（声音/过渡/修辞判据）加入 f_i；
+2. **增量在线更新**：每个新编辑对到达即局部更新权重（当前为批量重训）；
 3. **L3 约束入评分**：红线命中直接硬约束（score −∞ 或拒绝生成），立场约束软引导。
 
 **V2/V3（路线图）**：logprobs 对比（DExperts/CD/PREADD 的 API 近似）→ 本地个人 LoRA

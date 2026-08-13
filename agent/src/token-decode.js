@@ -1,71 +1,34 @@
-// 统一 Token 对比解码 · V1（v0.62）：候选对比解码。
-// 写作每节并行生成 n 个候选，用五路信号评分选优：
-//   S = β2·log p_personal + λK·S_knowledge + λD·S_defect + R(t)·S_impedance
+// 统一 Token 对比解码 · V1.5（v0.64）：候选对比解码 + 外层调制器。
+// 写作每节并行生成 n 个候选，用调制器评分选优：
+//   S(x|c,t) = w₀ + Σᵢ wᵢ·fᵢ(x,c,t) + w_personal·log p_personal(x)
+// 有编辑对时权重由作者偏好对学习（小数据微调，见 modulator.js），
+// 无编辑对时回退经验默认（等价 v0.62 五路权重）。
 // 基础信号（β1·log p_base）隐含在候选生成中（由 LLM 采样）；显式 β1 需 logprobs（V2）。
-// 每路分数可追溯输出（得分分解），这是"可解释的风格注入"的第一版。
+// 每路分数可追溯输出（得分分解），这是"可解释的风格注入"的第二版。
 import { chatWithRetry } from './llm.js';
-import { getPersonalModel, personalLogProb, personalCorpusSize } from './personal-model.js';
-import { listEntries } from './knowledge.js';
+import { getPersonalModel, personalCorpusSize } from './personal-model.js';
+import { modulate } from './modulator.js';
 
-// S_defect：作者的系统性回避词表（AI 连接词/套话/空洞表述）
-const AI_LEXICON = [
-  '在当今', '随着', '与此同时', '因此', '所以', '然而', '但是', '而且', '不仅',
-  '总而言之', '综上所述', '值得注意的是', '首先', '其次', '最后', '众所周知',
-  '不可否认', '深刻', '前所未有', '充分发挥', '积极作用', '必然趋势', '我们应当',
-  '我们应该', '让我们', '赋能', '助力', '点亮', '共赴', '新篇章', '开启', '更加美好的',
-];
+// 向后兼容导出（V1 的测试与调用方仍按原名取用）
+export { defectScore, impedanceScore, knowledgeScore } from './modulator.js';
 
-function countHits(text, words) {
-  let n = 0;
-  for (const w of words) {
-    const re = new RegExp(w, 'g');
-    const m = String(text || '').match(re);
-    if (m) n += m.length;
-  }
-  return n;
-}
-
-/** S_defect：命中 AI 腔词表越多，分数越低（负偏置）。 */
-export function defectScore(text) {
-  const hits = countHits(text, AI_LEXICON);
-  const chars = Math.max(1, String(text || '').replace(/\s/g, '').length);
-  return -Math.min(3, hits * 0.35 + (hits / chars) * 30);
-}
-
-/** S_knowledge：候选文本与个人知识库/检索来源的术语重合度（弱正偏，0~+1）。 */
-export function knowledgeScore(workspace, text) {
-  const t = String(text || '');
-  if (!t) return 0;
-  let hits = 0;
-  try {
-    for (const e of listEntries(workspace)) {
-      const title = String(e.title || '').replace(/《|》/g, '');
-      if (title.length >= 2 && t.includes(title)) hits += 1;
-    }
-  } catch {}
-  return Math.min(1, hits * 0.35);
-}
-
-/** S_impedance(w,t)：随写作进度 t∈(0,1] 调制——后期奖励短句、加重惩罚平滑连接词。 */
-export function impedanceScore(text, t) {
-  const ratio = Math.max(0.05, Math.min(1, Number(t) || 0));
-  const sents = String(text || '')
-    .split(/[。！？.!?]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const shortRatio = sents.length ? sents.filter((s) => [...s].length <= 8).length / sents.length : 0;
-  const connectors = countHits(text, ['因此', '所以', '然而', '而且', '综上所述', '总而言之']);
-  return shortRatio * 1.2 * ratio - Math.min(1.2, connectors * 0.25 * ratio);
-}
-
-/** 五路信号合成（β2/λK/λD/R 当前为经验默认，消融标定列为后续工作）。 */
+/** 调制器评分（有学习权重用学习权重，否则经验默认）。 */
 export function contrastiveScore(model, workspace, text, { t = 0.5 } = {}) {
-  const personal = model && model.ok ? personalLogProb(model, text) : 0;
-  const defect = defectScore(text);
-  const knowledge = knowledgeScore(workspace, text);
-  const impedance = impedanceScore(text, t);
-  const score = 2.0 * personal + 0.5 * knowledge + 1.0 * defect + 0.8 * impedance;
-  return { score, personal, defect, knowledge, impedance };
+  const m = modulate(workspace, text, { t });
+  return {
+    score: m.score,
+    personal: m.features.personal,
+    defect: m.features.defect,
+    knowledge: m.features.knowledge,
+    impedance: m.features.impedance,
+    surface: m.features.surface,
+    discourse: m.features.discourse,
+    stance: m.features.stance,
+    vector: m.features.vector,
+    weights: m.weights,
+    trained: m.trained,
+    mode: m.mode,
+  };
 }
 
 function decodeN(workspace) {
@@ -91,7 +54,7 @@ export async function decodeSection(
     return {
       text: String(body || '').trim(),
       mode: 'direct',
-      reason: model.ok ? '未启用对比（SCULPTOR_DECODE_N 或语料 <200 字符）' : '无个人语料（p_personal 缺失）',
+    reason: model.ok ? '未启用对比（SCULPTOR_DECODE_N 或语料 <200 字符）' : '无个人语料（p_personal 缺失）',
       n: 1,
       breakdown: null,
     };
@@ -132,6 +95,12 @@ export async function decodeSection(
       defect: Number(s.defect.toFixed(3)),
       knowledge: Number(s.knowledge.toFixed(3)),
       impedance: Number(s.impedance.toFixed(3)),
+      surface: Number(s.surface.toFixed(3)),
+      discourse: Number(s.discourse.toFixed(3)),
+      stance: Number(s.stance.toFixed(3)),
+      vector: Number(s.vector.toFixed(3)),
+      trained: Boolean(s.trained),
+      mode: s.mode,
     })),
   };
 }
