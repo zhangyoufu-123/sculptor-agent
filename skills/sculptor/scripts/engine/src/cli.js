@@ -80,6 +80,7 @@ import {
   submitFineTune,
 } from './style-adapter.js';
 import { modulatorStatus, forceRetrain, weightsFile } from './modulator.js';
+import { extractAuthorSheet, readAuthorSheet, sheetFile, FIVE_QUESTIONS } from './author-sheet.js';
 import { factCheck, renderFactCheck } from './fact-check.js';
 import { recentPulses, renderPulse } from './style-pulse.js';
 import { rhythmCurve, renderRhythmCurve } from './style-pulse.js';
@@ -180,7 +181,9 @@ const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四�
   sculptor style-adapter [--distill] [--dataset [out.jsonl]] [--lora] [工作区]
                                      风格持续微调：--distill 蒸馏风格适配卡（最高优先级注入）；--dataset 生成偏好对 JSONL；--lora 提交微调（未配置端点时给出本地 LoRA 指引）
   sculptor modulator [--train] [--export] [工作区]
-                                     外层调制器：把签名升级为可学习模型——编辑对偏好学习八维权重，推理时调制候选评分；--train 强制重训；--export 输出权重文件路径
+                                     外层调制器：把签名升级为可学习模型——编辑对偏好学习十维权重，推理时调制候选评分；--train 强制重训；--export 输出权重文件路径
+  sculptor author-sheet [--refresh] [工作区]
+                                     作者写作清单（L3 深层风格读取）：五问（主张/论证/读者/红线/触发）自动归纳，红线强制保留；--refresh 强制重算
   sculptor genre [名称]               文体库：结构骨架 + 行文规范（公文/合同/通知/纪要/报告/议论文/散文/演讲稿/记叙文）
   sculptor library [工作区]           个人写作库：查看分类作品与蒸馏 skill
   sculptor library scan [工作区]      蒸馏每类作品的"个人写作 skill"（vault/skills/personal/）
@@ -761,6 +764,27 @@ export async function runCli(argv, io = {}) {
             `  权重表: ${Object.entries(st.weights)
               .map(([k, v]) => `${k}=${v}`)
               .join('  ')}`,
+        );
+        break;
+      }
+      case 'author-sheet': {
+        const wDir =
+          flags.workspace ||
+          (typeof flags.refresh === 'string' ? flags.refresh : null) ||
+          positional[0] ||
+          '';
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, wDir));
+        const sheet = Boolean(flags.refresh)
+          ? await extractAuthorSheet(cfg, w, { force: true })
+          : await extractAuthorSheet(cfg, w);
+        console.log(
+          `作者写作清单（${sheet.mode}）→ ${sheetFile(w)}\n` +
+            FIVE_QUESTIONS.map((q) => {
+              const v = sheet[q.id];
+              const val = Array.isArray(v) ? (v.length ? v.join('；') : '（未定）') : v || '（未定）';
+              return `  ${q.label}：${String(val).slice(0, 100)}`;
+            }).join('\n') +
+            `\n  关键词：${(sheet.keywords || []).slice(0, 10).join('、') || '（无）'}`,
         );
         break;
       }

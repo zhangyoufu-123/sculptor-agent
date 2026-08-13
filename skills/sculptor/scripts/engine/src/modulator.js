@@ -27,6 +27,7 @@ import {
 import { listEntries } from './knowledge.js';
 import { readVector, embedSparse, cosineSparse } from './style-vector.js';
 import { readPrototype, cosineDenseVec } from './embedding.js';
+import { readAuthorSheet } from './author-sheet.js';
 
 export const FEATURES = [
   'personal',
@@ -38,6 +39,7 @@ export const FEATURES = [
   'impedance',
   'vector',
   'embedding',
+  'fineread',
 ];
 
 // 经验默认权重（无编辑对时的兜底，等价 v0.62 V1 语义 + 新特征温和先验）
@@ -51,6 +53,7 @@ export const DEFAULT_WEIGHTS = {
   impedance: 0.8,
   vector: 0.1,
   embedding: 0.2,
+  fineread: 0.15,
 };
 
 // ── 纯净数据收集 ───────────────────────────────────────────
@@ -266,9 +269,30 @@ export function vectorFeature(workspace, text) {
 }
 
 /**
- * 提取九维特征（未归一化的原始值）。
+ * L3 细读特征（v0.66）：候选文本对"作者写作清单"红线/关键词的命中。
+ * 红线是作者定死不许改的信号，命中即强正偏；无清单时中性 0.5。
+ */
+export function fineReadFeature(workspace, text) {
+  const sheet = readAuthorSheet(workspace);
+  if (!sheet?.ok) return 0.5;
+  const t = String(text || '');
+  if (!t) return 0;
+  const hits = [];
+  for (const k of sheet.redLineFragments || sheet.redLines || []) {
+    const key = String(k || '').trim();
+    if (key.length >= 2 && t.includes(key)) hits.push(key);
+  }
+  for (const k of sheet.keywords || []) {
+    const key = String(k || '').trim();
+    if (key.length >= 2 && t.includes(key)) hits.push(key);
+  }
+  return Math.min(1, hits.length * 0.25);
+}
+
+/**
+ * 提取十维特征（未归一化的原始值）。
  * embedding 为神经风格特征：需要作者稠密原型 + 候选稠密编码（decodeSection 预计算传入）；
- * 无则取中性 0.5，不破坏降级路径。
+ * fineread 为 L3 细读特征（作者写作清单命中）；均无则取中性 0.5，不破坏降级路径。
  */
 export function extractFeatures(workspace, text, { t = 0.5, prototype = null, candidateEmbedding = null } = {}) {
   const model = getPersonalModel(workspace);
@@ -288,6 +312,7 @@ export function extractFeatures(workspace, text, { t = 0.5, prototype = null, ca
     impedance: impedanceScore(text, t),
     vector: vectorFeature(workspace, text),
     embedding,
+    fineread: fineReadFeature(workspace, text),
   };
 }
 
