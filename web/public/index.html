@@ -321,6 +321,19 @@
 
   <div class="toast" id="toast" hidden></div>
 
+  <!-- 密码门（设置 SCULPTOR_WEB_PASSWORD 时出现） -->
+  <div class="modal" id="authModal" hidden>
+    <div class="modal-card" style="max-width:380px">
+      <div class="modal-head">
+        <h3>进入 Sculptor Studio</h3>
+      </div>
+      <p class="session-sub">此实例需要密码访问。</p>
+      <input type="password" id="authPassword" class="search" placeholder="输入访问密码" style="width:100%;margin-bottom:10px" />
+      <p class="session-sub" id="authError" style="color:#c95f5f;display:none">密码错误</p>
+      <button class="btn btn-gold" id="authSubmit" style="width:100%">进入</button>
+    </div>
+  </div>
+
   <script src="/assets/app.js"></script>
 </body>
 </html>

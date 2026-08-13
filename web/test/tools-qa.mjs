@@ -24,6 +24,8 @@ http.createServer = (h) => {
 };
 await import(pathToFileURL(path.join(REPO, 'web', 'server.mjs')).href);
 
+let AUTH_TOKEN = '';
+
 function fakeRes() {
   const chunks = [];
   const res = new Writable({
@@ -31,6 +33,7 @@ function fakeRes() {
   });
   res.statusCode = 200;
   res._headers = {};
+  res.setHeader = (k, v) => { res._headers[k] = v; };
   res.writeHead = (code, headers) => { res.statusCode = code; res._headers = headers || {}; };
   res._body = () => Buffer.concat(chunks).toString('utf8');
   return res;
@@ -41,7 +44,7 @@ function call(urlStr, method = 'GET', payload, headers = {}) {
     const req = new EventEmitter();
     req.method = method;
     req.url = urlStr;
-    req.headers = { host: 'localhost', ...headers };
+    req.headers = { host: 'localhost', ...(AUTH_TOKEN ? { 'x-auth-token': AUTH_TOKEN } : {}), ...headers };
     const res = fakeRes();
     const t = setTimeout(() => reject(new Error('handler timeout')), 20000);
     res.on('finish', () => { clearTimeout(t); resolve({ res, body: res._body() }); });
@@ -59,13 +62,20 @@ function check(name, cond, extra = '') {
 
 const b64 = (s) => Buffer.from(s, 'utf8').toString('base64');
 
-// 1) 鉴权（v0.58 已移除登录）：默认开放访问，旧接口返回 required:false
+// 1) 鉴权（v1.0）：设置 SCULPTOR_WEB_PASSWORD 时需登录
 {
   const st = JSON.parse((await call('/api/auth/status')).body);
-  check('auth/status 无需登录', st.required === false && st.ok === true);
+  check('auth/status 需要登录', st.required === true && st.ok === false);
   const denied = await call('/api/sessions');
-  check('未登录直接访问 API 正常', denied.res.statusCode === 200);
-  console.log('PASS 开放访问（登录已移除）');
+  check('未登录访问 API 返回 401', denied.res.statusCode === 401);
+  const bad = await call('/api/auth/login', 'POST', { password: 'wrong' });
+  check('错误密码返回 401', bad.res.statusCode === 401);
+  const login = await call('/api/auth/login', 'POST', { password: 'secret123' });
+  check('正确密码登录成功', login.res.statusCode === 200 && JSON.parse(login.body).ok === true);
+  AUTH_TOKEN = JSON.parse(login.body).token;
+  const ok = await call('/api/sessions');
+  check('带 token 访问 API 正常', ok.res.statusCode === 200);
+  console.log('PASS 密码门鉴权');
 }
 
 // 2) 学术规范审计：构造带问题的会话成稿

@@ -14,11 +14,36 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import crypto from 'node:crypto';
 
 const PORT = Number(process.env.PORT || 5177);
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const PUBLIC = path.resolve(HERE, 'public');
 const DATA_ROOT = path.resolve(process.env.SCULPTOR_WEB_DATA || path.resolve(HERE, '..', 'web-data'));
+
+// ── 最小密码门：设置 SCULPTOR_WEB_PASSWORD 即启用，未设置则开放（个人/演示）──
+const AUTH_PASSWORD = String(process.env.SCULPTOR_WEB_PASSWORD || '');
+const AUTH_COOKIE = 'sculptor_auth';
+
+function authToken() {
+  return crypto.createHash('sha256').update(`sculptor:${AUTH_PASSWORD}`).digest('hex');
+}
+
+function parseCookies(header) {
+  const out = {};
+  for (const part of String(header || '').split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+  }
+  return out;
+}
+
+function isAuthed(req) {
+  if (!AUTH_PASSWORD) return true;
+  const cookies = parseCookies(req.headers.cookie);
+  const token = req.headers['x-auth-token'] || cookies[AUTH_COOKIE] || '';
+  return token === authToken();
+}
 
 // ── 按机器隔离用户：一台机器一个 machineId，数据各归各的（web-data/machines/<id>/）──
 const machineCtx = new AsyncLocalStorage();
@@ -428,9 +453,23 @@ const server = http.createServer((req, res) => {
 async function handleRequest(req, res, url) {
   const p = url.pathname;
 
-  // ── 鉴权（v0.58 已移除登录：个人/演示实例默认开放；如需防护请走反向代理）──
+  // ── 鉴权：设置 SCULPTOR_WEB_PASSWORD 时，所有 /api/* 需登录（health/静态资源除外）──
+  const publicPath = p === '/health' || p === '/api/auth/status' || p === '/api/auth/login';
+  if (AUTH_PASSWORD && p.startsWith('/api/') && !publicPath && !isAuthed(req)) {
+    return json(res, 401, { error: '需要密码' });
+  }
+
   if (req.method === 'GET' && p === '/api/auth/status') {
-    return json(res, 200, { required: false, ok: true });
+    return json(res, 200, { required: Boolean(AUTH_PASSWORD), ok: isAuthed(req) });
+  }
+  if (req.method === 'POST' && p === '/api/auth/login') {
+    const { password } = await body(req).catch(() => ({}));
+    if (String(password || '') === AUTH_PASSWORD) {
+      const token = authToken();
+      res.setHeader('Set-Cookie', `${AUTH_COOKIE}=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000`);
+      return json(res, 200, { ok: true, token });
+    }
+    return json(res, 401, { error: '密码错误' });
   }
   if (req.method === 'GET' && p === '/health') {
     return json(res, 200, {

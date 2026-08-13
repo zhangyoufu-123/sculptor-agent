@@ -141,6 +141,34 @@ async function apiDelete(pathname, payload) {
   return data;
 }
 
+async function ensureAuth() {
+  try {
+    const s = await fetch('/api/auth/status', { headers: apiHeaders() }).then((r) => r.json());
+    if (s.required && !s.ok) {
+      $('authModal').hidden = false;
+    }
+  } catch {}
+}
+
+function bindAuth() {
+  $('authSubmit').addEventListener('click', async () => {
+    const pwd = $('authPassword').value;
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: apiHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ password: pwd }),
+    });
+    if (r.ok) {
+      location.reload();
+    } else {
+      $('authError').style.display = 'block';
+    }
+  });
+  $('authPassword').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') $('authSubmit').click();
+  });
+}
+
 function fmtDate(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -2159,6 +2187,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ── 初始化 ───────────────────────────────────────── */
+bindAuth();
+ensureAuth();
 renderDash();
 ensureSplitBtn();
 $('worksCompare')?.addEventListener('click', () => {
