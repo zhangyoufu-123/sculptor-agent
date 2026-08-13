@@ -15,10 +15,12 @@ import { createHash } from 'node:crypto';
 import * as ws from './workspace.js';
 import { recommendWorks } from './asset.js';
 import { chatWithRetry, parseJsonContent } from './llm.js';
+import { embedText, cosineDenseVec } from './embedding.js';
 
 const KB_DIR = 'knowledge';
 const ASKED_FILE = 'asked.jsonl';
 const MAX_KB_INJECT = 3;
+const KB_VECTOR_FILE = 'kb-vectors.json';
 
 export function kbDir(workspace) {
   return path.join(workspace, 'vault', KB_DIR);
@@ -252,6 +254,89 @@ export function matchKb(workspace, query, { limit = MAX_KB_INJECT, avoidIds = []
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map(({ id, title, type, author, note, score }) => ({ id, title, type, author, note, score }));
+}
+
+function kbVectorFile(workspace) {
+  return path.join(workspace, 'vault', KB_VECTOR_FILE);
+}
+
+function readKbVectors(workspace) {
+  try {
+    const obj = JSON.parse(fs.readFileSync(kbVectorFile(workspace), 'utf8'));
+    return obj && typeof obj === 'object' ? obj : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeKbVectors(workspace, cache) {
+  try {
+    fs.mkdirSync(path.join(workspace, 'vault'), { recursive: true });
+    fs.writeFileSync(kbVectorFile(workspace), JSON.stringify(cache) + '\n', { mode: 0o600 });
+  } catch {}
+}
+
+/**
+ * 向量混合检索（v0.65）：BM25 字符二元组 + 语义 embedding 余弦融合（0.6/0.4），
+ * 条目向量落盘缓存（vault/kb-vectors.json）。未配置/失败时自动降级为纯 BM25
+ * （排序与 matchKb 一致），语义层是增强而非依赖。
+ */
+export async function matchKbHybrid(
+  cfg = {},
+  workspace,
+  query,
+  { limit = MAX_KB_INJECT, avoidIds = [], fetchImpl = null } = {},
+) {
+  const entries = listEntries(workspace).filter((e) => !avoidIds.includes(e.id));
+  if (!entries.length) return [];
+  const docs = entries.map((e) => ({
+    ...e,
+    grams: tokenize(`${e.title} ${e.author} ${e.note} ${(e.tags || []).join(' ')} ${(e.relatedTo || []).join(' ')}`),
+  }));
+  const rawBm25 = bm25(docs, query);
+  const maxB = Math.max(...rawBm25, 1e-9);
+  let sims = null;
+  const qv = await embedText(cfg, query, { fetchImpl });
+  if (qv) {
+    const cache = readKbVectors(workspace);
+    sims = [];
+    for (const e of entries) {
+      let v = cache[e.id];
+      if (!v) {
+        v = await embedText(cfg, `${e.title} ${e.author} ${e.note}`, { fetchImpl });
+        if (v) cache[e.id] = Array.from(v);
+      }
+      const c = v ? cosineDenseVec(qv, v) : null;
+      sims.push(c !== null && Number.isFinite(c) ? c : null);
+    }
+    writeKbVectors(workspace, cache);
+  }
+  return docs
+    .map((d, i) => {
+      const bm = rawBm25[i] / maxB;
+      const sem = sims ? (sims[i] === null ? 0 : (sims[i] + 1) / 2) : 0;
+      const base = sims ? 0.6 * bm + 0.4 * sem : bm;
+      return {
+        ...d,
+        score: Number(
+          (base + (d.usageCount ? -Math.min(0.45, d.usageCount * 0.15) : 0.2)).toFixed(3),
+        ),
+        bm25: Number(bm.toFixed(3)),
+        semantic: sims && sims[i] !== null ? Number(sims[i].toFixed(3)) : null,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ id, title, type, author, note, score, bm25, semantic }) => ({
+      id,
+      title,
+      type,
+      author,
+      note,
+      score,
+      bm25,
+      semantic,
+    }));
 }
 
 /** 标记使用（轮换依据）。 */

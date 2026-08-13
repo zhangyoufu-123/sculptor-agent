@@ -34,6 +34,7 @@ import {
   addEntry,
   removeEntry,
   matchKb,
+  matchKbHybrid,
   normTitle,
   recommendReadings,
   exportKnowledge,
@@ -1093,7 +1094,11 @@ export async function runCli(argv, io = {}) {
         } else if (sub === 'search') {
           if (positional.length < 2)
             throw new Error('用法: sculptor knowledge search <关键词>');
-          const hits = matchKb(w, positional.slice(1).join(' '), { limit: 10 });
+          const q = positional.slice(1).join(' ');
+          // v0.65：配置了 embedding 时启用 BM25+语义混合检索，否则纯 BM25
+          const hits = cfg.embedBaseUrl && cfg.embedApiKey && cfg.embedModel
+            ? await matchKbHybrid(cfg, w, q, { limit: 10 })
+            : matchKb(w, q, { limit: 10 });
           if (!hits.length) {
             console.log('无匹配');
             break;
@@ -1101,6 +1106,8 @@ export async function runCli(argv, io = {}) {
           for (const h of hits) {
             console.log(
               `• 《${h.title.replace(/^《|》$/g, '')}》${h.author ? `（${h.author}）` : ''} [${h.type}] score=${h.score}${
+                h.semantic !== undefined && h.semantic !== null ? ` 语义=${h.semantic} bm25=${h.bm25}` : ''
+              }${
                 h.note ? ` — ${h.note.slice(0, 60)}` : ''
               }`,
             );

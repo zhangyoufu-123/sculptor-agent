@@ -77,13 +77,16 @@ $$\log P_{\mathrm{final}}(w \mid c, t) = \log P_{\mathrm{base}}(w \mid c) + \sum
 **V1（已落地，v0.62）**：候选对比解码——每节并行生成 2 候选，五路评分
 S = 2.0·p_personal + 0.5·S_knowledge + 1.0·S_defect + 0.8·R(t)·S_impedance，选优 + 得分分解。
 
-**已落地（v0.64，外层调制器）**：
+**已落地（v0.64–0.65，外层调制器 + 神经风格编码）**：
 1. **权重学习**：`agent/src/modulator.js` 把 edits.jsonl 的（原文，改后）当偏好对，
-   用 pairwise hinge + SGD 学八维权重 w_i——签名正式升级为可学习模型（见 MODULATOR.md）；
-2. **八维特征入评分**：表层（surface）/话语（discourse）/立场红线（stance）/知识/缺陷/
-   阻抗/风格向量方向 + 个人 n-gram，全部进 `modulate()` 评分；
-3. **在线重训**：数据签名变化自动失效重训，权重落 `vault/modulator-weights.json`；
-4. **降级保底**：编辑对不足时回退经验默认权重，不阻塞写作。
+   用 pairwise hinge + SGD 学九维权重 w_i——签名正式升级为可学习模型（见 MODULATOR.md）；
+2. **九维特征入评分**：表层/话语/立场红线/知识/缺陷/阻抗/风格向量方向 + 个人 n-gram +
+   可选 embedding 神经原型，全部进 `modulate()` 评分；
+3. **在线重训 + 增量更新**：数据签名变化自动失效重训，新编辑对局部 SGD 增量更新，
+   权重落 `vault/modulator-weights.json`；
+4. **神经风格编码（v0.65）**：`embedding.js` 作者稠密原型 + 知识库 BM25+语义混合检索，
+   未配置全部静默降级；
+5. **降级保底**：编辑对不足时回退经验默认权重，不阻塞写作。
 
 **下一步**：
 1. **L3 细读特征入评分**：把 LLM 六层细读的结构化输出（声音/过渡/修辞判据）加入 f_i；

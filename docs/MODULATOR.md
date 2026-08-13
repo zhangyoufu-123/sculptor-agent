@@ -69,21 +69,24 @@ $$S(x \mid c, t) = w_0 + \sum_i w_i\, f_i(x, c, t) + w_{\mathrm{personal}}\, \lo
 
 ## 六、验证
 
-- `agent/test/modulator.test.mjs`：数据收集、权重学习（改后 > 原文）、八维分解、
+- `agent/test/modulator.test.mjs`：数据收集、权重学习（改后 > 原文）、九维分解、
   特征区分度、数据不足降级、数据变化在线重训；
-- agent 全量 21 套 + web 11 套回归全绿；
+- `agent/test/embedding.test.mjs`：神经原型落盘/缓存/签名重算、第 9 维 embedding 特征、
+  知识库语义混合检索、调制器增量在线更新；
+- agent 全量 22 套 + web 11 套回归全绿；
 - CLI：`sculptor modulator [--train] [--export] [工作区]` 查看状态/强制重训/导出权重。
 
 ## 七、与论文理论的关系
 
 这是"统一 Token 对比解码框架"从 V1（固定权重候选对比）到 V2（逐 token logprobs）
 之间的 **V1.5 里程碑**：权重不再手调，而是从作者的偏好对中学出来——外层调制器
-成为一个**真正的、属于每个用户的轻量模型**，而不是一组经验系数。V2/V3
-（logprobs 重排、本地 DExperts/激活转向）仍按 STYLE-SYSTEM.md 路线推进。
+成为一个**真正的、属于每个用户的轻量模型**，而不是一组经验系数。v0.65 进一步加入
+可选 embedding 神经原型（第 9 维）、知识库 BM25+语义混合检索与增量在线更新；
+V2/V3（logprobs 重排、本地 DExperts/激活转向）仍按 STYLE-SYSTEM.md 路线推进。
 
 ## 八、局限与下一步
 
-- 当前权重学习是离线批量重训；下一步做增量在线更新（每来一个编辑对即局部更新）；
-- 特征仍是文本统计 + 确定性规则，深层立场（L3）特征待接入 LLM 细读的结构化输出；
+- 增量在线更新已落地（v0.65，`applyEditIncremental`）；仍待做批量与增量策略的自动权衡；
+- embedding 神经编码为可选（需配置 API）；深层立场（L3）特征待接入 LLM 细读的结构化输出；
 - 权重学习的消融（默认权重 vs 学习权重 vs 逐模块关闭）与第三方盲评尚未完成；
 - 逐 token 级调制（V2 logprobs）需要模型接口支持，是下一步主攻方向。

@@ -26,6 +26,7 @@ import {
 } from './personal-model.js';
 import { listEntries } from './knowledge.js';
 import { readVector, embedSparse, cosineSparse } from './style-vector.js';
+import { readPrototype, cosineDenseVec } from './embedding.js';
 
 export const FEATURES = [
   'personal',
@@ -36,6 +37,7 @@ export const FEATURES = [
   'defect',
   'impedance',
   'vector',
+  'embedding',
 ];
 
 // 经验默认权重（无编辑对时的兜底，等价 v0.62 V1 语义 + 新特征温和先验）
@@ -48,6 +50,7 @@ export const DEFAULT_WEIGHTS = {
   defect: 1.0,
   impedance: 0.8,
   vector: 0.1,
+  embedding: 0.2,
 };
 
 // ── 纯净数据收集 ───────────────────────────────────────────
@@ -262,9 +265,19 @@ export function vectorFeature(workspace, text) {
   }
 }
 
-/** 提取八维特征（未归一化的原始值）。 */
-export function extractFeatures(workspace, text, { t = 0.5 } = {}) {
+/**
+ * 提取九维特征（未归一化的原始值）。
+ * embedding 为神经风格特征：需要作者稠密原型 + 候选稠密编码（decodeSection 预计算传入）；
+ * 无则取中性 0.5，不破坏降级路径。
+ */
+export function extractFeatures(workspace, text, { t = 0.5, prototype = null, candidateEmbedding = null } = {}) {
   const model = getPersonalModel(workspace);
+  const proto = prototype || readPrototype(workspace);
+  let embedding = 0.5;
+  if (proto?.ok && candidateEmbedding) {
+    const c = cosineDenseVec(proto.vector, candidateEmbedding);
+    if (c !== null && Number.isFinite(c)) embedding = Math.max(0, Math.min(1, (c + 1) / 2));
+  }
   return {
     personal: model && model.ok ? personalLogProb(model, text) : 0,
     surface: surfaceFeature(text),
@@ -274,6 +287,7 @@ export function extractFeatures(workspace, text, { t = 0.5 } = {}) {
     defect: defectScore(text),
     impedance: impedanceScore(text, t),
     vector: vectorFeature(workspace, text),
+    embedding,
   };
 }
 
@@ -420,9 +434,9 @@ export function getModulator(workspace) {
 }
 
 /** 推理时调制：返回 {score, features, weights, trained, mode}。 */
-export function modulate(workspace, text, { t = 0.5 } = {}) {
+export function modulate(workspace, text, { t = 0.5, prototype = null, candidateEmbedding = null } = {}) {
   const mod = getModulator(workspace);
-  const features = extractFeatures(workspace, text, { t });
+  const features = extractFeatures(workspace, text, { t, prototype, candidateEmbedding });
   if (mod.ok) {
     const norm = normalizeRow(features, mod.norm);
     let score = mod.bias;
@@ -476,6 +490,69 @@ export function forceRetrain(workspace) {
   modCache.delete(data.signature);
   modCache.set(data.signature, mod);
   return mod;
+}
+
+/**
+ * 增量在线更新（v0.65）：新编辑对到达时，用现有归一化参数做局部 SGD 几步，
+ * 避免全量重训；从未训练（<2 对）时自动走批量重训。
+ */
+export function applyEditIncremental(
+  workspace,
+  edit,
+  { steps = 25, lr = 0.04, margin = 0.2, l2 = 0.02 } = {},
+) {
+  const original = String(edit?.original || '').trim();
+  const changed = String(edit?.changed || '').trim();
+  if (original.length < 4 || changed.length < 4 || original === changed) {
+    return { ok: false, reason: '无效编辑对' };
+  }
+  const data = collectModulatorData(workspace);
+  const mod = getModulator(workspace);
+  if (!mod.ok) return forceRetrain(workspace);
+  const neg = normalizeRow(extractFeatures(workspace, original, { t: 0.5 }), mod.norm);
+  const pos = normalizeRow(extractFeatures(workspace, changed, { t: 0.5 }), mod.norm);
+  const w = [Number(mod.bias || 0), ...FEATURES.map((f) => Number(mod.weights[f] || 0))];
+  const dim = FEATURES.length;
+  let loss = 0;
+  for (let it = 0; it < steps; it++) {
+    let sPos = w[0];
+    let sNeg = w[0];
+    for (let d = 0; d < dim; d++) {
+      sPos += w[d + 1] * pos[FEATURES[d]];
+      sNeg += w[d + 1] * neg[FEATURES[d]];
+    }
+    loss = Math.max(0, margin - (sPos - sNeg));
+    if (loss > 0) {
+      for (let d = 0; d < dim; d++) {
+        w[d + 1] += lr * (pos[FEATURES[d]] - neg[FEATURES[d]]) - l2 * w[d + 1];
+        if (Math.abs(w[d + 1]) > 15) w[d + 1] = Math.sign(w[d + 1]) * 15;
+      }
+    }
+  }
+  const weights = {};
+  for (let d = 0; d < dim; d++) weights[FEATURES[d]] = Number(w[d + 1].toFixed(4));
+  const next = {
+    ok: true,
+    bias: Number(w[0].toFixed(4)),
+    weights,
+    norm: mod.norm,
+    meta: {
+      ...(mod.meta || {}),
+      pairs: data.pairs.length,
+      positives: data.positives.length,
+      loss: Number(loss.toFixed(5)),
+      epoch: (mod.meta?.epoch || 0) + steps,
+      trainedAt: new Date().toISOString(),
+      signature: data.signature,
+    },
+  };
+  try {
+    fs.mkdirSync(path.join(workspace, 'vault'), { recursive: true });
+    fs.writeFileSync(weightsFile(workspace), JSON.stringify(next, null, 2) + '\n', { mode: 0o600 });
+  } catch {}
+  modCache.delete(data.signature);
+  modCache.set(data.signature, next);
+  return next;
 }
 
 export { personalCorpusSize };

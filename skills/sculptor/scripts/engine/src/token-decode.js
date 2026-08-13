@@ -8,13 +8,14 @@
 import { chatWithRetry } from './llm.js';
 import { getPersonalModel, personalCorpusSize } from './personal-model.js';
 import { modulate } from './modulator.js';
+import { authorPrototype, embedText } from './embedding.js';
 
 // 向后兼容导出（V1 的测试与调用方仍按原名取用）
 export { defectScore, impedanceScore, knowledgeScore } from './modulator.js';
 
 /** 调制器评分（有学习权重用学习权重，否则经验默认）。 */
-export function contrastiveScore(model, workspace, text, { t = 0.5 } = {}) {
-  const m = modulate(workspace, text, { t });
+export function contrastiveScore(model, workspace, text, { t = 0.5, prototype = null, candidateEmbedding = null } = {}) {
+  const m = modulate(workspace, text, { t, prototype, candidateEmbedding });
   return {
     score: m.score,
     personal: m.features.personal,
@@ -25,6 +26,7 @@ export function contrastiveScore(model, workspace, text, { t = 0.5 } = {}) {
     discourse: m.features.discourse,
     stance: m.features.stance,
     vector: m.features.vector,
+    embedding: m.features.embedding,
     weights: m.weights,
     trained: m.trained,
     mode: m.mode,
@@ -59,6 +61,7 @@ export async function decodeSection(
       breakdown: null,
     };
   }
+  const prototype = await authorPrototype(cfg, workspace).catch(() => ({ ok: false }));
   const temps = Array.from({ length: n }, (_, k) => Math.min(1.15, temperature + (k - (n - 1) / 2) * 0.12));
   const candidates = await Promise.all(
     temps.map((tp) =>
@@ -68,12 +71,21 @@ export async function decodeSection(
     ),
   );
   const scored = [];
+  const embeds = await Promise.all(
+    candidates.map((c) =>
+      typeof c === 'string' && !c.__err ? embedText(cfg, String(c).trim()).catch(() => null) : Promise.resolve(null),
+    ),
+  );
   for (let i = 0; i < candidates.length; i++) {
     const c = candidates[i];
     if (typeof c !== 'string' || c.__err) continue;
     const text = String(c || '').trim();
     if (text.length < 10) continue;
-    const s = contrastiveScore(model, workspace, text, { t });
+    const s = contrastiveScore(model, workspace, text, {
+      t,
+      prototype: prototype.ok ? prototype : null,
+      candidateEmbedding: embeds[i],
+    });
     scored.push({ i, text, ...s });
   }
   if (!scored.length) {
@@ -99,6 +111,7 @@ export async function decodeSection(
       discourse: Number(s.discourse.toFixed(3)),
       stance: Number(s.stance.toFixed(3)),
       vector: Number(s.vector.toFixed(3)),
+      embedding: Number(s.embedding.toFixed(3)),
       trained: Boolean(s.trained),
       mode: s.mode,
     })),
