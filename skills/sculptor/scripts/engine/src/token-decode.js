@@ -10,6 +10,7 @@ import { getPersonalModel, personalCorpusSize } from './personal-model.js';
 import { modulate, collectModulatorData } from './modulator.js';
 import { authorPrototype, embedText } from './embedding.js';
 import { readEditTransform, applyAuthorEdits } from './edit-transform.js';
+import { detectConcretizationPairs, concretize } from './concretize.js';
 
 // 向后兼容导出（V1 的测试与调用方仍按原名取用）
 export { defectScore, impedanceScore, knowledgeScore } from './modulator.js';
@@ -109,12 +110,23 @@ export async function decodeSection(
   scored.sort((a, b) => b.score - a.score);
   const best = scored[0];
   const revised = applyAuthorEdits(best.text, readEditTransform(workspace));
+  let finalText = revised.text;
+  const finalEdits = [...revised.applied];
+  // 具体化拟改（正方向）：有 ≥2 条"抽象→具体"编辑对时，用作者 few-shot 改写最佳候选。
+  const conPairs = detectConcretizationPairs(collectModulatorData(workspace).pairs);
+  if (conPairs.length >= 2) {
+    const c = await concretize(cfg, conPairs, revised.text, generate);
+    if (c.ok) {
+      finalText = c.text;
+      finalEdits.push('concretize');
+    }
+  }
   return {
-    text: revised.text,
+    text: finalText,
     mode: 'contrastive',
-    reason: `从 ${scored.length} 个候选中按五路信号选优${revised.applied.length ? ' + 拟改' : ''}`,
+    reason: `从 ${scored.length} 个候选中按五路信号选优${finalEdits.length ? ' + 拟改' : ''}`,
     n: scored.length,
-    edits: revised.applied,
+    edits: finalEdits,
     breakdown: scored.map((s) => ({
       rank: scored.indexOf(s) + 1,
       chars: s.text.replace(/\s/g, '').length,
