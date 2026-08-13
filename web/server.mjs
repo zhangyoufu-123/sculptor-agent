@@ -148,6 +148,9 @@ function loadEnvLocal(file) {
 }
 loadEnvLocal(path.resolve(HERE, '..', '.env.local'));
 
+// Web 端默认使用 deepseek-v4-flash（快、省），显式 SCULPTOR_LLM_MODEL 仍可覆盖为 pro。
+if (!process.env.SCULPTOR_LLM_MODEL) process.env.SCULPTOR_LLM_MODEL = 'deepseek-v4-flash';
+
 const cfg = loadConfig();
 
 const IO_SCRIPTS = path.resolve(HERE, '..', 'agent', 'scripts', 'io');
