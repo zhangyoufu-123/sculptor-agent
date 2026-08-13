@@ -71,7 +71,7 @@ const b64 = (s) => Buffer.from(s, 'utf8').toString('base64');
 // 2) 学术规范审计：构造带问题的会话成稿
 {
   const sid = 'n1';
-  const dir = path.join(TMP, 'sessions', sid);
+  const dir = path.join(TMP, 'machines', 'default', 'sessions', sid);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify({ id: sid, title: '规范审计样例' }));
   fs.mkdirSync(path.join(dir, 'protocol'), { recursive: true });

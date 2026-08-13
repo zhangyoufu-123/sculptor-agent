@@ -88,8 +88,21 @@ function toast(msg) {
   t._timer = setTimeout(() => { t.hidden = true; }, 2600);
 }
 
+function machineId() {
+  let id = localStorage.getItem('sculptor.machineId');
+  if (!id) {
+    id = 'm-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    localStorage.setItem('sculptor.machineId', id);
+  }
+  return id;
+}
+
+function apiHeaders(extra = {}) {
+  return { 'X-Machine-Id': machineId(), ...extra };
+}
+
 async function apiGet(pathname) {
-  const r = await fetch(pathname);
+  const r = await fetch(pathname, { headers: apiHeaders() });
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || '请求失败');
   return data;
@@ -98,7 +111,18 @@ async function apiGet(pathname) {
 async function apiPost(pathname, payload) {
   const r = await fetch(pathname, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: apiHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload || {}),
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || '请求失败');
+  return data;
+}
+
+async function apiPatch(pathname, payload) {
+  const r = await fetch(pathname, {
+    method: 'PATCH',
+    headers: apiHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload || {}),
   });
   const data = await r.json();
@@ -109,7 +133,7 @@ async function apiPost(pathname, payload) {
 async function apiDelete(pathname, payload) {
   const r = await fetch(pathname, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers: apiHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload || {}),
   });
   const data = await r.json();
@@ -1327,7 +1351,7 @@ async function renderSessions() {
         if (act === 'rename') {
           const title = prompt('新标题：', card.querySelector('h3').textContent);
           if (title && title.trim()) {
-            apiPost('/api/session', { sessionId: id, title: title.trim() })
+            apiPatch('/api/session', { sessionId: id, title: title.trim() })
               .then(() => { toast('已改名'); renderSessions(); renderDash(); })
               .catch((e) => toast(e.message));
           }

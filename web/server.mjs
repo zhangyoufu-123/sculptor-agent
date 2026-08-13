@@ -13,12 +13,29 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 const PORT = Number(process.env.PORT || 5177);
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const PUBLIC = path.resolve(HERE, 'public');
 const DATA_ROOT = path.resolve(process.env.SCULPTOR_WEB_DATA || path.resolve(HERE, '..', 'web-data'));
-const SESSIONS_DIR = path.join(DATA_ROOT, 'sessions');
+
+// ── 按机器隔离用户：一台机器一个 machineId，数据各归各的（web-data/machines/<id>/）──
+const machineCtx = new AsyncLocalStorage();
+
+function currentMachine() {
+  return machineCtx.getStore() || 'default';
+}
+
+function sessionsRoot(mid) {
+  const safe = String(mid || 'default').replace(/[^a-z0-9-]/gi, '') || 'default';
+  return path.join(DATA_ROOT, 'machines', safe, 'sessions');
+}
+
+function machineIdOf(req, url) {
+  const raw = String(req.headers['x-machine-id'] || url.searchParams.get('machineId') || '').trim();
+  return raw.replace(/[^a-z0-9-]/gi, '').slice(0, 64) || 'default';
+}
 
 // 离线 mock（与单测同一套）：SCULPTOR_MOCK_LLM=1 时启用，用于本地/CI 验证
 if (process.env.SCULPTOR_MOCK_LLM === '1') {
@@ -173,11 +190,12 @@ function readJsonSafe(file) {
 
 // ── 会话持久化（web-data/sessions/<id>/：meta.json + transcript.jsonl + Sculptor 工作区）──
 function sessionDir(id) {
+  const root = sessionsRoot(currentMachine());
   const safe = String(id || '').replace(/[^a-z0-9-]/gi, '');
   // 非法/空 id：返回必然不存在的路径（各端点随后走 404），绝不抛异常打崩服务。
-  if (!safe) return path.join(SESSIONS_DIR, '__invalid__');
-  const dir = path.resolve(SESSIONS_DIR, safe);
-  if (!dir.startsWith(path.resolve(SESSIONS_DIR))) return path.join(SESSIONS_DIR, '__invalid__');
+  if (!safe) return path.join(root, '__invalid__');
+  const dir = path.resolve(root, safe);
+  if (!dir.startsWith(path.resolve(root))) return path.join(root, '__invalid__');
   return dir;
 }
 
@@ -214,9 +232,10 @@ function readTranscript(id) {
 }
 
 function listSessions() {
+  const root = sessionsRoot(currentMachine());
   let ids = [];
   try {
-    ids = fs.readdirSync(SESSIONS_DIR).filter((f) => f !== '.DS_Store');
+    ids = fs.readdirSync(root).filter((f) => f !== '.DS_Store');
   } catch {
     return [];
   }
@@ -280,7 +299,7 @@ function botText(r) {
 }
 
 function newSession(topic) {
-  fs.mkdirSync(SESSIONS_DIR, { recursive: true });
+  fs.mkdirSync(sessionsRoot(currentMachine()), { recursive: true });
   const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const dir = sessionDir(id);
   fs.mkdirSync(dir, { recursive: true });
@@ -397,8 +416,13 @@ async function runStepAndRespond(res, id, message) {
   }
 }
 
-const server = http.createServer(async (req, res) => {
+const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const mid = machineIdOf(req, url);
+  return machineCtx.run(mid, () => handleRequest(req, res, url));
+});
+
+async function handleRequest(req, res, url) {
   const p = url.pathname;
 
   // ── 鉴权（v0.58 已移除登录：个人/演示实例默认开放；如需防护请走反向代理）──
@@ -1336,7 +1360,7 @@ const server = http.createServer(async (req, res) => {
 
   res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify({ error: 'Not Found' }));
-});
+}
 
 if (typeof server.on === 'function') {
   server.on('error', (err) => {
