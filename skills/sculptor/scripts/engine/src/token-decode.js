@@ -7,7 +7,7 @@
 // 每路分数可追溯输出（得分分解），这是"可解释的风格注入"的第二版。
 import { chatWithRetry } from './llm.js';
 import { getPersonalModel, personalCorpusSize } from './personal-model.js';
-import { modulate } from './modulator.js';
+import { modulate, collectModulatorData } from './modulator.js';
 import { authorPrototype, embedText } from './embedding.js';
 
 // 向后兼容导出（V1 的测试与调用方仍按原名取用）
@@ -40,7 +40,15 @@ export function contrastiveScore(model, workspace, text, { t = 0.5, prototype = 
 function decodeN(workspace) {
   const env = Number(process.env.SCULPTOR_DECODE_N || 0);
   if (env >= 1) return env;
-  return personalCorpusSize(workspace) >= 200 ? 2 : 1; // 有个人语料才启用对比解码
+  const corpus = personalCorpusSize(workspace);
+  if (corpus >= 200) return 2;
+  // 小样本冷启动（v1.6）：存在 ≥1 条作者亲手编辑对即启用对比解码——
+  // 其余 11 维可解释特征仍然有效，不依赖个人 n-gram 模型。
+  try {
+    const data = collectModulatorData(workspace);
+    if (data.pairs.length >= 1) return 2;
+  } catch {}
+  return 1;
 }
 
 /**
@@ -55,12 +63,12 @@ export async function decodeSection(
   const n = decodeN(workspace);
   const model = getPersonalModel(workspace);
   const gen = generate || ((msgs, opts) => chatWithRetry(cfg, msgs, opts));
-  if (n < 2 || !model.ok) {
+  if (n < 2) {
     const body = await gen(messages, { temperature, maxTokens });
     return {
       text: String(body || '').trim(),
       mode: 'direct',
-    reason: model.ok ? '未启用对比（SCULPTOR_DECODE_N 或语料 <200 字符）' : '无个人语料（p_personal 缺失）',
+      reason: '未启用对比（无个人语料且无编辑对；可设 SCULPTOR_DECODE_N 强制开启）',
       n: 1,
       breakdown: null,
     };

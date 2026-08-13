@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const { exactBinomialP, wilsonCI, cohensH, blindStatsReport, parseBlindCsv } = await import(
+const { exactBinomialP, wilsonCI, cohensH, blindStatsReport, parseBlindCsv, permutationTestPaired } = await import(
   path.join(HERE, '..', 'src', 'stats.js')
 );
 
@@ -68,6 +68,21 @@ const { exactBinomialP, wilsonCI, cohensH, blindStatsReport, parseBlindCsv } = a
   assert(rows[3].correct === true, '1 → true');
   assert(parseBlindCsv('无表头\n').length === 0, '空/无表头兜底');
   console.log('PASS 盲评 CSV 解析');
+}
+
+// 6) 配对置换检验：方法 A 明显更好 → p 小；完全一致 → p=1
+{
+  const truth = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'];
+  const good = [...truth];
+  const bad = truth.map((x) => (x === 'a' ? 'b' : 'a'));
+  const r = permutationTestPaired(good, bad, truth);
+  assert(r.accA === 1 && r.accB === 0, `准确率正确（${r.accA}/${r.accB}）`);
+  assert(r.pValue < 0.01, '明显差异显著');
+  const same = permutationTestPaired(good, good, truth);
+  assert(same.pValue === 1 && same.diff === 0, '一致 → p=1、差 0');
+  const half = permutationTestPaired(['a', 'b', 'a', 'b'], ['a', 'b', 'b', 'a'], ['a', 'b', 'a', 'b']);
+  assert(half.discordant === 2 && half.pValue >= 0.5, `2/2 不一致但样本过小 → p 不显著（${half.pValue}）`);
+  console.log('PASS 配对置换检验');
 }
 
 console.log('\n✓ stats.test.mjs 全部通过');

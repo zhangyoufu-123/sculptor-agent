@@ -89,5 +89,30 @@ fs.writeFileSync(path.join(sampleDir, 'sample-a.md'), authorA);
   console.log('PASS 无语料降级直接生成');
 }
 
+// 5) 小样本冷启动（v1.6）：无个人语料但存在 ≥1 编辑对 → 仍启用对比解码
+{
+  const w3 = ws.ensureWorkspace(path.join(tmp, 'w3'), { create: true });
+  fs.mkdirSync(path.join(w3, 'vault'), { recursive: true });
+  fs.writeFileSync(
+    path.join(w3, 'vault', 'edits.jsonl'),
+    JSON.stringify({ original: '我们要重视这个问题。', changed: '这个问题搁在桌上，没人动。', intent: '具体化' }) + '\n',
+  );
+  let calls = 0;
+  const gen = () =>
+    Promise.resolve(
+      calls++ % 2 === 0
+        ? '门开着。石阶旧，被磨得发亮。风从里面出来，带着木头的气味。'
+        : '在当今社会，随着科技的飞速发展，我们应当充分发挥前所未有的积极作用。',
+    );
+  const r = await decodeSection({ apiKey: 'mock' }, w3, {
+    messages: [{ role: 'user', content: 'x' }],
+    temperature: 0.85,
+    generate: gen,
+  });
+  assert(r.n === 2 && r.mode === 'contrastive', `小样本也应走对比解码（n=${r.n}, mode=${r.mode}）`);
+  assert(calls >= 2, `应生成 ≥2 候选（实际 ${calls}）`);
+  console.log('PASS 小样本冷启动（1 编辑对即启用对比）');
+}
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log('\n✓ token-decode 全部通过');

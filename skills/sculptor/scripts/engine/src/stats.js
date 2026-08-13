@@ -101,3 +101,41 @@ export function parseBlindCsv(text) {
   }
   return out;
 }
+
+/**
+ * 配对置换检验（两方法在同一批样本上的准确率差异是否显著）。
+ * H0：两方法等价——在判定不一致的样本上，"哪个方法判对"是可交换的。
+ * 该情形下不一致样本数 m 固定，方法 A 判对的数量 d 服从 Binomial(m, 0.5)，
+ * 因此精确 p 值 = 对 d 做双侧二项检验（即 McNemar/置换分布的精确形式，零蒙特卡洛噪声）。
+ * @param predA 方法 A 预测的标签数组
+ * @param predB 方法 B 预测的标签数组
+ * @param truth 真实标签数组
+ * @returns {accA, accB, diff, pValue, discordant}
+ */
+export function permutationTestPaired(predA, predB, truth) {
+  const n = Math.min(predA.length, predB.length, truth.length);
+  if (!n) return { accA: 0, accB: 0, diff: 0, pValue: 1, discordant: 0 };
+  let accA = 0;
+  let accB = 0;
+  let d = 0; // A 对 B 错
+  let e = 0; // A 错 B 对
+  for (let i = 0; i < n; i++) {
+    const a = predA[i] === truth[i];
+    const b = predB[i] === truth[i];
+    if (a) accA += 1;
+    if (b) accB += 1;
+    if (a && !b) d += 1;
+    else if (!a && b) e += 1;
+  }
+  accA /= n;
+  accB /= n;
+  const m = d + e;
+  const pValue = m ? exactBinomialP(d, m, 0.5) : 1;
+  return {
+    accA: Number(accA.toFixed(4)),
+    accB: Number(accB.toFixed(4)),
+    diff: Number((accA - accB).toFixed(4)),
+    pValue: Number(pValue.toFixed(4)),
+    discordant: m,
+  };
+}
