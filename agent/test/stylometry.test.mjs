@@ -37,4 +37,17 @@ const stylo = await import(path.join(HERE, '..', 'src', 'stylometry.js'));
   console.log('PASS 文体计量质心');
 }
 
+// 4) 表层节奏相对贴合：与作者质心更近的文本得分更高
+{
+  const profile = stylo.surfaceProfile([
+    '门开着。石阶旧。风从里面出来。历史不响，它只是等着。',
+    '木梯窄，每一步都响。窗台积灰。我没有擦，只是看。',
+  ]);
+  const like = stylo.surfaceMatch(profile, '回头，楼还在。暮色里，红砖暗下去。过去不说话。');
+  const unlike = stylo.surfaceMatch(profile, '在当今社会，随着科技的飞速发展，因此综上所述我们应当充分发挥前所未有的积极作用。');
+  assert(like > unlike, `相对作者节奏应更贴合（${like.toFixed(3)} > ${unlike.toFixed(3)}）`);
+  assert(stylo.surfaceMatch(null, '任意文本') === 0.5, '无 profile → 中性 0.5');
+  console.log('PASS 表层节奏相对贴合');
+}
+
 console.log('\n✓ stylometry.test.mjs 全部通过');

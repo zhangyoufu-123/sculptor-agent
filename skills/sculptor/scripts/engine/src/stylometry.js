@@ -84,3 +84,45 @@ export function stylometricCentroid(vecs) {
   for (const [k, s] of Object.entries(sum)) out[k] = s / count[k];
   return out;
 }
+
+// ── 表层节奏（句长/短句占比/意象密度）——相对作者语料，而非绝对"好"──
+
+const IMAGERY = [
+  '风', '雨', '门', '窗', '楼', '石', '路', '灯', '树', '花', '灰', '光', '影',
+  '雪', '河', '山', '桥', '街', '墙', '木', '火', '水', '云', '月', '夜', '烟',
+  '钟', '鸟', '纸', '墨', '舟', '巷',
+];
+
+/** 表层节奏的四个可观测分量。 */
+export function surfaceMetrics(text) {
+  const t = String(text || '');
+  const sents = t.split(/[。！？.!?；;]+/).map((s) => s.trim()).filter(Boolean);
+  const lens = sents.map((s) => [...s].length);
+  const mean = lens.length ? lens.reduce((a, b) => a + b, 0) / lens.length : 0;
+  const sd = lens.length ? Math.sqrt(lens.reduce((a, b) => a + (b - mean) ** 2, 0) / lens.length) : 0;
+  const short = lens.length ? lens.filter((l) => l <= 8).length / lens.length : 0;
+  const chars = t.replace(/\s/g, '');
+  const img = chars ? Math.min(1, IMAGERY.filter((w) => chars.includes(w)).length / 8) : 0;
+  return { mean, sd, short, img };
+}
+
+/** 作者表层节奏质心（多文本均值）。 */
+export function surfaceProfile(texts) {
+  const ms = texts.map((t) => surfaceMetrics(t));
+  const avg = (k) => ms.reduce((s, m) => s + m[k], 0) / Math.max(1, ms.length);
+  return { mean: avg('mean'), sd: avg('sd'), short: avg('short'), img: avg('img') };
+}
+
+/**
+ * 表层节奏贴合度（0~1）：候选的句长/波动/短句占比/意象密度
+ * 与作者质心的归一化 L1 距离取反——越大越像作者的节奏。
+ */
+export function surfaceMatch(profile, text) {
+  if (!profile) return 0.5;
+  const m = surfaceMetrics(text);
+  const meanD = Math.abs(m.mean - profile.mean) / Math.max(10, profile.mean, m.mean);
+  const sdD = Math.abs(m.sd - profile.sd) / Math.max(5, profile.sd, m.sd);
+  const shortD = Math.abs(m.short - profile.short);
+  const imgD = Math.abs(m.img - profile.img);
+  return Math.max(0, Math.min(1, 1 - (meanD + sdD + shortD + imgD) / 4));
+}

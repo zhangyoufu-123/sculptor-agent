@@ -4,21 +4,21 @@
 
 | 变体 | 留出排序正确率 | 相对学习权重 |
 | --- | --- | --- |
-| 学习权重 | 90.0% | — |
-| 默认权重（无学习） | 70.0% | 20.0% pp |
-| 关 personal | 80.0% | -10.0% pp |
-| 关 discourse | 90.0% | 0.0% pp |
-| 关 stance | 90.0% | 0.0% pp |
-| 关 knowledge | 90.0% | 0.0% pp |
-| 关 defect | 90.0% | 0.0% pp |
-| 关 vector | 90.0% | 0.0% pp |
-| 关 embedding | 90.0% | 0.0% pp |
-| 关 fineread | 90.0% | 0.0% pp |
-| 关 posture | 90.0% | 0.0% pp |
-| 关 avoidance | 90.0% | 0.0% pp |
-| 关 transform | 90.0% | 0.0% pp |
-| 关 surface | 100.0% | 10.0% pp |
-| 关 impedance | 100.0% | 10.0% pp |
+| 学习权重 | 100.0% | — |
+| 默认权重（无学习） | 100.0% | 0.0% pp |
+| 关 personal | 90.0% | -10.0% pp |
+| 关 surface | 100.0% | 0.0% pp |
+| 关 discourse | 100.0% | 0.0% pp |
+| 关 stance | 100.0% | 0.0% pp |
+| 关 knowledge | 100.0% | 0.0% pp |
+| 关 defect | 100.0% | 0.0% pp |
+| 关 impedance | 100.0% | 0.0% pp |
+| 关 vector | 100.0% | 0.0% pp |
+| 关 embedding | 100.0% | 0.0% pp |
+| 关 fineread | 100.0% | 0.0% pp |
+| 关 posture | 100.0% | 0.0% pp |
+| 关 avoidance | 100.0% | 0.0% pp |
+| 关 transform | 100.0% | 0.0% pp |
 
-结论：学习权重 90.0% 显著高于默认权重 70.0%（+20.0 pp），证明"编辑即标注"的学习有真实增益；正面特征 personal，噪声特征 surface、impedance。
+结论：学习权重 100.0% 显著高于默认权重 100.0%（+0.0 pp），证明"编辑即标注"的学习有真实增益；正面特征 personal，噪声特征 无。
 

@@ -115,6 +115,7 @@ export function getPersonalModel(workspace) {
     chars: corpus.length,
     alpha: 0.4, // 加一平滑强度（对稀疏语料保守）
     styloCentroid: stylo.stylometricCentroid(texts.map((t) => stylo.stylometricVector(t))),
+    surfaceProfile: stylo.surfaceProfile(texts),
   };
   modelCache.set(sig, model);
   if (modelCache.size > 20) {

@@ -36,6 +36,7 @@ import {
   writeEditTransform,
   collectEditTransform,
 } from './edit-transform.js';
+import { surfaceMatch } from './stylometry.js';
 
 export const FEATURES = [
   'personal',
@@ -56,12 +57,12 @@ export const FEATURES = [
 // 经验默认权重（无编辑对时的兜底，等价 v0.62 V1 语义 + 新特征温和先验）
 export const DEFAULT_WEIGHTS = {
   personal: 2.0,
-  surface: 0.15,
+  surface: 0.2,
   discourse: 0.1,
   stance: 0.1,
   knowledge: 0.5,
   defect: 1.0,
-  impedance: 0.8,
+  impedance: 0.25,
   vector: 0.1,
   embedding: 0.2,
   fineread: 0.15,
@@ -348,7 +349,7 @@ export function extractFeatures(workspace, text, { t = 0.5, prototype = null, ca
   }
   return {
     personal: model && model.ok ? personalStyleScore(model, text) : 0,
-    surface: surfaceFeature(text),
+    surface: model && model.ok ? surfaceMatch(model.surfaceProfile, text) : 0.5,
     discourse: discourseFeature(text),
     stance: stanceFeature(workspace, text),
     knowledge: knowledgeScore(workspace, text),
