@@ -26,9 +26,25 @@ import { simulateCharacter } from './character.js';
 import { academicNarrative, academicStyleNote } from './academic.js';
 import { personaBrief } from './persona.js';
 import { registerClues } from './consistency.js';
+import { readAvoidance } from './avoidance.js';
+import { readEditTransform } from './edit-transform.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
+}
+
+/** 风格约束（v1.1）：把从修改中学到的"作者删什么/加什么"作为生成时的硬约束注入，让算法真实影响输出。 */
+function steeringBrief(workspace) {
+  const av = readAvoidance(workspace);
+  const et = readEditTransform(workspace);
+  const avoid = Object.keys(av?.terms || {}).slice(0, 12);
+  const add = Object.keys(et?.added || {}).slice(0, 8);
+  const del = Object.keys(et?.deleted || {}).slice(0, 8);
+  const lines = [];
+  if (avoid.length) lines.push(`不要用这些词/句式（你过去亲手删过）：${avoid.join('、')}`);
+  if (add.length) lines.push(`多用这些词/意象（你过去亲手改成过）：${add.join('、')}`);
+  if (del.length) lines.push(`少用这些词（你删掉的连接词/套话）：${del.join('、')}`);
+  return lines.length ? lines.join('\n') : '';
 }
 
 /** 分节写回安全网（v0.42 修复）：split(/\n(?=## )/) 会吃掉 ## 前的换行，
@@ -158,6 +174,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
         workspace,
         `${outline.title || ''} ${section.heading || ''} ${section.thesis || ''} ${section.function || ''}`,
       ),
+      steering: steeringBrief(workspace),
       academicArc: /学术论文/.test(state.confirmed?.genre || '')
         ? academicNarrative(state)
         : '',

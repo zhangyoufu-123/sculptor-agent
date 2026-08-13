@@ -217,6 +217,7 @@ ${ctx.readStyle || '（未知，默认：节奏错落、信息密度适中、开
 
 ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
 ${ctx.styleDirection ? `【最新风格方向】${ctx.styleDirection}——按这个方向写，让整篇文章口吻统一。` : ''}
+${ctx.steering ? `【你的风格约束（硬约束，生成时就遵守，不是写完再改）】\n${ctx.steering}` : ''}
 ${ctx.genreBrief ? `【文体范式（公式化内容按此产出）】\n${ctx.genreBrief}` : ''}
 ${ctx.personalSkill ? `【这类文体你个人的写法（蒸馏自你的旧作）】\n${ctx.personalSkill}` : ''}
 ${ctx.styleAdapter ? `【风格适配卡（压缩自你的全部样本，最高优先级）】\n${ctx.styleAdapter}` : ''}
