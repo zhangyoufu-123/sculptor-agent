@@ -147,9 +147,9 @@ function ctxSection(title, body) {
 }
 
 function setPanelTab(tab) {
-  if (!['outline', 'draft', 'context'].includes(tab)) tab = 'outline';
+  if (!['outline', 'draft', 'context', 'modulator'].includes(tab)) tab = 'outline';
   document.querySelectorAll('#panelTabs .tab').forEach((b) => b.classList.toggle('is-active', b.dataset.tab === tab));
-  ['outline', 'draft', 'context'].forEach((t) => {
+  ['outline', 'draft', 'context', 'modulator'].forEach((t) => {
     const el = $(`pane-${t}`);
     if (el) el.classList.toggle('is-active', t === tab);
   });
@@ -801,6 +801,56 @@ function renderPaneContext(c) {
   });
 }
 
+const MOD_LABELS = {
+  personal: '笔迹接近度',
+  surface: '句法节奏',
+  discourse: '话语习惯',
+  stance: '立场红线',
+  knowledge: '知识呼应',
+  defect: 'AI 腔回避',
+  impedance: '节奏调制',
+  vector: '风格方向',
+  embedding: '语义原型',
+  fineread: '深层清单',
+  posture: '姿态健康度',
+  avoidance: '个人回避',
+  transform: '改迹贴合',
+};
+
+async function renderModulatorPane() {
+  const pane = $('pane-modulator');
+  if (!pane || !sessionId) return;
+  try {
+    const m = await apiGet(`/api/modulator?sessionId=${sessionId}`);
+    const modeTxt = m.trained ? '已学习（作者偏好对训练）' : '默认权重（编辑对不足）';
+    let html = `<div class="ctx-sec"><h4>改迹调制 · ${modeTxt}</h4>
+      <p class="ctx-note">编辑对 ${m.pairs} 条 · 正例 ${m.positives} 条</p></div>`;
+    if (m.breakdown && Array.isArray(m.breakdown.contributions)) {
+      const rows = m.breakdown.contributions
+        .map((c) => {
+          const label = MOD_LABELS[c.feature] || c.feature;
+          const sign = c.contrib >= 0 ? '+' : '';
+          const bar = Math.min(100, Math.max(0, Math.abs(c.contrib) * 100));
+          return `<div class="mod-row">
+            <span class="mod-name">${esc(label)}</span>
+            <span class="mod-bar"><i style="width:${bar.toFixed(0)}%"></i></span>
+            <span class="mod-val">${sign}${c.contrib.toFixed(2)}</span>
+          </div>`;
+        })
+        .join('');
+      html += `<div class="ctx-sec"><h4>为什么选它</h4>
+        <p class="ctx-note">${esc(m.breakdown.rationale || '各信号均衡，没有明显的主导选择')}</p></div>
+        <div class="ctx-sec"><h4>十三维贡献分解</h4>${rows}</div>`;
+    } else {
+      html += `<div class="ctx-sec"><h4>十三维贡献分解</h4>
+        <p class="ctx-note">成稿后即可看到每维贡献与"为什么选它"。</p></div>`;
+    }
+    pane.innerHTML = html;
+  } catch (e) {
+    pane.innerHTML = `<div class="ctx-sec"><h4>改迹调制</h4><p class="ctx-note">加载失败</p></div>`;
+  }
+}
+
 async function refreshPanel() {
   if (!sessionId) return;
   try {
@@ -809,6 +859,7 @@ async function refreshPanel() {
     renderOutlinePane(c);
     renderPaneDraft(c);
     renderPaneContext(c);
+    renderModulatorPane();
     const stageKey = c.stage || c.phase || '';
     if (stageKey !== lastPanelStage) {
       setPanelTab(defaultTabFor(stageKey));

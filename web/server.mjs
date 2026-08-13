@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Sculptor Studio Web（v0.26）：零依赖 Node HTTP 服务。
+// Sculptor Studio Web（v1.0）：零依赖 Node HTTP 服务。
 // 把 Sculptor 导演状态机（agentStep）包成 REST，前端提供完整写作工作台：
 //   多会话持久化（web-data/sessions/，可列表/改名/删除/续写）
 //   作品库（vault/library 跨会话聚合，按文体分类展示）
@@ -61,6 +61,9 @@ const { thinkingBrief } = await import(
 );
 const { rhythmCurve } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'style-pulse.js')).href
+);
+const { modulatorStatus, modulate } = await import(
+  pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'modulator.js')).href
 );
 const { checkConsistency } = await import(
   pathToFileURL(path.resolve(HERE, '..', 'agent', 'src', 'consistency.js')).href
@@ -900,6 +903,30 @@ const server = http.createServer(async (req, res) => {
       progress: styleProgress(dir),
       styleNote: state.confirmed?.styleNote || '',
     });
+  }
+  if (req.method === 'GET' && p === '/api/modulator') {
+    const id = String(url.searchParams.get('sessionId') || '');
+    const dir = sessionDir(id);
+    if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    const status = modulatorStatus(dir);
+    const draftPath = path.join(dir, 'draft.md');
+    const draft = fs.existsSync(draftPath) ? fs.readFileSync(draftPath, 'utf8').slice(0, 4000) : '';
+    let breakdown = null;
+    if (draft) {
+      const m = modulate(dir, draft, { t: 0.5 });
+      breakdown = {
+        mode: m.mode,
+        trained: m.trained,
+        rationale: m.rationale || '',
+        contributions: (m.contributions || []).map((c) => ({
+          feature: c.feature,
+          weight: Number(c.weight),
+          value: Number(c.value),
+          contrib: Number(c.contrib),
+        })),
+      };
+    }
+    return json(res, 200, { ...status, breakdown });
   }
   if (req.method === 'GET' && p === '/api/knowledge') {
     const id = String(url.searchParams.get('sessionId') || '');

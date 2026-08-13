@@ -1489,3 +1489,10 @@ body.panel-open .shell { padding-right: 360px; }
   100% { background: transparent; }
 }
 .ann-flash { animation: annFlash 1.5s ease-out; border-radius: 8px; }
+
+/* 改迹调制面板（v1.0） */
+.mod-row { display:flex; align-items:center; gap:8px; margin:5px 0; }
+.mod-name { width:72px; font-size:12px; color:var(--ink-2, #8a8378); flex:none; }
+.mod-bar { flex:1; height:6px; background:var(--line, #e8e2d6); border-radius:3px; overflow:hidden; }
+.mod-bar i { display:block; height:100%; background:var(--gold, #b8913a); border-radius:3px; }
+.mod-val { width:52px; text-align:right; font-size:12px; font-variant-numeric:tabular-nums; flex:none; }
