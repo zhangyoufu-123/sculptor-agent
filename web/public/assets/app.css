@@ -1496,3 +1496,9 @@ body.panel-open .shell { padding-right: 360px; }
 .mod-bar { flex:1; height:6px; background:var(--line, #e8e2d6); border-radius:3px; overflow:hidden; }
 .mod-bar i { display:block; height:100%; background:var(--gold, #b8913a); border-radius:3px; }
 .mod-val { width:52px; text-align:right; font-size:12px; font-variant-numeric:tabular-nums; flex:none; }
+
+/* 改前 vs 改后对比（v1.0） */
+.mod-cmp { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+.mod-cmp-col { background:var(--card, #f4eee2); border:1px solid var(--line, #e8e2d6); border-radius:8px; padding:8px; }
+.mod-cmp-col b { display:block; font-size:12px; color:var(--ink-2, #8a8378); margin-bottom:4px; }
+.mod-cmp-col p { font-size:12px; line-height:1.6; color:var(--ink, #2b2118); white-space:pre-wrap; }

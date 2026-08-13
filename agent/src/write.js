@@ -187,6 +187,8 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
       n: dec.n,
       breakdown: dec.breakdown || null,
       edits: dec.edits || [],
+      before: dec.before || '',
+      after: dec.text || '',
     };
     let actual = (text.match(/[\u4e00-\u9fff]/g) || []).length;
     let expanded = false;

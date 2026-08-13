@@ -901,8 +901,15 @@ async function renderModulatorPane() {
       const tags = m.lastDecode.edits
         .map((e) => (e === 'concretize' ? '具体化拟改' : `删「${esc(e)}」`))
         .join('、');
+      let cmp = '';
+      if (m.lastDecode.before && m.lastDecode.after && m.lastDecode.before !== m.lastDecode.after) {
+        cmp = `<div class="mod-cmp">
+          <div class="mod-cmp-col"><b>改前</b><p>${esc(m.lastDecode.before.slice(0, 180))}</p></div>
+          <div class="mod-cmp-col"><b>改后</b><p>${esc(m.lastDecode.after.slice(0, 180))}</p></div>
+        </div>`;
+      }
       html += `<div class="ctx-sec"><h4>本节拟改（${m.lastDecode.section || '正文'}）</h4>
-        <p class="ctx-note">${tags}</p></div>`;
+        <p class="ctx-note">${tags}</p>${cmp}</div>`;
     }
     pane.innerHTML = html;
   } catch (e) {
@@ -1929,6 +1936,28 @@ $('workAnnClose')?.addEventListener('click', () => { $('workAnnPanel').hidden = 
 /* ── 事件绑定 ─────────────────────────────────────── */
 $('send').addEventListener('click', send);
 $('seedSend').addEventListener('click', send);
+$('uploadBtn').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', async (e) => {
+  const files = [...(e.target.files || [])];
+  if (!files.length || !sessionId) return;
+  for (const f of files) {
+    if (f.size > 20 * 1024 * 1024) { toast(`${f.name} 超过 20MB，跳过`); continue; }
+    const b64 = await new Promise((resolve) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result || ''));
+      r.onerror = () => resolve('');
+      r.readAsDataURL(f);
+    });
+    if (!b64) continue;
+    try {
+      const r = await apiPost('/api/upload', { sessionId, filename: f.name, dataBase64: b64 });
+      toast(r.kind === 'text' && r.text ? `已提取「${f.name}」为素材` : `「${f.name}」：${r.hint || '未提取'}`);
+    } catch (err) {
+      toast(`上传失败：${err.message}`);
+    }
+  }
+  e.target.value = '';
+});
 $('seedInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
 });

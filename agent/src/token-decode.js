@@ -124,6 +124,7 @@ export async function decodeSection(
   }
   return {
     text: finalText,
+    before: best.text,
     mode: 'contrastive',
     reason: `从 ${scored.length} 个候选中按五路信号选优${finalEdits.length ? ' + 拟改' : ''}`,
     n: scored.length,
