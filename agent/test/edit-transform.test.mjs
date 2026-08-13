@@ -7,7 +7,9 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ws = await import(path.join(HERE, '..', 'src', 'workspace.js'));
-const { collectEditTransform, editFitScore } = await import(path.join(HERE, '..', 'src', 'edit-transform.js'));
+const { collectEditTransform, editFitScore, applyAuthorEdits } = await import(
+  path.join(HERE, '..', 'src', 'edit-transform.js')
+);
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-edit-transform-'));
 const w = ws.ensureWorkspace(path.join(tmp, 'w'), { create: true });
@@ -41,6 +43,17 @@ fs.writeFileSync(
   assert(sGood > sBad, `贴合度：改后风格 > 原文风格（${sGood.toFixed(3)} > ${sBad.toFixed(3)}）`);
   assert(editFitScore(p, '无关文本xyz。') === 0.5, '无命中 → 中性 0.5');
   console.log('PASS 改迹贴合度（正方向 > 负方向）');
+}
+
+// 3) 拟改层：只删"作者删过且安全可删"的连接词，不删内容词，并记录应用清单
+{
+  const profile = { ok: true, deleted: { 因此: 2, 所以: 1, 重要: 1 }, added: {} };
+  const r = applyAuthorEdits('在当今社会，因此我们要重视这个问题。所以我们应该行动。', profile);
+  assert(!r.text.includes('因此') && !r.text.includes('所以'), '删除连接词');
+  assert(r.text.includes('这个问题'), '不删内容词');
+  assert(r.applied.length === 2, `记录应用 2 条删除（${r.applied.length}）`);
+  assert(!r.text.includes('。。') && !r.text.includes('，。'), '断句/标点已规范化');
+  console.log('PASS 拟改层（删除连接词 + 断句 + 可追溯）');
 }
 
 console.log('\n✓ edit-transform.test.mjs 全部通过');

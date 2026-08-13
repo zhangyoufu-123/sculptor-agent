@@ -107,3 +107,36 @@ export function editFitScore(profile, text) {
   if (pos + neg === 0) return 0.5;
   return Math.max(0, Math.min(1, pos / (pos + neg)));
 }
+
+// 安全可删的连接词/AI 腔（删除不伤语义，只改节奏与"AI 味"）。
+const SAFE_DELETE = new Set([
+  '在当今', '随着', '与此同时', '因此', '所以', '然而', '但是', '而且', '不仅',
+  '总而言之', '综上所述', '值得注意的是', '首先', '其次', '最后', '众所周知',
+  '不可否认', '我们应当', '我们应该', '让我们', '充分发挥', '积极作用', '必然趋势',
+]);
+
+/**
+ * 拟改层（v1.7）：把作者"亲手删过"的连接词/AI 腔直接作用到候选文本上——
+ * 只在命中 SAFE_DELETE 时删除（不删内容词），并做句号断裂，返回 { text, applied }。
+ * 这是"改迹"从打分走向"复现作者改法"的第一步。
+ */
+export function applyAuthorEdits(text, profile) {
+  let out = String(text || '');
+  const applied = [];
+  const deleted = profile?.deleted || {};
+  for (const term of Object.keys(deleted)) {
+    if (!SAFE_DELETE.has(term)) continue;
+    while (out.includes(term)) {
+      out = out.replace(term, '');
+      applied.push(term);
+    }
+  }
+  out = out
+    .replace(/，。|。，/g, '。')
+    .replace(/，，+/g, '，')
+    .replace(/。。+/g, '。')
+    .replace(/^[，。；、]+/, '')
+    .replace(/[，。；、]+$/, '。')
+    .trim();
+  return { text: out, applied };
+}

@@ -9,6 +9,7 @@ import { chatWithRetry } from './llm.js';
 import { getPersonalModel, personalCorpusSize } from './personal-model.js';
 import { modulate, collectModulatorData } from './modulator.js';
 import { authorPrototype, embedText } from './embedding.js';
+import { readEditTransform, applyAuthorEdits } from './edit-transform.js';
 
 // 向后兼容导出（V1 的测试与调用方仍按原名取用）
 export { defectScore, impedanceScore, knowledgeScore } from './modulator.js';
@@ -107,11 +108,13 @@ export async function decodeSection(
   }
   scored.sort((a, b) => b.score - a.score);
   const best = scored[0];
+  const revised = applyAuthorEdits(best.text, readEditTransform(workspace));
   return {
-    text: best.text,
+    text: revised.text,
     mode: 'contrastive',
-    reason: `从 ${scored.length} 个候选中按五路信号选优`,
+    reason: `从 ${scored.length} 个候选中按五路信号选优${revised.applied.length ? ' + 拟改' : ''}`,
     n: scored.length,
+    edits: revised.applied,
     breakdown: scored.map((s) => ({
       rank: scored.indexOf(s) + 1,
       chars: s.text.replace(/\s/g, '').length,
