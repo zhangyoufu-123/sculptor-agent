@@ -21,7 +21,7 @@ import crypto from 'node:crypto';
 import * as ws from './workspace.js';
 import {
   getPersonalModel,
-  personalLogProb,
+  personalStyleScore,
   personalCorpusSize,
 } from './personal-model.js';
 import { listEntries } from './knowledge.js';
@@ -339,7 +339,7 @@ export function extractFeatures(workspace, text, { t = 0.5, prototype = null, ca
     if (c !== null && Number.isFinite(c)) embedding = Math.max(0, Math.min(1, (c + 1) / 2));
   }
   return {
-    personal: model && model.ok ? personalLogProb(model, text) : 0,
+    personal: model && model.ok ? personalStyleScore(model, text) : 0,
     surface: surfaceFeature(text),
     discourse: discourseFeature(text),
     stance: stanceFeature(workspace, text),

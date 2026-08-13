@@ -15,6 +15,7 @@ const pm = await import(path.join(ROOT, 'agent', 'src', 'personal-model.js'));
 const mod = await import(path.join(ROOT, 'agent', 'src', 'modulator.js'));
 const { permutationTestPaired } = await import(path.join(ROOT, 'agent', 'src', 'stats.js'));
 const ws = await import(path.join(ROOT, 'agent', 'src', 'workspace.js'));
+const stylo = await import(path.join(ROOT, 'agent', 'src', 'stylometry.js'));
 
 const SAMPLES = {
   'SCULPTOR 作者':
@@ -153,6 +154,19 @@ function classifyFeatures(featCentroids, text) {
   }
   return best;
 }
+function classifyStylometry(styloCentroids, text) {
+  const v = stylo.stylometricVector(text);
+  let best = null;
+  let bestS = -1;
+  for (const [a, cent] of styloCentroids) {
+    const s = stylo.stylometricCosine(v, cent);
+    if (s > bestS) {
+      bestS = s;
+      best = a;
+    }
+  }
+  return best;
+}
 function classifyFused(models, featCentroids, text, alpha = 0.6) {
   let best = null;
   let bestS = -Infinity;
@@ -166,6 +180,26 @@ function classifyFused(models, featCentroids, text, alpha = 0.6) {
     const pNorm = (pm.personalLogProb(m, text) - plMin) / span;
     const fc = featCos(feat, featCentroids.get(a));
     const s = alpha * pNorm + (1 - alpha) * fc;
+    if (s > bestS) {
+      bestS = s;
+      best = a;
+    }
+  }
+  return best;
+}
+function classifySignature(models, styloCentroids, text, alpha = 0.5) {
+  const plogs = [];
+  for (const [a, m] of models) plogs.push([a, pm.personalLogProb(m, text)]);
+  const plMin = Math.min(...plogs.map((x) => x[1]));
+  const plMax = Math.max(...plogs.map((x) => x[1]));
+  const span = plMax - plMin || 1;
+  const sv = stylo.stylometricVector(text);
+  let best = null;
+  let bestS = -Infinity;
+  for (const [a, m] of models) {
+    const pNorm = (pm.personalLogProb(m, text) - plMin) / span;
+    const sc = stylo.stylometricCosine(sv, styloCentroids.get(a));
+    const s = alpha * pNorm + (1 - alpha) * sc;
     if (s > bestS) {
       bestS = s;
       best = a;
@@ -200,7 +234,7 @@ function avgVec(vecs) {
   return out.map((x) => x / n);
 }
 
-const preds = { tfidf: [], personal: [], features: [], fused: [] };
+const preds = { tfidf: [], personal: [], features: [], stylometry: [], signature: [], fused: [] };
 const truths = [];
 const ROUNDS = 12;
 for (let r = 0; r < ROUNDS; r++) {
@@ -215,10 +249,12 @@ for (let r = 0; r < ROUNDS; r++) {
   }
   const models = new Map();
   const featCentroids = new Map();
+  const styloCentroids = new Map();
   for (const a of AUTHORS) {
     const w = authorWorkspace(a, trainByAuthor.get(a).join('\n'));
     models.set(a, pm.getPersonalModel(w));
     featCentroids.set(a, avgVec(trainByAuthor.get(a).map((t) => textFeatureVec(t))));
+    styloCentroids.set(a, stylo.stylometricCentroid(trainByAuthor.get(a).map((t) => stylo.stylometricVector(t))));
   }
   // 2) TF-IDF 在训练块上拟合
   const trainFlat = [];
@@ -245,6 +281,8 @@ for (let r = 0; r < ROUNDS; r++) {
       preds.tfidf.push(classifyTfidf(centroids, tfidfTransform([gramVec(bigrams(text))], idf, maxIdf)[0]));
       preds.personal.push(classifyPersonal(models, text));
       preds.features.push(classifyFeatures(featCentroids, text));
+      preds.stylometry.push(classifyStylometry(styloCentroids, text));
+      preds.signature.push(classifySignature(models, styloCentroids, text));
       preds.fused.push(classifyFused(models, featCentroids, text));
     }
   }
@@ -258,8 +296,12 @@ function acc(p) {
 const accTfidf = acc(preds.tfidf);
 const accPersonal = acc(preds.personal);
 const accFeatures = acc(preds.features);
+const accStylometry = acc(preds.stylometry);
+const accSignature = acc(preds.signature);
 const accFused = acc(preds.fused);
 const sigFeaturesVsTfidf = permutationTestPaired(preds.features, preds.tfidf, truths);
+const sigStylometryVsTfidf = permutationTestPaired(preds.stylometry, preds.tfidf, truths);
+const sigSignatureVsTfidf = permutationTestPaired(preds.signature, preds.tfidf, truths);
 const sigFusedVsTfidf = permutationTestPaired(preds.fused, preds.tfidf, truths);
 const sigPersonalVsTfidf = permutationTestPaired(preds.personal, preds.tfidf, truths);
 
@@ -275,6 +317,8 @@ lines.push('| --- | --- | --- | --- |');
 lines.push(`| TF-IDF 基线 | ${(accTfidf * 100).toFixed(1)}% | — | — |`);
 lines.push(`| 个人 n-gram（似然） | ${(accPersonal * 100).toFixed(1)}% | ${((accPersonal - accTfidf) * 100).toFixed(1)}% | ${sigPersonalVsTfidf.pValue} |`);
 lines.push(`| 文本特征（5 维，最近质心） | ${(accFeatures * 100).toFixed(1)}% | ${((accFeatures - accTfidf) * 100).toFixed(1)}% | ${sigFeaturesVsTfidf.pValue} |`);
+lines.push(`| 文体计量（功能词+标点） | ${(accStylometry * 100).toFixed(1)}% | ${((accStylometry - accTfidf) * 100).toFixed(1)}% | ${sigStylometryVsTfidf.pValue} |`);
+lines.push(`| 签名（n-gram + 文体计量） | ${(accSignature * 100).toFixed(1)}% | ${((accSignature - accTfidf) * 100).toFixed(1)}% | ${sigSignatureVsTfidf.pValue} |`);
 lines.push(`| 融合（n-gram + 特征） | ${(accFused * 100).toFixed(1)}% | ${((accFused - accTfidf) * 100).toFixed(1)}% | ${sigFusedVsTfidf.pValue} |`);
 lines.push('');
 lines.push(`置换检验（融合 vs 基线）：不一致样本 ${sigFusedVsTfidf.discordant}，p=${sigFusedVsTfidf.pValue}${sigFusedVsTfidf.pValue < 0.05 ? '（显著）' : '（未达显著）'}`);

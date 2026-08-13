@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import * as stylo from './stylometry.js';
 
 const ORDER = 4;
 const MIN_CORPUS = 80; // 至少 80 字符才有统计意义
@@ -113,6 +114,7 @@ export function getPersonalModel(workspace) {
     vocab,
     chars: corpus.length,
     alpha: 0.4, // 加一平滑强度（对稀疏语料保守）
+    styloCentroid: stylo.stylometricCentroid(texts.map((t) => stylo.stylometricVector(t))),
   };
   modelCache.set(sig, model);
   if (modelCache.size > 20) {
@@ -120,6 +122,16 @@ export function getPersonalModel(workspace) {
     modelCache.delete(first);
   }
   return model;
+}
+
+/**
+ * 个人风格得分（v1.7，词级文体计量）：候选文本与作者语料的
+ * "功能词 + 标点节奏"质心余弦，0~1，越大越像作者。
+ * 比字符 n-gram 更稳：功能词/标点承载风格，字符 n-gram 易被内容词淹没。
+ */
+export function personalStyleScore(model, text) {
+  if (!model || !model.ok || !model.styloCentroid) return 0;
+  return stylo.stylometricCosine(stylo.stylometricVector(text), model.styloCentroid);
 }
 
 /** 单字符条件对数概率（回退到更短前缀，最终回退到均匀分布）。 */
