@@ -13,7 +13,7 @@ import path from 'node:path';
 // 常见 OpenAI 兼容 API 环境变量候选（key → 默认端点/模型）
 const ENV_CANDIDATES = [
   { key: 'OPENAI_API_KEY', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4.1-mini', protocol: 'openai' },
-  { key: 'DEEPSEEK_API_KEY', baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat', protocol: 'openai' },
+  { key: 'DEEPSEEK_API_KEY', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-v4-flash', protocol: 'openai' },
   { key: 'OPENROUTER_API_KEY', baseUrl: 'https://openrouter.ai/api/v1', model: 'openrouter/auto', protocol: 'openai' },
   { key: 'MOONSHOT_API_KEY', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', protocol: 'openai' },
   { key: 'DASHSCOPE_API_KEY', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', protocol: 'openai' },
@@ -56,13 +56,17 @@ export function discoverFromEnv(env = process.env) {
   for (const c of ENV_CANDIDATES) {
     const key = env[c.key];
     if (!key) continue;
+    // DeepSeek 允许通过 DEEPSEEK_BASE_URL / DEEPSEEK_MODEL 覆盖默认端点与模型，
+    // 避免 .env.local 里的 DEEPSEEK_MODEL 被硬编码默认值（deepseek-chat）吞掉。
+    const baseUrl = c.key === 'DEEPSEEK_API_KEY' ? env.DEEPSEEK_BASE_URL || c.baseUrl : c.baseUrl;
+    const model = c.key === 'DEEPSEEK_API_KEY' ? env.DEEPSEEK_MODEL || c.model : c.model;
     out.push(
       toCandidate({
         source: `env:${c.key}`,
         provider: c.key.replace(/_API_KEY$/, '').toLowerCase(),
-        baseUrl: c.baseUrl,
+        baseUrl,
         apiKey: key,
-        model: c.model,
+        model,
         protocol: c.protocol,
       }),
     );
