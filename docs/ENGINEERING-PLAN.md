@@ -170,6 +170,9 @@ Activation Addition（Turner 2023）。
   （+20 pp），证明 pairwise hinge 学习有真实增益；逐维消融显示 personal（词级文体计量）贡献最大
   （关闭 -10 pp），surface/impedance 当前是噪声（关闭反而 +10 pp）。这是"编辑即标注"可消融、可归因的
   直接证据，写入 MODULATOR-ABLATION.md。
+- 2026-08-13（Phase B 特征升级 2.3）：把 surface 从"绝对规则"改成"相对作者节奏"（surfaceMatch），
+  impedance 权重 0.8→0.25 去噪；消融噪声特征清零。副作用：合成评测已饱和（留出 100%、学习=默认），
+  说明"学习 > 默认"的证据需要更难的混淆集或真实多作者数据——这是下一步评测体系升级的硬约束。
 
 ## 7. 参考文献（关键）
 
