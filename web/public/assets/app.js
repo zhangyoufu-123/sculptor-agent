@@ -845,6 +845,13 @@ async function renderModulatorPane() {
       html += `<div class="ctx-sec"><h4>十三维贡献分解</h4>
         <p class="ctx-note">成稿后即可看到每维贡献与"为什么选它"。</p></div>`;
     }
+    if (m.lastDecode && Array.isArray(m.lastDecode.edits) && m.lastDecode.edits.length) {
+      const tags = m.lastDecode.edits
+        .map((e) => (e === 'concretize' ? '具体化拟改' : `删「${esc(e)}」`))
+        .join('、');
+      html += `<div class="ctx-sec"><h4>本节拟改（${m.lastDecode.section || '正文'}）</h4>
+        <p class="ctx-note">${tags}</p></div>`;
+    }
     pane.innerHTML = html;
   } catch (e) {
     pane.innerHTML = `<div class="ctx-sec"><h4>改迹调制</h4><p class="ctx-note">加载失败</p></div>`;

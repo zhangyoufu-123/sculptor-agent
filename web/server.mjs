@@ -908,6 +908,7 @@ const server = http.createServer(async (req, res) => {
     const id = String(url.searchParams.get('sessionId') || '');
     const dir = sessionDir(id);
     if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
+    const state = ws.readState(dir);
     const status = modulatorStatus(dir);
     const draftPath = path.join(dir, 'draft.md');
     const draft = fs.existsSync(draftPath) ? fs.readFileSync(draftPath, 'utf8').slice(0, 4000) : '';
@@ -926,7 +927,7 @@ const server = http.createServer(async (req, res) => {
         })),
       };
     }
-    return json(res, 200, { ...status, breakdown });
+    return json(res, 200, { ...status, breakdown, lastDecode: state.lastDecode || null });
   }
   if (req.method === 'GET' && p === '/api/knowledge') {
     const id = String(url.searchParams.get('sessionId') || '');
