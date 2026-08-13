@@ -30,6 +30,12 @@ import { readPrototype, cosineDenseVec } from './embedding.js';
 import { readAuthorSheet } from './author-sheet.js';
 import { deterministicFakeThinking } from './fake-thinking.js';
 import { readAvoidance, writeAvoidance, collectAvoidance } from './avoidance.js';
+import {
+  readEditTransform,
+  editFitScore,
+  writeEditTransform,
+  collectEditTransform,
+} from './edit-transform.js';
 
 export const FEATURES = [
   'personal',
@@ -44,6 +50,7 @@ export const FEATURES = [
   'fineread',
   'posture',
   'avoidance',
+  'transform',
 ];
 
 // 经验默认权重（无编辑对时的兜底，等价 v0.62 V1 语义 + 新特征温和先验）
@@ -60,6 +67,7 @@ export const DEFAULT_WEIGHTS = {
   fineread: 0.15,
   posture: 0.2,
   avoidance: 0.15,
+  transform: 0.25,
 };
 
 // ── 纯净数据收集 ───────────────────────────────────────────
@@ -351,6 +359,7 @@ export function extractFeatures(workspace, text, { t = 0.5, prototype = null, ca
     fineread: fineReadFeature(workspace, text),
     posture: postureFeature(text),
     avoidance: avoidanceFeature(workspace, text),
+    transform: editFitScore(readEditTransform(workspace), text),
   };
 }
 
@@ -497,6 +506,7 @@ export function getModulator(workspace) {
         fs.mkdirSync(path.join(workspace, 'vault'), { recursive: true });
         fs.writeFileSync(weightsFile(workspace), JSON.stringify(mod, null, 2) + '\n', { mode: 0o600 });
         writeAvoidance(workspace, collectAvoidance(workspace));
+        writeEditTransform(workspace, collectEditTransform(workspace));
       } catch {}
     }
   }
@@ -530,6 +540,7 @@ const FEATURE_LABELS = {
   fineread: '深层清单',
   posture: '姿态健康度',
   avoidance: '个人回避',
+  transform: '改迹贴合',
 };
 
 /** 把贡献分解翻译成人话（候选级"为什么选它"）。 */
