@@ -85,4 +85,17 @@ const { exactBinomialP, wilsonCI, cohensH, blindStatsReport, parseBlindCsv, perm
   console.log('PASS 配对置换检验');
 }
 
+// 7) 方向判定：命中率低于 50% 时结论应为"显著低于随机"
+{
+  const answers = [];
+  for (let i = 0; i < 60; i++) {
+    answers.push({ pairIndex: (i % 3) + 1, choice: i < 20 ? 'A' : 'B', correct: i < 20 });
+  }
+  const below = blindStatsReport(answers);
+  assert(below.rate < 0.5, `低于随机命中率（${below.rate}）`);
+  assert(below.direction === 'below', `方向应为 below（${below.direction}）`);
+  assert(below.table.some(([k, v]) => k === '结论' && String(v).includes('低于随机')), '结论含"低于随机"');
+  console.log('PASS 方向判定（低于随机）');
+}
+
 console.log('\n✓ stats.test.mjs 全部通过');

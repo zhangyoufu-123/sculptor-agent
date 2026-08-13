@@ -50,6 +50,7 @@ export function blindStatsReport(answers) {
   const pValue = exactBinomialP(hits, valid, 0.5);
   const ci = wilsonCI(hits, valid);
   const effect = cohensH(rate, 0.5);
+  const direction = rate > 0.5 ? 'above' : rate < 0.5 ? 'below' : 'equal';
   return {
     valid,
     hits,
@@ -58,6 +59,7 @@ export function blindStatsReport(answers) {
     ci: ci.map((x) => Number(x.toFixed(4))),
     effect: Number(effect.toFixed(4)),
     significant: pValue < 0.05,
+    direction,
     table: [
       ['有效作答', String(valid)],
       ['命中（选对更像作者）', String(hits)],
@@ -65,7 +67,7 @@ export function blindStatsReport(answers) {
       ['精确二项 p（H0: 50%）', pValue.toFixed(4)],
       ['95% Wilson CI', `[${ci[0].toFixed(3)}, ${ci[1].toFixed(3)}]`],
       ['Cohen\'s h（vs 50%）', effect.toFixed(3)],
-      ['结论', pValue < 0.05 ? '显著高于随机（p<0.05）' : '未达显著（样本或效果不足）'],
+      ['结论', pValue < 0.05 ? (rate > 0.5 ? '显著高于随机（p<0.05）' : '显著低于随机（p<0.05）') : '未达显著（样本或效果不足）'],
     ],
   };
 }
