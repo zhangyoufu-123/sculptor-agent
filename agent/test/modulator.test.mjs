@@ -208,4 +208,14 @@ const edits = [
   console.log('PASS 可解释层（贡献分解/人话理由/排序）');
 }
 
+// 预测-误差闭环：模型预测作者选择，越惊讶增量学习步长越大
+{
+  const { predictEdit } = await import(path.join(HERE, '..', 'src', 'modulator.js'));
+  const p = predictEdit(w, { original: '门开着，石阶旧，被磨得发亮。', changed: '我们要充分发挥这件事的积极作用。' });
+  assert(p.ok === true && typeof p.margin === 'number' && typeof p.surprise === 'number', '预测返回边距与惊讶度');
+  assert(p.predicted === 'original', `模型应预测"原文"（因为这条违反已学的具体化风格）：${p.predicted}`);
+  assert(p.surprise > 0, `预测错误 → 惊讶度应 > 0：${p.surprise}`);
+  console.log('PASS 预测-误差闭环（predictEdit 惊讶度）');
+}
+
 console.log('\n✓ modulator.test.mjs 全部通过');

@@ -640,13 +640,18 @@ export function applyEditIncremental(
   }
   const data = collectModulatorData(workspace);
   const mod = getModulator(workspace);
-  if (!mod.ok) return forceRetrain(workspace);
+  const prediction = predictEdit(workspace, edit);
+  if (!mod.ok) return { ...forceRetrain(workspace), prediction };
   const neg = normalizeRow(extractFeatures(workspace, ctxJoin(edit, original), { t: 0.5 }), mod.norm);
   const pos = normalizeRow(extractFeatures(workspace, ctxJoin(edit, changed), { t: 0.5 }), mod.norm);
   const w = [Number(mod.bias || 0), ...FEATURES.map((f) => Number(mod.weights[f] || 0))];
   const dim = FEATURES.length;
   let loss = 0;
-  for (let it = 0; it < steps; it++) {
+  // 预测-误差闭环：模型越没预料到这次修改（惊讶度越高），本轮学习步数与步长越大。
+  const surprise = Number(prediction?.surprise ?? 0);
+  const adaptiveSteps = Math.max(steps, Math.min(120, Math.round(steps * (1 + surprise * 3))));
+  const adaptiveLr = Math.min(0.2, lr * (1 + surprise * 2));
+  for (let it = 0; it < adaptiveSteps; it++) {
     let sPos = w[0];
     let sNeg = w[0];
     for (let d = 0; d < dim; d++) {
@@ -656,7 +661,7 @@ export function applyEditIncremental(
     loss = Math.max(0, margin - (sPos - sNeg));
     if (loss > 0) {
       for (let d = 0; d < dim; d++) {
-        w[d + 1] += lr * (pos[FEATURES[d]] - neg[FEATURES[d]]) - l2 * w[d + 1];
+        w[d + 1] += adaptiveLr * (pos[FEATURES[d]] - neg[FEATURES[d]]) - l2 * w[d + 1];
         if (Math.abs(w[d + 1]) > 15) w[d + 1] = Math.sign(w[d + 1]) * 15;
       }
     }
@@ -673,9 +678,10 @@ export function applyEditIncremental(
       pairs: data.pairs.length,
       positives: data.positives.length,
       loss: Number(loss.toFixed(5)),
-      epoch: (mod.meta?.epoch || 0) + steps,
+      epoch: (mod.meta?.epoch || 0) + adaptiveSteps,
       trainedAt: new Date().toISOString(),
       signature: data.signature,
+      surprise: Number(surprise.toFixed(4)),
     },
   };
   try {
@@ -685,6 +691,31 @@ export function applyEditIncremental(
   modCache.delete(data.signature);
   modCache.set(data.signature, next);
   return next;
+}
+
+/**
+ * 预测作者的选择（v1.1，预测-误差闭环）：给定一个编辑对，用当前模型预测
+ * "作者更可能选原文还是改后"。真实情况是作者选了改后；若模型预测错误/犹豫，
+ * surprise 越大表示越该被这次修改纠正。
+ */
+export function predictEdit(workspace, edit) {
+  const original = String(edit?.original || '').trim();
+  const changed = String(edit?.changed || '').trim();
+  if (!original || !changed) return { ok: false, reason: '无效编辑对' };
+  const mod = getModulator(workspace);
+  if (!mod.ok) return { ok: true, margin: 0, predicted: 'uncertain', surprise: 1, trained: false };
+  const neg = normalizeRow(extractFeatures(workspace, ctxJoin(edit, original), { t: 0.5 }), mod.norm);
+  const pos = normalizeRow(extractFeatures(workspace, ctxJoin(edit, changed), { t: 0.5 }), mod.norm);
+  let sPos = Number(mod.bias || 0);
+  let sNeg = Number(mod.bias || 0);
+  for (const f of FEATURES) {
+    sPos += (mod.weights[f] || 0) * pos[f];
+    sNeg += (mod.weights[f] || 0) * neg[f];
+  }
+  const m = sPos - sNeg;
+  const predicted = m > 0.2 ? 'changed' : m < -0.2 ? 'original' : 'uncertain';
+  const surprise = Math.max(0, 0.2 - m);
+  return { ok: true, margin: Number(m.toFixed(4)), predicted, surprise: Number(surprise.toFixed(4)), trained: true };
 }
 
 export { personalCorpusSize };
