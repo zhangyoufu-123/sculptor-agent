@@ -39,7 +39,18 @@
 
 ## 2. 创新点深化路线（核心）
 
-主线不变：编辑即标注。深化方向是把"编辑"用得比现在深得多。
+主线不变：编辑即标注。深化方向是把"编辑"用得比现在深得多，并补齐"风格是分层的"这一盲区。
+
+### 2.0 风格是分层的（新增核心原则）
+
+风格不是单一向量，而是四个层级的联合：
+
+- 文档级（整篇构成 + 起承转合）：段落/章节数量与分布、开篇—承接—转折—收束的弧线。
+- 话语级（论证/叙事结构）：修辞 moves、论证链、伏笔—回收节奏。
+- 句子级（句法/节奏）：句长波动、标点节奏、句首模式。
+- 词级（用词习惯）：功能词、意象、口语/书面、个人回避词。
+
+现状：12 维调制器只覆盖句子级和词级，文档级和话语级是盲区，这是本次深化要补的最大一块。
 
 ### 2.1 从"编辑→权重"升级为"编辑→变换模型"（最关键的深化）
 
@@ -78,6 +89,25 @@
 - 真实多作者语料（脱敏）+ 强基线（TF-IDF、char TF-IDF、无调制基线）。
 - 交叉验证 + 置换检验 + 逐维消融 + 学习权重 vs 默认权重对照。
 - 盲评落地：`sculptor experiment blind-stats` 已有，补齐一键收集 + 报告。
+
+### 2.6 文档级风格：起承转合 + 整篇构成（新增，补齐多层盲区）
+
+- 起承转合弧线特征：对候选文本做"开篇/承接/转折/收束"四段识别（转折词、收束标记、段落位置、
+  情感极性的弧线走向），与作者典型弧线比对（对应 Reagan et al. 2016 的六种情感弧线）。
+- 整篇构成特征：段落数、段落长度分布、章节节奏、开合方式，作为文档级维进入评分。
+- 话语级特征：论证链完整性、伏笔—回收节奏（复用现有 `outline.js`/`reader-gallery.js` 的结构信号）。
+
+### 2.7 外围算法集群（无 LoRA 的推理期控制，替代微调）
+
+不做 LoRA，改用一簇推理期算法共同影响大模型判断，按 DExperts/对比解码范式组织：
+
+- 对比解码（DExperts 式）：`personal`（expert）vs `avoidance`（anti-expert）做解码期对比，
+  惩罚"反专家也高概率"的候选——把现有"打分"升级为"对比影响"。
+- 候选重排 + 拟改：现有 12 维评分 + 2.1 的编辑变换模型。
+- 前缀/提示引导（PREADD 式）：用作者风格画像做前缀注入，影响生成方向。
+
+对应文献：DExperts（Liu 2021）、Contrastive Decoding（Li 2022）、StyleVector（Liu 2025）、
+Activation Addition（Turner 2023）。
 
 ## 3. 真实可用性工程
 
@@ -122,3 +152,16 @@
   这是把候选级评分升级为真正风格迁移的关键一跳，也是论文从"评分器"叙事升级为"编辑策略"叙事的落点。
 - 2026-08-13：小样本定位与 `decodeN` 的 200 字符阈值矛盾——修复后"几十次修改学出方向"才能名副其实地
   覆盖"几段话就能起步"的场景。
+- 2026-08-13：文献复盘确认两条主线——(1) 风格是分层的（文档/话语/句子/词四级），当前只覆盖后两级；
+  (2) 无微调的控制走"解码期专家-反专家对比"（DExperts/对比解码/StyleVector/ActAdd），SCULPTOR 的
+  personal/avoidance 恰好是 expert/anti-expert 的雏形，缺的是把"打分"升级为"对比影响"。
+
+## 7. 参考文献（关键）
+
+- Liu et al., 2021. DExperts: Decoding-Time Controlled Text Generation with Experts and Anti-Experts. ACL.
+- Li et al., 2022. Contrastive Decoding: Open-ended Text Generation as Optimization. arXiv:2210.15097.
+- Liu et al., 2025. Personalized Text Generation with Contrastive Activation Steering (StyleVector). ACL.
+- Turner et al., 2023. Activation Addition: Steering Language Models Without Optimization. arXiv:2308.10248.
+- S. et al., 2021. Unifying Lexical, Syntactic, and Structural Representations of Written Language for Authorship Attribution. SN Computer Science.
+- Reagan et al., 2016. The emotional arcs of stories are dominated by six basic shapes. EPJ Data Science.
+- A Lexical, Syntactic, and Semantic Perspective for Understanding Style in Text. arXiv:1909.08349.
