@@ -119,6 +119,18 @@ if (!process.env.SCULPTOR_LLM_RETRIES) process.env.SCULPTOR_LLM_RETRIES = '2';
 // CLI 端不设默认（保持"未配置→排队宿主代检"的原行为）。
 if (!process.env.SCULPTOR_SEARCH_PROVIDER) process.env.SCULPTOR_SEARCH_PROVIDER = 'builtin';
 
+// 自动加载仓库根目录 .env.local（DEEPSEEK_* 等），让 `npm start` 开箱即用。
+function loadEnvLocal(file) {
+  try {
+    if (!fs.existsSync(file)) return;
+    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+      if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+    }
+  } catch {}
+}
+loadEnvLocal(path.resolve(HERE, '..', '.env.local'));
+
 const cfg = loadConfig();
 
 const IO_SCRIPTS = path.resolve(HERE, '..', 'agent', 'scripts', 'io');
@@ -392,6 +404,14 @@ const server = http.createServer(async (req, res) => {
   // ── 鉴权（v0.58 已移除登录：个人/演示实例默认开放；如需防护请走反向代理）──
   if (req.method === 'GET' && p === '/api/auth/status') {
     return json(res, 200, { required: false, ok: true });
+  }
+  if (req.method === 'GET' && p === '/health') {
+    return json(res, 200, {
+      ok: true,
+      mode: process.env.SCULPTOR_MOCK_LLM === '1' ? 'mock' : 'live',
+      model: cfg.model,
+      key: cfg.apiKey ? 'configured' : 'missing',
+    });
   }
 
   if (req.method === 'GET' && (p === '/' || p.startsWith('/assets/'))) {
@@ -1318,9 +1338,21 @@ const server = http.createServer(async (req, res) => {
   res.end(JSON.stringify({ error: 'Not Found' }));
 });
 
+if (typeof server.on === 'function') {
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`端口 ${PORT} 已被占用。请关闭占用进程，或改用其它端口：PORT=5178 npm start`);
+    } else {
+      console.error('服务器启动失败:', err.message);
+    }
+    process.exit(1);
+  });
+}
+
 server.listen(PORT, () => {
   console.log(
     `Sculptor Studio → http://localhost:${PORT}（${process.env.SCULPTOR_MOCK_LLM === '1' ? '离线 mock 模式' : '真实 LLM 模式'}）`,
   );
   console.log(`  会话数据: ${DATA_ROOT}`);
+  console.log(`  模型: ${cfg.model} · 密钥: ${cfg.apiKey ? '已配置' : '未配置（可在 .env.local 或环境变量里设）'}`);
 });
