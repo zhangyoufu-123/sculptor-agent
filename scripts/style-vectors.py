@@ -269,7 +269,7 @@ def fig_ability():
     img = Image.new('RGB', (W, H), '#fbf7f0')
     d = ImageDraw.Draw(img)
     d.text((W // 2, 34), '图3　写作能力全方位对比（综合评分 C = Σ wₖ·sₖ）', font=TITLE, fill='#2b2118', anchor='mm')
-    d.text((W // 2, 70), 'w = (0.25, 0.20, 0.20, 0.20, 0.15)；SCULPTOR 各维来自实测（22+11 套 QA / 反 AI 审计 / 人类化指标）', font=SUB, fill='#6f5f4b', anchor='mm')
+    d.text((W // 2, 70), 'w = (0.25, 0.20, 0.20, 0.20, 0.15)；SCULPTOR 各维来自实测（24+11 套 QA / 反 AI 审计 / 人类化指标）', font=SUB, fill='#6f5f4b', anchor='mm')
     objs = [n for n in names if n.startswith('SCULPTOR') or '通用' in n or '模板' in n]
     x0, y0 = 190, 150
     bw, bh, gap = 150, 34, 12
@@ -366,7 +366,7 @@ for n in objs:
     lines.append('| ' + ' | '.join(row) + ' |')
 lines += [
     '',
-    '注：SCULPTOR 的"人类化/反AI味/全流程"来自实测（22+11 套 QA、反 AI 审计真实修复案例、'
+    '注：SCULPTOR 的"人类化/反AI味/全流程"来自实测（24+11 套 QA、反 AI 审计真实修复案例、'
     '人类化指标四量纲达标）；通用模型与模板的相应维度为代表性基线估计（它们没有公开的全链路写作证据）。',
     '',
     '## 6. 可复现性',

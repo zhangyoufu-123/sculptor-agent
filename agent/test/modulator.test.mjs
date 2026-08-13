@@ -18,7 +18,11 @@ const {
   surfaceFeature,
   discourseFeature,
   postureFeature,
+  avoidanceFeature,
+  humanRationale,
+  contributionBreakdown,
 } = await import(path.join(HERE, '..', 'src', 'modulator.js'));
+const avoidanceMod = await import(path.join(HERE, '..', 'src', 'avoidance.js'));
 const { contrastiveScore } = await import(path.join(HERE, '..', 'src', 'token-decode.js'));
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-mod-'));
@@ -140,6 +144,68 @@ const edits = [
   const bad = modulate(w, performative, {});
   assert(typeof bad.score === 'number' && bad.score !== -Infinity, 'posture 软性加权，不拒绝生成');
   console.log('PASS 姿态层细读特征（posture 健康度/软性加权/得分分解）');
+}
+
+// 7) 个人回避库（v0.68，B1）：作者亲手删掉的词聚合为回避特征，命中即压低
+{
+  fs.appendFileSync(
+    path.join(w, 'vault', 'edits.jsonl'),
+    JSON.stringify({ original: '综上所述，我们应该充分发挥作用。', changed: '风停。门合。', intent: '去套话' }) + '\n',
+  );
+  const av = avoidanceMod.collectAvoidance(w);
+  assert(av.ok === true, '回避库可聚合');
+  assert(Object.keys(av.terms).some((t) => t.includes('综上')), '被删的「综上所述」进入回避库');
+  const hit = avoidanceFeature(w, '综上所述，我们应该充分发挥作用。');
+  const clean = avoidanceFeature(w, '门开着。石阶旧。风从里面出来。');
+  assert(hit < clean, `命中回避词应压低（${hit} < ${clean}）`);
+  const m = modulate(w, '综上所述，我们应该充分发挥作用。', {});
+  assert(typeof m.features.avoidance === 'number', 'modulate 特征含 avoidance');
+  console.log('PASS 个人回避库（聚合/命中压低/特征入评分）');
+}
+
+// 8) 上下文窗口化编辑对（v0.68，B2）：带原文上下文的偏好对训练仍成立
+{
+  const ctxEdits = [
+    {
+      original: '因此我们要重视这个问题',
+      changed: '这个问题搁在桌上，没人动',
+      intent: '去连接词',
+      ctxBefore: '老师在黑板上写了一个字。',
+      ctxAfter: '下课铃响了。',
+    },
+    {
+      original: '总而言之，历史值得铭记',
+      changed: '纪念牌上的字，我念了一遍',
+      intent: '留白',
+      ctxBefore: '我站在楼前。',
+      ctxAfter: '风从门里出来。',
+    },
+  ];
+  fs.writeFileSync(
+    path.join(w, 'vault', 'edits.jsonl'),
+    ctxEdits.map((e) => JSON.stringify(e)).join('\n') + '\n',
+  );
+  const r = forceRetrain(w);
+  assert(r.ok === true, '上下文编辑对训练成功');
+  assert(r.meta.pairs === 2, '上下文对计入训练');
+  const mPos = modulate(w, '这个问题搁在桌上，没人动。下课铃响了。', {});
+  const mNeg = modulate(w, '因此我们要重视这个问题。下课铃响了。', {});
+  assert(mPos.score > mNeg.score, '上下文对训练后"改后 > 原文"');
+  console.log('PASS 上下文窗口化编辑对（ctxJoin 训练/排序正确）');
+}
+
+// 9) 可解释层（v0.68，B7）：贡献分解 + 人话理由
+{
+  const m = modulate(w, '纪念牌上的字，我念了一遍。风从门里出来。', {});
+  assert(Array.isArray(m.contributions) && m.contributions.length === FEATURES.length, '贡献分解覆盖全部特征');
+  assert(typeof m.rationale === 'string' && m.rationale.length > 0, '人话理由非空');
+  const human = humanRationale(m.contributions);
+  assert(human.includes('笔迹') || human.includes('回避') || human.includes('均衡'), `理由可读（${human}）`);
+  const sorted = contributionBreakdown(m.weights, m.features, null);
+  for (let i = 1; i < sorted.length; i++) {
+    assert(Math.abs(sorted[i - 1].contrib) >= Math.abs(sorted[i].contrib), '贡献按绝对值降序');
+  }
+  console.log('PASS 可解释层（贡献分解/人话理由/排序）');
 }
 
 console.log('\n✓ modulator.test.mjs 全部通过');

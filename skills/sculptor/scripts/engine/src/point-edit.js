@@ -215,6 +215,8 @@ export async function pointEdit(cfg, wsDir, { quote, instruction, dir, file, rep
     evidence: `point-edit: ${String(instruction).slice(0, 40)}`,
     writeDims: dims.write,
     readDims: dims.read,
+    ctxBefore: before.slice(-160),
+    ctxAfter: after.slice(0, 160),
   });
   // L4 偏好对 + L2 偏好轴 + L1 连续向量：亲手修改是最高权重风格信号
   await refreshStyleVector(cfg, workspace, {

@@ -29,6 +29,7 @@ import { readVector, embedSparse, cosineSparse } from './style-vector.js';
 import { readPrototype, cosineDenseVec } from './embedding.js';
 import { readAuthorSheet } from './author-sheet.js';
 import { deterministicFakeThinking } from './fake-thinking.js';
+import { readAvoidance, writeAvoidance, collectAvoidance } from './avoidance.js';
 
 export const FEATURES = [
   'personal',
@@ -42,6 +43,7 @@ export const FEATURES = [
   'embedding',
   'fineread',
   'posture',
+  'avoidance',
 ];
 
 // 经验默认权重（无编辑对时的兜底，等价 v0.62 V1 语义 + 新特征温和先验）
@@ -57,6 +59,7 @@ export const DEFAULT_WEIGHTS = {
   embedding: 0.2,
   fineread: 0.15,
   posture: 0.2,
+  avoidance: 0.15,
 };
 
 // ── 纯净数据收集 ───────────────────────────────────────────
@@ -97,7 +100,13 @@ export function collectModulatorData(workspace) {
         const original = String(e.original || '').trim();
         const changed = String(e.changed || '').trim();
         if (original.length >= 4 && changed.length >= 4 && original !== changed) {
-          pairs.push({ original, changed, intent: String(e.intent || '') });
+          pairs.push({
+            original,
+            changed,
+            intent: String(e.intent || ''),
+            ctxBefore: String(e.ctxBefore || ''),
+            ctxAfter: String(e.ctxAfter || ''),
+          });
           push(changed, 0.7);
         }
       } catch {}
@@ -303,7 +312,21 @@ export function postureFeature(text) {
 }
 
 /**
- * 提取十一维特征（未归一化的原始值）。
+ * 个人回避特征（v0.68）：候选文本命中作者亲手删过的词越多，值越低（"越高越好"方向）。
+ * 无回避库时中性 0.5。
+ */
+export function avoidanceFeature(workspace, text) {
+  const av = readAvoidance(workspace);
+  if (!av?.ok) return 0.5;
+  const terms = Object.keys(av.terms || {});
+  if (!terms.length) return 0.5;
+  const t = String(text || '');
+  const hits = terms.filter((k) => k.length >= 2 && t.includes(k)).length;
+  return Math.max(0, Math.min(1, 1 - Math.min(1, hits * 0.25)));
+}
+
+/**
+ * 提取十二维特征（未归一化的原始值）。
  * embedding 为神经风格特征：需要作者稠密原型 + 候选稠密编码（decodeSection 预计算传入）；
  * fineread 为 L3 细读特征（作者写作清单命中）；均无则取中性 0.5，不破坏降级路径。
  */
@@ -327,10 +350,17 @@ export function extractFeatures(workspace, text, { t = 0.5, prototype = null, ca
     embedding,
     fineread: fineReadFeature(workspace, text),
     posture: postureFeature(text),
+    avoidance: avoidanceFeature(workspace, text),
   };
 }
 
 // ── 小数据权重学习（签名 → 模型的关键一步） ─────────────────────
+
+/** 把局部编辑对放进原文上下文（v0.68，B2）：无上下文时退回原文本。 */
+function ctxJoin(p, text) {
+  const joined = `${p?.ctxBefore || ''}${text}${p?.ctxAfter || ''}`.trim();
+  return joined || text;
+}
 
 function zstats(rows) {
   const mean = {};
@@ -371,15 +401,17 @@ export function trainModulatorWeights(workspace, data = null) {
   }
   const rows = [];
   for (const p of d.pairs) {
-    rows.push(extractFeatures(workspace, p.original, { t: 0.5 }));
-    rows.push(extractFeatures(workspace, p.changed, { t: 0.5 }));
+    const negText = ctxJoin(p, p.original);
+    const posText = ctxJoin(p, p.changed);
+    rows.push(extractFeatures(workspace, negText, { t: 0.5 }));
+    rows.push(extractFeatures(workspace, posText, { t: 0.5 }));
   }
   const norm = zstats(rows);
   // 配对样本（归一化后）
   const pairRows = [];
   for (const p of d.pairs) {
-    const neg = normalizeRow(extractFeatures(workspace, p.original, { t: 0.5 }), norm);
-    const pos = normalizeRow(extractFeatures(workspace, p.changed, { t: 0.5 }), norm);
+    const neg = normalizeRow(extractFeatures(workspace, ctxJoin(p, p.original), { t: 0.5 }), norm);
+    const pos = normalizeRow(extractFeatures(workspace, ctxJoin(p, p.changed), { t: 0.5 }), norm);
     pairRows.push({ pos, neg });
   }
   const dim = feats;
@@ -464,12 +496,55 @@ export function getModulator(workspace) {
       try {
         fs.mkdirSync(path.join(workspace, 'vault'), { recursive: true });
         fs.writeFileSync(weightsFile(workspace), JSON.stringify(mod, null, 2) + '\n', { mode: 0o600 });
+        writeAvoidance(workspace, collectAvoidance(workspace));
       } catch {}
     }
   }
   modCache.set(data.signature, mod);
   if (modCache.size > 20) modCache.delete(modCache.keys().next().value);
   return mod;
+}
+
+/** 逐特征贡献分解（B7）：wᵢ × zᵢ，按贡献绝对值排序。 */
+export function contributionBreakdown(weights, features, norm = null) {
+  const out = [];
+  for (const f of FEATURES) {
+    const raw = Number(features[f]) || 0;
+    const z = norm ? (raw - (norm.mean[f] || 0)) / (norm.std[f] || 1e-4) : raw;
+    const w = Number(weights[f]) || 0;
+    out.push({ feature: f, contrib: w * z, weight: w, value: raw });
+  }
+  return out.sort((a, b) => Math.abs(b.contrib) - Math.abs(a.contrib));
+}
+
+const FEATURE_LABELS = {
+  personal: '笔迹接近度',
+  surface: '句法节奏',
+  discourse: '话语习惯',
+  stance: '立场红线',
+  knowledge: '知识呼应',
+  defect: 'AI 腔回避',
+  impedance: '节奏调制',
+  vector: '风格方向',
+  embedding: '语义原型',
+  fineread: '深层清单',
+  posture: '姿态健康度',
+  avoidance: '个人回避',
+};
+
+/** 把贡献分解翻译成人话（候选级"为什么选它"）。 */
+export function humanRationale(contributions) {
+  if (!Array.isArray(contributions) || !contributions.length) return '（无可解释信号）';
+  const pos = contributions.filter((c) => c.contrib > 0.02).slice(0, 2);
+  const neg = contributions.filter((c) => c.contrib < -0.02).slice(0, 1);
+  const parts = [];
+  if (pos.length) {
+    parts.push(`它更贴你的笔迹，主要因为${pos.map((c) => FEATURE_LABELS[c.feature] || c.feature).join('、')}占优`);
+  }
+  if (neg.length) {
+    parts.push(`它在${FEATURE_LABELS[neg[0].feature] || neg[0].feature}上扣分更少`);
+  }
+  return parts.length ? parts.join('；') : '各信号均衡，没有明显的主导选择';
 }
 
 /** 推理时调制：返回 {score, features, weights, trained, mode}。 */
@@ -480,6 +555,7 @@ export function modulate(workspace, text, { t = 0.5, prototype = null, candidate
     const norm = normalizeRow(features, mod.norm);
     let score = mod.bias;
     for (const f of FEATURES) score += mod.weights[f] * norm[f];
+    const contributions = contributionBreakdown(mod.weights, features, mod.norm);
     return {
       score: Number(score.toFixed(4)),
       features,
@@ -487,16 +563,21 @@ export function modulate(workspace, text, { t = 0.5, prototype = null, candidate
       trained: true,
       mode: 'learned',
       meta: mod.meta,
+      contributions,
+      rationale: humanRationale(contributions),
     };
   }
   let score = 0;
   for (const f of FEATURES) score += DEFAULT_WEIGHTS[f] * features[f];
+  const contributions = contributionBreakdown(DEFAULT_WEIGHTS, features, null);
   return {
     score: Number(score.toFixed(4)),
     features,
     weights: { ...DEFAULT_WEIGHTS },
     trained: false,
     mode: 'default',
+    contributions,
+    rationale: humanRationale(contributions),
   };
 }
 
@@ -548,8 +629,8 @@ export function applyEditIncremental(
   const data = collectModulatorData(workspace);
   const mod = getModulator(workspace);
   if (!mod.ok) return forceRetrain(workspace);
-  const neg = normalizeRow(extractFeatures(workspace, original, { t: 0.5 }), mod.norm);
-  const pos = normalizeRow(extractFeatures(workspace, changed, { t: 0.5 }), mod.norm);
+  const neg = normalizeRow(extractFeatures(workspace, ctxJoin(edit, original), { t: 0.5 }), mod.norm);
+  const pos = normalizeRow(extractFeatures(workspace, ctxJoin(edit, changed), { t: 0.5 }), mod.norm);
   const w = [Number(mod.bias || 0), ...FEATURES.map((f) => Number(mod.weights[f] || 0))];
   const dim = FEATURES.length;
   let loss = 0;

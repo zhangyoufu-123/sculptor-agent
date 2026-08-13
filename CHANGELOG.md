@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-08-13（v0.68 改迹调制做实：修改即标注 + 可解释 + 学习曲线）
+
+按批准的升级方案（UPGRADE-PLAN.md Phase 1）执行，命名按用户要求不造生硬缩写：
+
+- **改迹调制（revision-trace modulation）**：论文核心从"统一 Token 对比解码"校准为
+  "从作者修改中学习"的候选评分机制，摘要/贡献/方法/结论全面重排（贡献一改为改迹调制）；
+- **个人回避库（负空间第一阶段）**：`agent/src/avoidance.js` 聚合"作者亲手删掉的词"，
+  调制器第 12 维特征，命中即压低；
+- **上下文窗口编辑对**：point-edit 记录修改点前后文，训练时用带上下文的偏好对，
+  缓解"短替换特征稀疏"；
+- **可解释层**：`contributionBreakdown` + `humanRationale`——得分分解翻译成人话
+  （"为什么选它"），写作评分路径可用；
+- **样本复杂度实验（A3）**：`scripts/experiments/rsa-learning-curve.mjs` + 绘图——
+  留出得分边距 0.286→0.498、权重稳定性 0.968→0.999 随 n 单调改善，n≈15–20 进入平台，
+  论文新增 3.1.2 与图 8；
+- **盲评统计（D1）**：`agent/src/stats.js` 精确二项/Wilson CI/Cohen's h/CSV 解析，
+  CLI `sculptor experiment blind-stats <answers.csv>`；
+- **embedding 统一**：`style-vector.js` 删除重复实现，统一走 `embedding.js`；
+- **doctor 检查**：新增神经风格编码/外层调制器/作者写作清单检查项；
+- 新增 `test/stats.test.mjs`（五组断言），agent 24 套 + web 11 套全绿；
+- 论文 docx 重渲染、计数修正 agent 24。
+
 ## 2026-08-13（v0.67 姿态层细读判据前置：从"事后审计"到"事中选择"，软性加权）
 
 继续补劣势，并按用户要求**不做硬约束**：

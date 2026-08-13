@@ -81,6 +81,7 @@ import {
 } from './style-adapter.js';
 import { modulatorStatus, forceRetrain, weightsFile } from './modulator.js';
 import { extractAuthorSheet, readAuthorSheet, sheetFile, FIVE_QUESTIONS } from './author-sheet.js';
+import { blindStatsReport, parseBlindCsv } from './stats.js';
 import { factCheck, renderFactCheck } from './fact-check.js';
 import { recentPulses, renderPulse } from './style-pulse.js';
 import { rhythmCurve, renderRhythmCurve } from './style-pulse.js';
@@ -292,11 +293,27 @@ async function doctor(cfg, { ping = false } = {}) {
   report.push(
     `凭据来源: ${cfg.credentialsSource ? `${cfg.credentialsSource}（自动发现，密钥已脱敏）` : cfg.apiKey ? '显式 SCULPTOR_LLM_API_KEY' : '（未配置，可用 sculptor credentials --ask 选择或输入）'}`,
   );
+  report.push(
+    `神经风格编码: ${
+      cfg.embedBaseUrl && cfg.embedApiKey && cfg.embedModel
+        ? `✓ 已配置（${cfg.embedModel}）`
+        : '⚠ 未配置（可选：设置 SCULPTOR_EMBED_BASE_URL/API_KEY/MODEL，未配置自动降级统计特征）'
+    }`,
+  );
   const w = ws.resolveWorkspace(cfg, '');
   report.push(`工作区: ${w} ${fs.existsSync(w) ? '✓' : '（未初始化）'}`);
   if (fs.existsSync(`${w}/vault/write-style.json`)) {
     report.push(
       `风格档案: write ${ws.styleDimSummary(`${w}/vault/write-style.json`)} · read ${ws.styleDimSummary(`${w}/vault/read-style.json`)}`,
+    );
+  }
+  if (fs.existsSync(w)) {
+    const mod = modulatorStatus(w);
+    report.push(
+      `外层调制器: ${mod.mode === 'learned' ? `✓ 学习权重（${mod.pairs} 个编辑对）` : '⚠ 经验默认权重（编辑对 <2）'}`,
+    );
+    report.push(
+      `作者写作清单: ${fs.existsSync(sheetFile(w)) ? '✓ 已归纳' : '⚠ 未生成（澄清后自动归纳）'}`,
     );
   }
   if (ping) {
@@ -681,8 +698,20 @@ export async function runCli(argv, io = {}) {
           fs.writeFileSync(out, md + '\n', { mode: 0o600 });
           console.log(md);
           console.log(`\n论文表格已写入 → ${out}`);
+        } else if (sub === 'blind-stats') {
+          if (positional.length < 2) {
+            throw new Error('用法: sculptor experiment blind-stats <answers.csv>（表头 pairIndex,choice,correct）');
+          }
+          const answers = parseBlindCsv(fs.readFileSync(path.resolve(positional[1]), 'utf8'));
+          if (!answers.length) throw new Error('没有解析到有效作答（要求表头 pairIndex,choice,correct，choice 为 A/B/none）');
+          const r = blindStatsReport(answers);
+          console.log(r.table.map(([k, v]) => `${k}: ${v}`).join('\n'));
+          const out = flags.out ? path.resolve(String(flags.out)) : path.join(w, 'vault', 'experiments', 'blind-stats.md');
+          fs.mkdirSync(path.dirname(out), { recursive: true });
+          fs.writeFileSync(out, r.table.map(([k, v]) => `| ${k} | ${v} |`).join('\n') + '\n', { mode: 0o600 });
+          console.log(`\n报告已写入 → ${out}`);
         } else {
-          throw new Error('用法: sculptor experiment metrics|collect|run|ablation|survey|blind|summarize');
+          throw new Error('用法: sculptor experiment metrics|collect|run|ablation|survey|blind|blind-stats|summarize');
         }
         break;
       }

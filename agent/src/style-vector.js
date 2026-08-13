@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as ws from './workspace.js';
+import { embedText } from './embedding.js';
 
 const VECTOR_FILE = 'style-vector.json';
 const DEFAULT_EMA = 0.75; // 新信号占比 (1-alpha)；越大越稳、越小越跟手
@@ -52,8 +53,6 @@ const MATERIAL_STOP = new Set([
   '然后', '知道', '觉得', '真的', '起来', '出来', '这样', '那样', '有点', '一些',
   '东西', '事情', '感觉', '开始', '最后', '最后', '第一', '第二', '不是', '只是',
 ]);
-
-let denseCache = new Map();
 
 // ── L1 稀疏嵌入（字符二元组，兼容中英混排）──────────────────────
 
@@ -120,34 +119,6 @@ function emaSparse(oldMap, sigMap, alpha) {
     for (const [k, v] of top) out.set(k, v);
   }
   return out;
-}
-
-/** 可选真实 embedding（OpenAI 兼容 /embeddings）。失败静默降级稀疏。 */
-async function embedDense(cfg, text) {
-  const key = createHash('sha1').update(String(text)).digest('hex');
-  if (denseCache.has(key)) return denseCache.get(key);
-  const base = String(cfg.embedBaseUrl || '').replace(/\/+$/, '');
-  if (!base || !cfg.embedApiKey || !cfg.embedModel) return null;
-  try {
-    const res = await fetch(`${base}/embeddings`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${cfg.embedApiKey}`,
-      },
-      body: JSON.stringify({ model: cfg.embedModel, input: String(text).slice(0, 8000) }),
-      signal: AbortSignal.timeout(20000),
-    });
-    if (!res.ok) return null;
-    const j = await res.json();
-    const vec = j?.data?.[0]?.embedding;
-    if (!Array.isArray(vec) || !vec.length) return null;
-    const arr = Float64Array.from(vec);
-    denseCache.set(key, arr);
-    return arr;
-  } catch {
-    return null;
-  }
 }
 
 function objectToMap(obj) {
@@ -406,7 +377,7 @@ export async function refreshStyleVector(cfg = {}, workspace, { text = '', kind 
   // L1 连续向量：EMA 增量更新（dense 优先，失败降级稀疏）
   if (t) {
     if (cfg.embedBaseUrl && cfg.embedApiKey && cfg.embedModel) {
-      const dense = await embedDense(cfg, t);
+      const dense = await embedText(cfg, t);
       if (dense) {
         const old = v.continuous.dense;
         v.continuous.dense = old && old.length === dense.length

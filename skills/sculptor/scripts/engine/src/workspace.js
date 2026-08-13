@@ -136,6 +136,8 @@ export function absorbEdit(ws, edit) {
       changed: edit.changed || '',
       intent: edit.intent || '',
       evidence: edit.evidence || '',
+      ctxBefore: String(edit.ctxBefore || '').slice(-160),
+      ctxAfter: String(edit.ctxAfter || '').slice(0, 160),
     }),
   );
 
