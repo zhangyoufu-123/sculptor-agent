@@ -170,8 +170,8 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/stylotrace/main/inst
 ## 仓库结构
 
 本仓库只保留产品本体：`agent/`（核心引擎）、`skills/`（可安装技能）、`web/`（写作工作台）、
-`scripts/`（实验与工具）、`install.sh`、`README.md`；论文本体与支撑报告随版本提交在
-`docs/competition/`，比赛过程档案与个人分析材料不提交（见 `.gitignore`）。
+`scripts/`（实验与工具）、`install.sh`、`README.md`；论文与竞赛材料为个人成果，不随仓库发布
+（见 `.gitignore`）。
 - [Web 人机交互规划](docs/UX-PLAN.md)
 - [Web 接口自检报告](docs/WEB-API-AUDIT.md)
 - [Web 演示版部署指南](docs/DEPLOY.md)
@@ -200,7 +200,7 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/stylotrace/main/inst
 姿态层细读 posture 前置，推理时调制；学习曲线显示几十次修改即可学到稳定方向）、
 导演状态机与多 Agent 协作、
 Web 伴随式工作台（选区 AI/候选卡/版本回滚/并排/图谱）、真实 LLM 可靠性修复、翻译方法论、
-数学可视化与参赛论文。
+数学可视化。
 接下来：意图分流训练、状态向量化、姿态层 LLM 细读精读特征（可选）、
 V2 logprobs / V3 本地 DExperts 与激活转向、第三方盲评样本收集、跨语言语料验证。
 
