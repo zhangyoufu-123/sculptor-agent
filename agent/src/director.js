@@ -13,7 +13,7 @@ import { writeSection, detectDraftGaps } from './write.js';
 import { redteam } from './redteam.js';
 import { runAudience, renderAudience, runDebate, renderDebate } from './reader-gallery.js';
 import { restyle } from './restyle.js';
-import { applyStyleDirection, extractStyleFromConversation } from './style.js';
+import { applyStyleDirection, extractStyleFromConversation, applyStyleSignals, recordImplicitSignals } from './style.js';
 import { applyCorrectionFeedback } from './style-pulse.js';
 import { refreshStyleVector } from './style-vector.js';
 import { distillStyleAdapter, adapterStale } from './style-adapter.js';
@@ -226,6 +226,19 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     return { state, d };
   };
   let { state, d } = load();
+
+  // ── 全流程风格采集（v1.3）──
+  // 澄清阶段在 clarifyStep 内部已逐轮采集；这里补齐其余阶段：自由式导演直接跳到
+  // 写作/修订/红队/成稿时，用户的每一句话（措辞、语气、素材、修改意见）也要进风格档案。
+  // 保证"从每一轮对话、每一个问题、每一句反馈都抓风格"，而不是只抓澄清阶段。
+  if (d.stage !== 'clarify' && String(lastInput || '').trim()) {
+    try {
+      applyStyleSignals(workspace, lastInput);
+      recordImplicitSignals(workspace, lastInput);
+      await refreshStyleVector(cfg, workspace, { text: lastInput, kind: 'turn', evidence: '每轮输入' });
+    } catch {}
+    ({ state, d } = load());
+  }
 
   // ── 自由式 agent（v1.2）：每轮都让 LLM 读进度 + 用户输入，自主决定下一步（多轮判断）。
   //    LLM 不可用 / 非法动作 / 前置条件不满足 → 回退确定性状态机（保留原工作流兜底）。──
