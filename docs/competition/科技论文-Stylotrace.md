@@ -6,9 +6,7 @@
 
 ## 摘要
 
-大语言模型让“机器能写”成为常态，但也让“谁在写”变得模糊：机器写出的文字工整、平滑，却少了作者本人的味道。本文提出 Stylotrace，一个从作者每一次亲手修改中学习个人文风的写作系统。其核心是**改迹调制（revision-trace modulation）**：把作者对 AI 草稿的每次修改当作最诚实的标注，将风格、知识、缺陷、阻抗统一进一个可解释的候选评分函数，在候选之间挑出更像作者的写法，并说明“为什么选它”。系统以词级文体计量刻画“怎么写”，把个人知识库、风格向量与收集数据归纳为十三维特征，权重由作者亲手修改的偏好对学成并随修改增量更新；候选选优后，再复现作者的改法——删掉作者会删的连接词并断句、把抽象句按作者习惯改具体。交互上以外溢优先（overflow-first）接住用户主动说出的高价值信息，工程上完成全流程互操作（作品导入、续写、按阶段导出等）。实验显示**几十次修改即可学到稳定的作者方向**（n≈15–20 进入平台）。V2 logprobs / V3 本地 logits 仍为路线图。
-
-实验表明：agent 28 套 + web 11 套（300+ 断言）契约测试均满足输出契约。风格距离实验中，Stylotrace 与 5 组真人/模拟样本的平均距离为 0.96，其中与样本3 仅 0.41（该样本句长均值 29.8、意象密度 3.24，与作者语料同为“北大红楼”主题），剔除该异常值后均值升至 1.10，与 DeepSeek 持平、略低于 ChatGPT（1.24）——该结果受异常值影响较大，不足以单独支撑“接近作者”结论。作者识别与续写选择中，词级文体计量把个人模型从字符 n-gram 的 46.3% 提升到 76.4%（字符二元组 TF-IDF 基线 90.3%）。学习曲线显示留出得分边距随编辑对数量从 0.247 升至 0.719、权重稳定性从 0.856 升至 1.000——几十次修改即可学到稳定的作者方向；调制器逐维消融显示 personal（词级文体计量）是唯一有边际贡献的特征，排序正确率在两类权重下均饱和（5.7）。LLM 自评的红队指标（见 5.8 节）属内部开发参考，未经真人验证，不作有效性证据。结果与“作者身份保持”假设一致，但样本规模尚不足以支持显著性结论。本文定位为在生成过程中保持作者表达偏好与语义意图，而非最大化一般意义上的文本质量。
+大语言模型让“机器能写”成为常态，却也抹平了“谁在写”：文字工整平滑，少了作者本人的表达痕迹。本文提出 Stylotrace，一个从作者亲手修改中学习个人文风的写作系统。其核心是改迹调制：把作者对 AI 草稿的每次修改视为最诚实的标注，将风格、知识、缺陷、阻抗统一进可解释的候选评分函数，在候选间挑出更像作者的写法。系统以词级文体计量刻画“怎么写”，以四层签名近似作者相对中性基线的条件选择偏差，权重由修改偏好对学成并增量更新。实验显示，几十次修改即可学到稳定的作者方向；词级文体计量把个人模型从字符 n-gram 的 46.3% 提升到 76.4%（低于字符二元组 TF-IDF 基线 90.3%）；红队盲评由 LLM 模拟、未经真人验证。本文定位为在生成过程中保持作者表达偏好与语义意图，而非最大化一般意义上的文本质量。
 
 **关键词**：作者身份保持；个性化文本生成；作者表示；改迹调制（revision-trace modulation）；对比解码；澄清式人机交互；检索增强生成；写作审计
 
@@ -36,32 +34,30 @@
 
 ### 1.4 Contributions
 
-本文的贡献归纳为三项（详细实验证据分别对应第 5 节相应小节）：
+本文的贡献归纳为四项（详细实验证据分别对应第 5 节相应小节）：
 
-- **C1（方法）改迹调制：从修改中学习**：把作者对 AI 草稿的每次修改（原文→改后→意图）当作隐式偏好标注，将风格、知识、缺陷、阻抗统一为可解释的候选评分函数，权重由偏好对学成并随修改增量更新；个人模型以词级文体计量（功能词+标点节奏）刻画“怎么写”，并把编辑对组织为正空间（新增词）与负空间（删除词），在候选选优后复现作者的改法（拟改层：删连接词断句 + 具体化拟改），从“打分排序”升级为“选优+拟改”；实验给出样本复杂度观察（留出得分边距随编辑对数量上升，几十次修改即可学到稳定的作者方向）与逐维消融证据（personal 是唯一有边际贡献的特征）（第 3.1 节、5.7 节）。
-- **C2（交互）澄清协议与供给闭环**：以"主张—前提—推理—理论来源"追踪用户思想脉络，提问顺序由 LLM 结合对话自主判断，并配合检索增强供给闭环（第 3.3–3.4 节）。
-- **C3（质量与工程）姿态层诊断与一体化交付**：提出姿态层（postural layer）检测缓解"表演思考"式模型化倾向，把细读判据前置到候选选择（软性加权，不拒绝生成）；同一核心以 CLI/Web 双形态交付，契约测试 agent 28 + web 11 套（第 3.6 节、附录 A）。
-- **C4（理论）四层签名与作者表示**：将风格形式化为作者相对中性基线的稳定条件选择偏差，用四层互补签名近似（连续向量、动态维度、不可预测性、显式修改记录）；提出"修改监督"——以作者亲手修改为最高权重信号持续更新表示（第 3.2 节；外部检验见 5.5）。
-- **C5（交互）外溢优先与自进化问询**：用户主动给出的高价值信息当轮识别、回显、深挖、入档（种子/红线/立意），并沉淀 overflow-log 升级信号流水反哺问询系统（第 3.4 节、第 5.6 节）。
-- **C6（工程）全流程互操作**：作品导入分片、作品库同步、成品文档导入续写、按阶段导出、长文档分段审计，让"澄清→大纲→写作→审计→交付"每一环节都能与外部流程文件进出（第 3.11 节、第 5.6 节）。
+- **C1（理论）四层签名与作者表示**：将风格形式化为作者相对中性基线的稳定条件选择偏差（Sₐ(c)=Pₐ(w|c)−P₀(w|c)），用四层互补签名近似——连续向量（L1）、动态维度（L2）、不可预测性（L3）、显式修改记录（L4）；提出“修改监督”，以作者亲手修改为最高权重风格信号持续更新表示（第 3.1、3.2 节；外部检验见 5.5）。
+- **C2（方法）改迹调制：从修改中学习**：把作者对 AI 草稿的每次修改（原文→改后→意图）当作隐式偏好标注，将风格、知识、缺陷、阻抗统一为可解释的候选评分函数，权重由偏好对学成并随修改增量更新；候选选优后复现作者的改法（删连接词断句 + 具体化拟改），从“打分排序”升级为“选优+拟改”（第 3.1.1 节）。样本复杂度实验显示留出得分边距随编辑对数量上升，几十次修改即可学到稳定的作者方向；逐维消融显示 personal 是唯一有实质边际贡献的特征（第 3.1.2 节、5.7 节）。
+- **C3（交互）澄清协议、外溢优先与供给闭环**：以“主张—前提—推理—理论来源”追踪用户思想脉络，提问顺序由 LLM 自主判断；以外溢优先接住用户主动说出的高价值信息（种子/红线/立意当轮入档），并配合检索增强供给闭环（第 3.3–3.4 节、5.6 节）。
+- **C4（质量与工程）姿态层诊断与全流程交付**：提出姿态层（postural layer）检测缓解“表演思考”式模型化倾向，把细读判据前置到候选选择（软性加权，不拒绝生成）；同一核心以 CLI/Web 双形态交付，完成作品导入分片、续写、按阶段导出等全流程互操作，契约测试 agent 28 + web 11 套（第 3.6、3.11 节、附录 A）。
 
 ## 2 相关工作
 
 ### 2.1 作者刻画与文体计量
 
-文体计量学（stylometry）以可计算特征刻画作者，如相对参考语料的 Delta 方法[14]与基于表层特征共现的多维分析（MD）[15]。本文沿用"相对基线"的度量思想，但将其**条件化**：偏差定义在同一创作空间 c 下（见 3.1），结论不依赖"哪个模型更强"。作者识别基线（3.7 节方法）参考了该领域的最近邻/质心范式。
+文体计量学（stylometry）以可计算特征刻画作者，如相对参考语料的 Delta 方法[4]及其几何与概率基础[5]、基于表层特征共现的多维分析（MD）[6]。本文沿用"相对基线"的度量思想，但将其**条件化**：偏差定义在同一创作空间 c 下（见 3.1），结论不依赖"哪个模型更强"。作者识别基线（3.7 节方法）参考了该领域的最近邻/质心范式。
 
 ### 2.2 个性化文本生成与风格注入
 
-StyleVector[2] 将用户风格表示为激活空间向量并在推理时干预，其"训练免费、推理时干预"思想与本文同族，但本文在可解释特征层落地，并增加澄清协议与修改监督。GhostWriter[3] 提出隐式学习 + 显式教学时刻；本文将"教学时刻"具体化为可入库的修改监督三元组（原文，改后，意图）。EMNLP 2025 的研究[1]表明 LLM 用少量样本模仿个人风格在非正式文体中显著失败，支持"持续采集 + 修改监督"的必要性。近期 agentic ghostwriter[4] 通过风格奖励微调复制经典作家，与本文"提取作者本人"的目标不同。
+StyleVector[2] 将用户风格表示为激活空间向量并在推理时干预，其"训练免费、推理时干预"思想与本文同族，但本文在可解释特征层落地，并增加澄清协议与修改监督。GhostWriter[3] 提出隐式学习 + 显式教学时刻；本文将"教学时刻"具体化为可入库的修改监督三元组（原文，改后，意图）。EMNLP 2025 的研究[1]表明 LLM 用少量样本模仿个人风格在非正式文体中显著失败，支持"持续采集 + 修改监督"的必要性。近期基于 GRPO 风格奖励微调的长篇故事生成工作[7]旨在复现经典作家风格，与本文"从作者本人修改中学习"的目标不同。
 
 ### 2.3 检索增强写作
 
-面向写作的 RAG 关注内容供给（如两阶段内容/风格检索[5]、检索器校准的个性化助手[6]）。本文的差异在于把 RAG 组织为**供给闭环**（触发—排队—回灌—缺口节重写），并使检索结果与个人知识库、写作资产三源合一注入（3.3 节）。
+面向写作的 RAG 关注内容供给（如两阶段内容/风格检索[8]、检索器校准的个性化助手[9]）。本文的差异在于把 RAG 组织为**供给闭环**（触发—排队—回灌—缺口节重写），并使检索结果与个人知识库、写作资产三源合一注入（3.3 节）。
 
 ### 2.4 人机协同写作与澄清交互
 
-人机协同研究（如 CollabLLM[7]）关注通用协同框架；意图发现工作（DiscoverLLM[8]）通过对比草稿定位用户意图。本文的澄清协议以"响应推理链"为设计目标，把提问顺序交给 LLM 自主判断，代码仅作防死循环安全网（3.4 节），区别于模板清单式交互。
+人机协同研究（如 CollabLLM[10]）关注通用协同框架；意图发现工作（DiscoverLLM[11]）通过对比草稿定位用户意图。本文的澄清协议以"响应推理链"为设计目标，把提问顺序交给 LLM 自主判断，代码仅作防死循环安全网（3.4 节），区别于模板清单式交互。
 
 ### 2.5 与现有工作的关系
 
@@ -71,11 +67,11 @@ StyleVector[2] 将用户风格表示为激活空间向量并在推理时干预�
 | --- | --- | --- | --- | --- |
 | StyleVector[2] | 激活向量 | 无 | 无 | 无 |
 | GhostWriter[3] | 隐式学习 | 无 | 无 | 无 |
-| writing-anima[5] | 两阶段检索 | 无 | 内容/风格 | 无 |
-| 智能写作系统[9] | 风格建模 | 多轮对话 | RAG | 无 |
+| writing-anima[8] | 两阶段检索 | 无 | 内容/风格 | 无 |
+| 智能写作系统[12] | 风格建模 | 多轮对话 | RAG | 无 |
 | **Stylotrace（本文）** | **四层签名+修改监督** | **思想脉络** | **供给闭环** | **姿态层** |
 
-说明：表 1 中来自产品横评与工程博客的非同行评议条目[9][10]，仅用于行业现状对照，不作为理论依据。
+说明：表 1 中的非同行评议条目[12]与产品能力横评[13]仅用于行业现状对照，不作为理论依据。
 
 ## 3 方法
 
@@ -92,7 +88,7 @@ Sₐ(c) = Pₐ(w|c) − P₀(w|c)
 3. **Estimation（估计）**：连续向量用字符二元组稀疏向量 $\varphi(x)$ 与 EMA 增量更新（式 2）估计，动态维度用权重 × 新鲜度衰减维护，不可预测性用 surprisal 判别式（式 8–9）估计，修改监督用（原文，改后，意图）三元组记录；
 4. **Validation（验证）**：以判别任务（作者识别，5.5 节）与预测任务（续写选择，5.5 节）检验签名是否包含可复现的作者信号。
 
-### 3.1.1 改迹调制：把作者的修改变成候选评分（C1）
+### 3.1.1 改迹调制：把作者的修改变成候选评分（C2）
 
 签名回答"作者是谁"，注入层把签名写进提示词；进一步的问题是**在候选之间直接重排**。本文提出统一评分函数，把风格、知识、缺陷、阻抗五路信号在同一个候选评分空间中融合：
 
@@ -108,7 +104,7 @@ $$P(w \mid c, t) = \operatorname{softmax}\bigl(S(w \mid c, t)/\tau\bigr)$$
 4. **缺陷信号** $S_{\mathrm{defect}}$：作者的系统性回避——AI 连接词/套话/重复比喻/金句收尾负偏置（来自 3.6 节反 AI 审计词表与姿态层判据）；
 5. **阻抗调制** $S_{\mathrm{impedance}}(w,t)$：随写作进度 $t$ 变化——初期轻调制，后期 $R(t)$ 升高，惩罚平滑连接词、奖励短句与具体名词（节奏曲线 rhythmCurve 由"事后曲线"升级为"生成时节奏"）。
 
-**实现边界（诚实界定）**：签名层与注入层已交付（L1–L4、双风格、知识注入、缺陷审计）；**V1 候选对比与 V1.5 外层调制器均已落地**——写作每节并行生成 n 个候选，用十三维特征函数（词级文体计量 $p_{\mathrm{personal}}$、表层、话语、立场红线、知识、缺陷、阻抗、风格向量方向、可选 embedding 神经原型、L3 作者写作清单 fineRead、姿态层细读 posture、个人回避库 avoidance、改迹贴合 transform）评分选优。其中调制器权重不再手调：`agent/src/modulator.js` 把 edits.jsonl 的（原文，改后）当作作者偏好对，用 pairwise hinge + SGD 学习每个作者独有的权重向量，数据签名变化自动在线重训，新编辑对到达时增量更新；L3 深层读取由作者写作清单协议提供（`author-sheet.js`，五问自动归纳、红线强制保留）；姿态层判据（金句排比收束/路标转折/点题顿悟）以软性加权进入评分——只影响候选排序，不拒绝生成；权重与得分分解逐候选可追溯（设计文档：MODULATOR.md）；V2 词级 logprobs 重排（显式 $\beta_1$）与 V3 本地 vLLM logits 全词表融合仍为路线图，不宣称已逐 token 生效。
+**实现边界（诚实界定）**：签名层与注入层已交付（L1–L4、双风格、知识注入、缺陷审计）；**V1 候选对比与 V1.5 外层调制器均已落地**——写作每节并行生成 n 个候选，用十三维特征函数（词级文体计量 $p_{\mathrm{personal}}$、表层、话语、立场红线、知识、缺陷、阻抗、风格向量方向、可选 embedding 神经原型、L3 作者写作清单 fineRead、姿态层细读 posture、个人回避库 avoidance、改迹贴合 transform）评分选优。其中调制器权重不再手调：`agent/src/modulator.js` 把 edits.jsonl 的（原文，改后）当作作者偏好对，用成对合页损失（pairwise hinge）+ 随机梯度下降（SGD）学习每个作者独有的权重向量，数据签名变化自动在线重训，新编辑对到达时增量更新；L3 深层读取由作者写作清单协议提供（`author-sheet.js`，五问自动归纳、红线强制保留）；姿态层判据（金句排比收束/路标转折/点题顿悟）以软性加权进入评分——只影响候选排序，不拒绝生成；权重与得分分解逐候选可追溯（设计文档：MODULATOR.md）。本层作用于候选重排而非逐 token 生成，边界见 6.4 节。
 
 **符号与术语约定（表 2）**：本文统一使用以下符号与术语，首次出现处均给出定义，避免概念漂移。
 
@@ -165,11 +161,11 @@ $$s = \frac{v_{\mathrm{author}} - v_{\mathrm{base}}}{\|v_{\mathrm{author}} - v_{
 
 **质量约束（区分"作者选择"与"错误"）**：仅凭距离无法区分独特表达与语病。本文以三重约束回应：① 最高权重信号来自作者亲手修改与确认的选择——"他要的"才进入风格档案；② 校对、回译校验、事实核查作为前置质量门，语法与事实错误不进入风格统计，偏差只在语义正确的表达空间内度量；③ 偏差注入是概率性偏好、作者保留否决权（3.6 节）。
 
-**体系化：从表层指纹到深层选择模式**。人类风格形成的研究表明，语言是意义资源上的系统性选择（Halliday[16]），写作的每个阶段都发生风格选择、其中"复阅/修改"阶段密度最高（Flower & Hayes[12]），且表层语言特征会共现成潜在功能维度（Biber[15]）。据此，本文把实现层面的四层签名归入一个完整的四层风格体系（设计文档：STYLE-SYSTEM.md），并明确每层的理论依据、信号来源与读取方法：
+**体系化：从表层指纹到深层选择模式**。人类风格形成的研究表明，语言是意义资源上的系统性选择（Halliday[14]），写作的每个阶段都发生风格选择、其中"复阅/修改"阶段密度最高（Flower & Hayes[15]），且表层语言特征会共现成潜在功能维度（Biber[6]）。据此，本文把实现层面的四层签名归入一个完整的四层风格体系（设计文档：STYLE-SYSTEM.md），并明确每层的理论依据、信号来源与读取方法：
 
-- **表层·词汇句法层**：用词偏好、句长节奏、词汇丰富度（Burrows Delta[14] 的高频词指纹思想），对应现有 L1 连续向量、feats8 与词级文体计量模型；小语料（数千字）即可估计，但跨主题泛化弱，易被主题污染；
+- **表层·词汇句法层**：用词偏好、句长节奏、词汇丰富度（Burrows Delta[4] 的高频词指纹思想），对应现有 L1 连续向量、feats8 与词级文体计量模型；小语料（数千字）即可估计，但跨主题泛化弱，易被主题污染；
 - **中层·话语修辞层**：意象密度与类型、修辞装置（排比/设问/隐喻）、叙事视角、时间处理与对话比例，读取方法为规则词表 + LLM 细读（现有意象词表、姿态层六层细读与节奏曲线），对应 Biber MD 的"特征共现 → 潜在功能维度"；
-- **深层·认知立场层**：论证结构（主张—前提—推理—来源）、立场与价值取向、情感曲线、读者意识与知识偏好；小语料下深层风格**不能靠统计读取，必须靠交互确认**——借鉴作者写作清单式访谈[23]（主张/论证/读者/红线/触发五问），对应现有思想脉络、外溢种子与 read-style；
+- **深层·认知立场层**：论证结构（主张—前提—推理—来源）、立场与价值取向、情感曲线、读者意识与知识偏好；小语料下深层风格**不能靠统计读取，必须靠交互确认**——借鉴作者写作清单式访谈[16]（主张/论证/读者/红线/触发五问），对应现有思想脉络、外溢种子与 read-style；
 - **元层·选择偏好层**：作者亲手修改、确认、拒绝与红线，是密度最高、最可信的风格信号（GhostWriter 的"教学时刻"[3]），对应 edits.jsonl、批注与红线清单，交互累积即可获得，语料需求最少。
 
 生成时**分层注入、按层加权**：表层信号决定措辞与节奏，深层信号决定结构与立场，元层信号决定不可越界的红线；层与层之间以"选择倾向的一致性"连接，避免孤立的统计指标冒充风格（6.2 节）。
@@ -180,23 +176,23 @@ $$s = \frac{v_{\mathrm{author}} - v_{\mathrm{base}}}{\|v_{\mathrm{author}} - v_{
 
 ![图3 RAG 供给闭环：触发 → 排队 → 检索 → 回灌 → 缺口节重写 → 重审计](rag-loop.png)
 
-### 3.4 意图表示与澄清协议（C2）
+### 3.4 意图表示与澄清协议（C3）
 
-意图表示追踪用户发言中的"主张—前提—推理—理论来源"（思想脉络）：如用户引用《乡土中国》[11]的论述并给出推理方向时，LLM 做一步概括并请用户确认（"你的意思是……对吗？"），确认后进入素材与风格档案。澄清协议由三条软规则与一条确定性护栏构成：先思想、后信息、最后规划；蓝图状态只是清单、提问由 LLM 自主判断；RAG 知识背景注入；蓝图无缺口仍追问 ≥2 轮则强制放行。
+意图表示追踪用户发言中的"主张—前提—推理—理论来源"（思想脉络）：如用户引用《乡土中国》[17]的论述并给出推理方向时，LLM 做一步概括并请用户确认（"你的意思是……对吗？"），确认后进入素材与风格档案。澄清协议由三条软规则与一条确定性护栏构成：先思想、后信息、最后规划；蓝图状态只是清单、提问由 LLM 自主判断；RAG 知识背景注入；蓝图无缺口仍追问 ≥2 轮则强制放行。
 
 交互采用"一次一问 + 我的建议 + A/B/C"模式，用户回答按信息价值分级（L0 空答 → L5 精准指令）："可以/挺好"为推进信号，"不不不"为修正信号——从否定中提炼真实需求。
 
-**外溢优先（overflow-first，C5）**：澄清的盲区不是"不会问"，而是"不会接"——用户最高价值的信息往往不是系统问出来的，而是用户主动说出、系统本来不准备问的。本轮升级让每轮回复先过外溢判断（由追问 LLM 动态决定，非硬编码分类）：参照系外溢（作品/作者/视频/播客）→ 当轮复述并深挖"哪一点击中了你"；私人网络外溢（家庭/师承/代际）→ 深挖"这条线怎么传到你"；红线外溢（定死的台词/情节/格式）→ 原样入红线清单，不再问"要不要改"；推理线外溢 → 按思想脉络复述＋顺推一层＋请确认。深挖连续最多 2 轮后回主线清单；每次外溢写入 `overflow-log.jsonl`（任务/当时所问/用户原话/类型），由聚合脚本定期归纳成问询系统升级信号，形成"用户主动说的话 → 规律 → 反哺问询"的自进化闭环。
+**外溢优先（overflow-first，C3）**：澄清的盲区不是"不会问"，而是"不会接"——用户最高价值的信息往往不是系统问出来的，而是用户主动说出、系统本来不准备问的。本轮升级让每轮回复先过外溢判断（由追问 LLM 动态决定，非硬编码分类）：参照系外溢（作品/作者/视频/播客）→ 当轮复述并深挖"哪一点击中了你"；私人网络外溢（家庭/师承/代际）→ 深挖"这条线怎么传到你"；红线外溢（定死的台词/情节/格式）→ 原样入红线清单，不再问"要不要改"；推理线外溢 → 按思想脉络复述＋顺推一层＋请确认。深挖连续最多 2 轮后回主线清单；每次外溢写入 `overflow-log.jsonl`（任务/当时所问/用户原话/类型），由聚合脚本定期归纳成问询系统升级信号，形成"用户主动说的话 → 规律 → 反哺问询"的自进化闭环。
 
 ![图4 澄清协议：响应推理链（主张→前提→概括→确认→入库→追问）](clarify-flow.png)
 
 ### 3.5 生成与前置约束
 
-写作以逐节生成为单位（参考"规划—转译—审校"的认知写作模型[12]），携带风格签名与统一简报（知识 + 素材 + 检索来源）。生成提示词包含前置约束：避免金句收束式同义反复、允许冗余与模糊、不替人物开口、反过度释义。这些约束为软性偏好引导，作者可一键否决。
+写作以逐节生成为单位（参考"规划—转译—审校"的认知写作模型[15]），携带风格签名与统一简报（知识 + 素材 + 检索来源）。生成提示词包含前置约束：避免金句收束式同义反复、允许冗余与模糊、不替人物开口、反过度释义。这些约束为软性偏好引导，作者可一键否决。
 
 ### 3.6 生成后审计：姿态层检测（RQ3）
 
-术语定义：**姿态层（postural layer）** 指文本在"如何呈现思考过程"层面的修辞姿态，对应文学批评中的叙述姿态（narrative stance），区别于可统计的用词与句式层；其检测目标是"表演思考"（performative thinking）——文本以形式上的推进姿态掩盖实质上的空洞。检测方法分两层：主路径为 LLM 六层细读（声音/过渡/修辞/引用/翻译体/收尾）+ RAG 作者对照（诊断前检索作者侧写、个人写作 skill 与知识库作参照），区别于规则型反 AI 腔检测工具[13]；确定性正则降级为离线兜底。修复遵守"绝不用新金句替换旧金句"；用《差生》的克制式结尾做回归样例，检验不误伤真实写作。
+术语定义：**姿态层（postural layer）** 指文本在"如何呈现思考过程"层面的修辞姿态，对应文学批评中的叙述姿态（narrative stance），区别于可统计的用词与句式层；其检测目标是"表演思考"（performative thinking）——文本以形式上的推进姿态掩盖实质上的空洞。检测方法分两层：主路径为 LLM 六层细读（声音/过渡/修辞/引用/翻译体/收尾）+ RAG 作者对照（诊断前检索作者侧写、个人写作 skill 与知识库作参照），区别于规则型反 AI 腔检测工具[18]；确定性正则降级为离线兜底。修复遵守"绝不用新金句替换旧金句"；用《差生》的克制式结尾做回归样例，检验不误伤真实写作。
 
 ### 3.7 应用扩展：原意优先翻译
 
@@ -216,7 +212,7 @@ $$F_{\mathrm{rt}} = \frac{|K_{\mathrm{kept}}|}{|K_{\mathrm{orig}}|} \times 100\%
 
 个人知识库采集由"正则抓《书名》"升级为 **LLM 主导筛选**：用户提到看过/读过/刷到的书、B站等视频、新闻、文章、去过的地方、认可的观点时，LLM 提炼条目（title/type/note/tags/confidence）入库，正则只做入口判断；短句确认（"对，就是那个"）把低置信条目升级为"已查验"。知识库跨会话聚合为个人知识库，并并入风格提炼语料——"读过什么、看过什么"也是风格的一部分（风格多面读取）。
 
-### 3.11 全流程互操作（C6）
+### 3.11 全流程互操作（C4）
 
 每一环节支持"文件进、文件出"，并与其他流程（Word/其他 Agent/工具链）衔接：
 
@@ -376,9 +372,9 @@ $$PP(x) = 2 + 6 \cdot S(x)$$
 
 ### 5.7 改迹调制：现状与可复现性
 
-签名层（L1–L4）、注入层（双风格、知识、缺陷审计）、**V1 候选对比**与 **V1.5 外层调制器**均已交付：本地词级文体计量个人模型（功能词+标点节奏，作者语料训练）提供 $p_{\mathrm{personal}}$，反 AI 审计词表提供 $S_{\mathrm{defect}}$，知识库匹配提供 $S_{\mathrm{knowledge}}$，节奏曲线提供 $S_{\mathrm{impedance}}$ 的时间结构，另加表层/话语/立场红线/风格向量方向/可选 embedding 神经原型/L3 作者清单 fineRead/姿态层细读 posture/个人回避库/改迹贴合九路特征，共十三维进入 `modulate()` 评分；写作节级接入候选对比（`agent/src/token-decode.js`，每节并行 n 候选十三维评分选优，得分分解落盘）。**调制器权重由作者偏好对学习**：edits.jsonl 的（原文，改后）经 pairwise hinge + SGD 拟合出每个作者独有的权重向量，数据签名变化自动在线重训、新编辑对增量更新（`agent/src/modulator.js`）；知识库检索升级为 BM25+语义混合（`matchKbHybrid`）；神经风格编码由可选 embedding 稠密原型提供（`embedding.js`，未配置时静默降级）；**L3 深层读取由作者写作清单协议提供**（`author-sheet.js`：主张/论证/读者/红线/触发五问自动归纳，红线拆句后强制保留，作为 fineRead 特征入评分）；**个人回避库聚合"作者亲手删掉的词"**（`avoidance.js`，负空间第一阶段，命中即压低）；**姿态层判据从"事后审计"前置到"事中选择"**——金句排比收束/路标转折/点题顿悟的确定性检测（`deterministicFakeThinking`）转为 posture 健康度特征，以软性加权参与候选排序，不拒绝生成（3.6 节仍保留 LLM 六层细读做生成后审计与修复）。单元测试（token-decode.test、modulator.test、embedding.test、author-sheet.test、stats.test）验证：个人模型可预测、缺陷/阻抗信号有效、改后文本得分高于原文、十三维分解可追溯、回避词命中压低、原型落盘与签名重算、语义排序、红线命中拉高 fineRead、表演式文本 posture 低而克制文本高、精确二项检验、数据不足降级、在线重训与增量更新生效。逐 token 重排（V2 logprobs / V3 本地 logits）仍为路线图。
+签名层（L1–L4）、注入层（双风格、知识、缺陷审计）、**V1 候选对比**与 **V1.5 外层调制器**均已交付：本地词级文体计量个人模型（功能词+标点节奏，作者语料训练）提供 $p_{\mathrm{personal}}$，反 AI 审计词表提供 $S_{\mathrm{defect}}$，知识库匹配提供 $S_{\mathrm{knowledge}}$，节奏曲线提供 $S_{\mathrm{impedance}}$ 的时间结构，另加表层/话语/立场红线/风格向量方向/可选 embedding 神经原型/L3 作者清单 fineRead/姿态层细读 posture/个人回避库/改迹贴合九路特征，共十三维进入 `modulate()` 评分；写作节级接入候选对比（`agent/src/token-decode.js`，每节并行 n 候选十三维评分选优，得分分解落盘）。**调制器权重由作者偏好对学习**：edits.jsonl 的（原文，改后）经成对合页损失（pairwise hinge）+ 随机梯度下降（SGD）拟合出每个作者独有的权重向量，数据签名变化自动在线重训、新编辑对增量更新（`agent/src/modulator.js`）；知识库检索升级为 BM25+语义混合（`matchKbHybrid`）；神经风格编码由可选 embedding 稠密原型提供（`embedding.js`，未配置时静默降级）；**L3 深层读取由作者写作清单协议提供**（`author-sheet.js`：主张/论证/读者/红线/触发五问自动归纳，红线拆句后强制保留，作为 fineRead 特征入评分）；**个人回避库聚合"作者亲手删掉的词"**（`avoidance.js`，负空间第一阶段，命中即压低）；**姿态层判据从"事后审计"前置到"事中选择"**——金句排比收束/路标转折/点题顿悟的确定性检测（`deterministicFakeThinking`）转为 posture 健康度特征，以软性加权参与候选排序，不拒绝生成（3.6 节仍保留 LLM 六层细读做生成后审计与修复）。单元测试（token-decode.test、modulator.test、embedding.test、author-sheet.test、stats.test）验证：个人模型可预测、缺陷/阻抗信号有效、改后文本得分高于原文、十三维分解可追溯、回避词命中压低、原型落盘与签名重算、语义排序、红线命中拉高 fineRead、表演式文本 posture 低而克制文本高、精确二项检验、数据不足降级、在线重训与增量更新生效。
 
-**词级文体计量与消融**：把个人模型从字符 n-gram 升级为词级文体计量（功能词+标点节奏），作者识别从 46.3% 提升到 76.4%（见 AUTHOR-ID-v2.md）。调制器逐维消融显示：在该"原文 vs 改后"排序任务上，学习权重与默认权重的留出正确率**均饱和到 100%**——编辑对差异过大，正确率这个指标无法区分二者；逐维关闭则显示 personal（词级文体计量个人模型）是**唯一有实质边际贡献的特征**，关闭后正确率降至 90%，其余十二维在留出集上无边际影响（见 MODULATOR-ABLATION.md，图 9）。因此"学习有真实增益"的可靠证据来自 3.1.2 的留出得分边距随编辑对数量上升，而非消融正确率。此外，词级文体计量仍低于字符二元组 TF-IDF 基线（90.3%）——该合成语料中作者与主题强耦合、内容级特征占优；这一硬指标与第三方盲评列入未来工作。
+**词级文体计量与消融**：把个人模型从字符 n-gram 升级为词级文体计量（功能词+标点节奏），作者识别从 46.3% 提升到 76.4%（见 AUTHOR-ID-v2.md）。调制器逐维消融显示：在该"原文 vs 改后"排序任务上，学习权重与默认权重的留出正确率**均饱和到 100%**——编辑对差异过大，正确率这个指标无法区分二者；逐维关闭则显示 personal（词级文体计量个人模型）是**唯一有实质边际贡献的特征**，关闭后正确率降至 90%，其余十二维在留出集上无边际影响（见 MODULATOR-ABLATION.md，图 9）。因此"学习有真实增益"的可靠证据来自 3.1.2 的留出得分边距随编辑对数量上升，而非消融正确率。
 
 ![图9 调制器逐维消融：留出排序正确率（学习=默认均饱和；关闭 personal 掉至 90%）](ablation-bars.png)
 
@@ -434,7 +430,7 @@ $$PP(x) = 2 + 6 \cdot S(x)$$
 
 本文定位是面向人文环境的帮助工具：在生成过程中保持作者特定的表达偏好与语义意图，而非最大化一般意义上的文本质量。目标用户为三类写作者：需要把"憋着的想法"理清的普通写作者与学生、在合规框架内需要保留个人表达的职场写作者、需要在 AI 时代守住"自己的声音"的内容创作者。
 
-### 6.4 改迹调制的意义与边界（C1）
+### 6.4 改迹调制的意义与边界（C2）
 
 提示工程"告诉模型怎么选"、LoRA"改模型整体倾向"、RAG"把知识写进上文"——三者都让修改发生在模型之外，风格的执行落在模型黑箱里。改迹调制把五路信号放进**同一个候选评分空间**：基础分布推、个人分布偏、知识撑、缺陷压、阻抗调，每一处选择都可回答"为什么选它"。这从方法层面回应了评审对"签名 ≠ 模型"的质疑：签名提供可观测信号，评分层把信号转化为候选排序的偏置，中间链路（评分器）全部可解释、可消融。
 
@@ -463,9 +459,9 @@ $$PP(x) = 2 + 6 \cdot S(x)$$
 
 本文提出 Stylotrace：以作者表示为中心的生成式写作系统。理论上，将风格形式化为作者相对中性基线的稳定条件选择偏差，用四层签名近似，并提出"修改监督"与**改迹调制**（五路信号在候选评分中融合，签名 → 注入 → 候选调制三段论）；实现上，把签名升级为**可学习的外层调制器**——十三维特征函数（含个人回避库、L3 作者清单 fineRead、姿态层 posture 与可选 embedding 神经编码）统一承载个人知识库、风格向量与收集数据，权重由作者亲手修改的偏好对拟合并随编辑增量更新，推理时实时调制通用模型的行为（V1 候选对比 → V1.5 调制器 → V2/V3 路线）；交互上，以思想脉络澄清协议与**外溢优先**接住用户主动给出的高价值信息（种子/红线/立意当轮入档 + 升级信号流水），并以作者写作清单把深层风格读取结构化；质量上，以姿态层检测缓解模型化话语特征，并把细读判据前置到生成时的候选选择（软性加权，不拒绝生成）；工程上，完成**全流程互操作**（作品同步/分割/按阶段导出）。实验表明，全部契约测试满足输出契约；学习曲线显示几十次修改即可学到稳定的作者方向；风格距离结果与"接近作者、远离模型化倾向"的假设一致；判别与预测两类外部检验显示签名具备作者信号，但样本规模不足以支持显著性结论。
 
-**未来工作**：① **改迹调制 V1、V1.5 外层调制器（偏好对学习十三维权重、增量在线更新、个人回避库、上下文窗口编辑对、可解释层、可选 embedding 神经编码、知识库向量混合检索、L3 作者写作清单 fineRead、姿态层 posture 软性入评分）均已落地**；下一步沿解码期控制（decoding-time control）路线推进——把姿态层 LLM 六层细读的结构化输出作为可选精读特征（当前为确定性判据前置，LLM 细读保留在生成后审计）、权重消融标定（即对 $\beta$/$\lambda$/$R$ 的敏感性分析）与候选数自适应，然后用 DExperts 式专家/反专家对比[18]与对比解码[19]做 V2 logprobs 重排，用 PREADD 前缀自适应[20]、ITI 激活干预[21]、Steering Vectors/激活工程[22]与 StyleVector[2] 做 V3 本地推理干预；② 扩大多作者 × 多篇跨文体语料，按"个性化文本生成评估"的三类判别任务[24]完成作者识别/续写选择的显著性检验（当前词级文体计量 76.4% 仍低于字符二元组 TF-IDF 基线 90.3%，是必须攻克的硬指标）；③ 执行澄清协议与外溢优先的消融对照实验（4.4 设计）；④ 跨语言验证与公开部署；⑤ 批注数据反哺——把用户批注积累为错误模式库与风格档案（已打通"批注 → AI 修改"闭环）。本文坚持**软性引导、作者保留否决权**：所有特征（含红线与姿态层判据）只参与加权排序与审计报告，不引入拒绝生成式的硬约束。
+**未来工作**：① **改迹调制 V1、V1.5 外层调制器（偏好对学习十三维权重、增量在线更新、个人回避库、上下文窗口编辑对、可解释层、可选 embedding 神经编码、知识库向量混合检索、L3 作者写作清单 fineRead、姿态层 posture 软性入评分）均已落地**；下一步沿解码期控制（decoding-time control）路线推进——把姿态层 LLM 六层细读的结构化输出作为可选精读特征（当前为确定性判据前置，LLM 细读保留在生成后审计）、权重消融标定（即对 $\beta$/$\lambda$/$R$ 的敏感性分析）与候选数自适应，然后用 DExperts 式专家/反专家对比[19]与对比解码[20]做 V2 logprobs 重排，用 PREADD 前缀自适应[21]、ITI 激活干预[22]、Steering Vectors/激活工程[23]与 StyleVector[2] 做 V3 本地推理干预；② 扩大多作者 × 多篇跨文体语料，按"个性化文本生成评估"的三类判别任务[24]完成作者识别/续写选择的显著性检验（当前词级文体计量仍低于字符二元组 TF-IDF 基线，需在跨主题语料上补齐）；③ 执行澄清协议与外溢优先的消融对照实验（4.4 设计）；④ 跨语言验证与公开部署；⑤ 批注数据反哺——把用户批注积累为错误模式库与风格档案（已打通"批注 → AI 修改"闭环）。本文坚持**软性引导、作者保留否决权**：所有特征（含红线与姿态层判据）只参与加权排序与审计报告，不引入拒绝生成式的硬约束。
 
-**理论可能的使用地方（应用展望）**：改迹调制的本质是"把一个人的稳定选择模式在解码层可度量、可注入、可追溯"，因此凡是存在"个人化选择模式"的场景都可以迁移：
+**应用展望**：改迹调制的本质是"把一个人的稳定选择模式在解码层可度量、可注入、可追溯"，因此凡是存在"个人化选择模式"的场景都可以迁移：
 
 - **翻译（正在尝试）**：已落地的"原意优先翻译 + 回译校验"（3.7 节）是第一层；下一步把改迹调制用于翻译——译文在信息保真（式 4）前提下，用 $p_{\mathrm{personal}}$ 与 $S_{\mathrm{defect}}$ 保持原作者的节奏、意象与语气偏好（"作者声音"跨语言保持），并用 $S_{\mathrm{knowledge}}$ 约束领域术语一致性；回译校验仍作为质量门；
 - **编辑校对与批注驱动修订**："选段批注 → AI 修改"可升级为"批注即训练信号"——批量批注自动进入风格档案与错误模式库，形成"越批注越懂你"的闭环；
@@ -536,56 +532,56 @@ $$PP(x) = 2 + 6 \cdot S(x)$$
 
 ## 致谢
 
-感谢指导教师、参与测试的同学与开源社区；StyleVector[2]、GhostWriter[3]、EMNLP 2025[1] 与 Flower & Hayes[12] 等成果为本文提供了理论基础。
+感谢指导教师、参与测试的同学与开源社区；StyleVector[2]、GhostWriter[3]、EMNLP 2025[1] 与 Flower & Hayes[15] 等成果为本文提供了理论基础。
 
 ## 参考文献
 
 [1] WANG Y, TRIPTO N, et al. Catch Me If You Can? Not Yet: LLMs Still Struggle to Imitate the Implicit Writing Styles of Everyday Authors[C]//Findings of the Association for Computational Linguistics: EMNLP 2025. Stroudsburg: ACL, 2025.
 
-[2] ZHANG H, LIU Y, et al. Personalized Text Generation with Contrastive Activation Steering (StyleVector)[C]//Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics. Stroudsburg: ACL, 2025.
+[2] ZHANG J, LIU Y, WANG W, et al. Personalized Text Generation with Contrastive Activation Steering (StyleVector)[C]//Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics. Stroudsburg: ACL, 2025.
 
 [3] CHAKRABARTY T, et al. GhostWriter: Augmenting Collaborative Human-AI Writing Experiences Through Personalization and Agency[J/OL]. arXiv preprint arXiv:2402.08855, 2024.
 
-[4] Agentic Ghostwriter: Style-Reward Fine-Tuning for Writing Assistance[J/OL]. arXiv preprint arXiv:2512.05747, 2025.
+[4] BURROWS J. Delta: A Measure of Stylistic Difference and a Guide to Likely Authorship[J]. Literary and Linguistic Computing, 2002, 17(3): 267-287.
 
-[5] Oxford HAI Lab. Writing-Anima: Two-Stage Style-Aware Retrieval for Personalized Writing[EB/OL]. 2025.（项目主页，非同行评议，仅作行业对照）
+[5] ARGAMON S. Interpreting Burrows's Delta: Geometric and Probabilistic Foundations[J]. Literary and Linguistic Computing, 2008, 23(2): 131-147.
 
-[6] CustomNLP4U. Pearl: A Personalized Writing Assistant with Retriever Calibration[R/OL]. 2024.（非同行评议技术报告，仅作行业对照）
+[6] BIBER D. Variation across Speech and Writing[M]. Cambridge: Cambridge University Press, 1988.
 
-[7] COLLABLLM: Human-AI Collaborative Learning[C]//Proceedings of the 42nd International Conference on Machine Learning (ICML). 2025.
+[7] LIU J, BAHJA M, KOVATCHEV V, et al. Capturing Classic Authorial Style in Long-Form Story Generation with GRPO Fine-Tuning[J/OL]. arXiv preprint arXiv:2512.05747, 2025.
 
-[8] DiscoverLLM: Discovering User Intent Through Draft Contrasting[R/OL]. 2026.（非同行评议技术报告，仅作行业对照）
+[8] Oxford HAI Lab. Writing-Anima: Two-Stage Style-Aware Retrieval for Personalized Writing[EB/OL]. 2025.（项目主页，非同行评议，仅作行业对照）
 
-[9] 基于 AI 智能体的智能写作辅助系统[EB/OL]. CSDN, 2026.（博客，非正式发表，仅作行业现状参考）
+[9] CustomNLP4U. Pearl: A Personalized Writing Assistant with Retriever Calibration[R/OL]. 2024.（非同行评议技术报告，仅作行业对照）
 
-[10] 马良写作. 中文长篇 AI 写作 18 款工具横评[EB/OL]. https://maliangwriter.com/compare/.（产品横评，非同行评议，仅用于提炼产品能力维度）
+[10] WU S, GALLEY M, PENG B, et al. CollabLLM: From Passive Responders to Active Collaborators[C]//Proceedings of the 42nd International Conference on Machine Learning (ICML). 2025.
 
-[11] 费孝通. 乡土中国[M]. 北京: 生活·读书·新知三联书店, 1985.
+[11] KIM T S, LEE Y, YU J, et al. DiscoverLLM: From Executing Intents to Discovering Them[C]//International Conference on Machine Learning (ICML). 2026.
 
-[12] FLOWER L, HAYES J R. A Cognitive Process Theory of Writing[J]. College Composition and Communication, 1981, 32(4): 365-387.
+[12] 基于 AI 智能体的智能写作辅助系统[EB/OL]. CSDN, 2026.（博客，非正式发表，仅作行业现状参考）
 
-[13] no-ai-slop / avoid-ai-writing-zh / de-aigc-ch 等开源反 AI 腔检测项目[EB/OL]. GitHub, 2024-2026.（开源项目，非同行评议，仅作行业对照）
+[13] 马良写作. 中文长篇 AI 写作 18 款工具横评[EB/OL]. https://maliangwriter.com/compare/.（产品横评，非同行评议，仅用于提炼产品能力维度）
 
-[14] BURROWS J. Delta: A Measure of Stylistic Difference and a Guide to Likely Authorship[J]. Literary and Linguistic Computing, 2002, 17(3): 267-287.
+[14] HALLIDAY M A K. An Introduction to Functional Grammar[M]. London: Edward Arnold, 1985.
 
-[15] BIBER D. Variation across Speech and Writing[M]. Cambridge: Cambridge University Press, 1988.
+[15] FLOWER L, HAYES J R. A Cognitive Process Theory of Writing[J]. College Composition and Communication, 1981, 32(4): 365-387.
 
-[16] HALLIDAY M A K. An Introduction to Functional Grammar[M]. London: Edward Arnold, 1985.
+[16] KUMAR N A, PHAM C M, IYYER M, et al. Whose story is it? Personalizing Story Generation by Inferring Author Styles[C]//Proceedings of the International Joint Conference on Natural Language Processing and the Conference of the Asia-Pacific Chapter of the Association for Computational Linguistics (IJCNLP-AACL). 2025.
 
-[17] ARGAMON S. Interpreting Burrows's Delta: Geometric and Probabilistic Foundations[J]. Literary and Linguistic Computing, 2008, 23(2): 131-147.
+[17] 费孝通. 乡土中国[M]. 北京: 生活·读书·新知三联书店, 1985.
 
-[18] LIU A, SAP M, LU X, et al. DExperts: Decoding-Time Controlled Text Generation with Experts and Anti-Experts[C]//Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics. Stroudsburg: ACL, 2021.
+[18] no-ai-slop / avoid-ai-writing-zh / de-aigc-ch 等开源反 AI 腔检测项目[EB/OL]. GitHub, 2024-2026.（开源项目，非同行评议，仅作行业对照）
 
-[19] LI X L, HOLTZMAN A, FRIED D, et al. Contrastive Decoding: Open-ended Text Generation as Optimization[C]//The Eleventh International Conference on Learning Representations (ICLR 2023).
+[19] LIU A, SAP M, LU X, et al. DExperts: Decoding-Time Controlled Text Generation with Experts and Anti-Experts[C]//Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics. Stroudsburg: ACL, 2021.
 
-[20] YANG K, KLEIN D. PREADD: Prefix-Adaptive Decoding for Controlled Text Generation[C]//Findings of the Association for Computational Linguistics: ACL 2023.
+[20] LI X L, HOLTZMAN A, FRIED D, et al. Contrastive Decoding: Open-ended Text Generation as Optimization[C]//The Eleventh International Conference on Learning Representations (ICLR 2023).
 
-[21] LI K, PATEL O, VIEIRA F, et al. Inference-Time Intervention: Eliciting Truthful Answers from a Language Model[C]//Advances in Neural Information Processing Systems 36 (NeurIPS 2023).
+[21] YANG K, KLEIN D. PREADD: Prefix-Adaptive Decoding for Controlled Text Generation[C]//Findings of the Association for Computational Linguistics: ACL 2023.
 
-[22] TURNER A M, THIERJEN L, UDANDARAO D, et al. Steering Language Models with Activation Engineering[EB/OL]. arXiv preprint arXiv:2308.10248, 2023.
+[22] LI K, PATEL O, VIEIRA F, et al. Inference-Time Intervention: Eliciting Truthful Answers from a Language Model[C]//Advances in Neural Information Processing Systems 36 (NeurIPS 2023).
 
-[23] Whose story is it? Personalizing Story Generation by Inferring Author Styles[J/OL]. arXiv preprint arXiv:2502.13028, 2025.
+[23] TURNER A M, THIERJEN L, UDANDARAO D, et al. Steering Language Models with Activation Engineering[EB/OL]. arXiv preprint arXiv:2308.10248, 2023.
 
-[24] Evaluating Style-Personalized Text Generation: Challenges and Directions[J/OL]. arXiv preprint arXiv:2508.06374, 2025.
+[24] JANGRA A, SARRAFZADEH B, DE WYNTER A, et al. Evaluating Style-Personalized Text Generation: Challenges and Directions[J/OL]. arXiv preprint arXiv:2508.06374, 2025.
 
-注：[5][6][8][9][10][13][23][24] 为非同行评议来源（技术报告、开源项目、博客、产品横评、预印本），仅用于行业现状、能力维度与验证协议对照，不作为核心理论依据。
+注：[7][8][9][12][13][18][24] 为非同行评议来源（技术报告、开源项目、博客、产品横评、预印本），仅用于行业现状、能力维度与验证协议对照，不作为核心理论依据。
