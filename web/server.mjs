@@ -176,7 +176,45 @@ loadEnvLocal(path.resolve(HERE, '..', '.env.local'));
 // Web 端默认使用 deepseek-v4-flash（快、省），显式 SCULPTOR_LLM_MODEL 仍可覆盖为 pro。
 if (!process.env.SCULPTOR_LLM_MODEL) process.env.SCULPTOR_LLM_MODEL = 'deepseek-v4-flash';
 
-const cfg = loadConfig();
+// 服务端兜底凭据（本地/开发者自用）：仅在没有 BYOK key 时使用。
+// 对外部署时建议不配 SCULPTOR_LLM_API_KEY，强制用户自带 key，避免烧服务端额度。
+const serverCfg = loadConfig();
+
+// ── BYOK：用户带自己的 LLM key 调用，key 既是身份也是计费凭证 ──
+const cfgCtx = new AsyncLocalStorage();
+
+function currentCfg() {
+  return cfgCtx.getStore() || serverCfg;
+}
+
+function byokKeyOf(req, url) {
+  const auth = String(req.headers.authorization || '').trim();
+  const m = auth.match(/^Bearer\s+(\S+)$/i);
+  if (m) return m[1];
+  return String(url.searchParams.get('apiKey') || '').trim();
+}
+
+function userNamespace(req, url) {
+  const key = byokKeyOf(req, url);
+  if (key) {
+    return 'key-' + crypto.createHash('sha256').update(key).digest('hex').slice(0, 16);
+  }
+  return machineIdOf(req, url);
+}
+
+function cfgForRequest(req, url) {
+  const key = byokKeyOf(req, url);
+  if (!key) return serverCfg;
+  const model = String(url.searchParams.get('model') || '').trim();
+  const baseUrl = String(url.searchParams.get('baseUrl') || '').trim();
+  return loadConfig({
+    ...process.env,
+    SCULPTOR_LLM_API_KEY: key,
+    SCULPTOR_CREDENTIALS: 'off',
+    ...(model ? { SCULPTOR_LLM_MODEL: model } : {}),
+    ...(baseUrl ? { SCULPTOR_LLM_BASE_URL: baseUrl } : {}),
+  });
+}
 
 const IO_SCRIPTS = path.resolve(HERE, '..', 'agent', 'scripts', 'io');
 
@@ -405,7 +443,7 @@ async function runStepAndRespond(res, id, message) {
   }
   if (message) appendTranscript(id, { role: 'user', text: String(message) });
   try {
-    const r = await agentStep(cfg, dir, { lastInput: String(message || '') });
+    const r = await agentStep(currentCfg(), dir, { lastInput: String(message || '') });
     const state = ws.readState(dir);
     const meta = metaFromState(readMeta(id) || { id, title: '新写作', createdAt: ws.nowIso() }, state);
     writeMeta(id, meta);
@@ -446,8 +484,8 @@ async function runStepAndRespond(res, id, message) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  const mid = machineIdOf(req, url);
-  return machineCtx.run(mid, () => handleRequest(req, res, url));
+  const mid = userNamespace(req, url);
+  return machineCtx.run(mid, () => cfgCtx.run(cfgForRequest(req, url), () => handleRequest(req, res, url)));
 });
 
 async function handleRequest(req, res, url) {
@@ -475,8 +513,9 @@ async function handleRequest(req, res, url) {
     return json(res, 200, {
       ok: true,
       mode: process.env.SCULPTOR_MOCK_LLM === '1' ? 'mock' : 'live',
-      model: cfg.model,
-      key: cfg.apiKey ? 'configured' : 'missing',
+      model: currentCfg().model,
+      key: currentCfg().apiKey ? 'configured' : 'missing',
+      byok: true,
     });
   }
 
@@ -576,7 +615,7 @@ async function handleRequest(req, res, url) {
       liveOutline: lo || null,
       outlineComplete: Boolean(lo?.complete),
       outlineConfirmed: Boolean(state.confirmed?.outlineConfirmed),
-      rag: ragStatus(dir, cfg),
+      rag: ragStatus(dir, currentCfg()),
     });
   }
   if (req.method === 'POST' && p === '/api/outline') {
@@ -659,7 +698,7 @@ async function handleRequest(req, res, url) {
         hint: '可以直接把资料粘贴进"资料回灌"输入框。',
       });
     }
-    const out = await searchOnline(cfg, queries);
+    const out = await searchOnline(currentCfg(), queries);
     if (!out.searched) {
       return json(res, 400, { error: '未配置检索端点或检索失败', hint: out.hint || '', queries });
     }
@@ -720,7 +759,7 @@ async function handleRequest(req, res, url) {
     const file = path.join(upDir, `${Date.now()}-${safe}`);
     fs.writeFileSync(file, buf);
     const state = ws.readState(dir);
-    const ing = await extractInput(file, cfg);
+    const ing = await extractInput(file, currentCfg());
     if (ing.kind === 'text' && ing.text) {
       state.materials = state.materials || [];
       state.materials.push(`[文件 ${safe}] ${ing.text.slice(0, 2000)}`);
@@ -750,7 +789,7 @@ async function handleRequest(req, res, url) {
     const draftFile = path.join(dir, 'draft.md');
     if (!fs.existsSync(draftFile)) return json(res, 400, { error: '还没有成稿，无法定点修改' });
     try {
-      const out = await pointEdit(cfg, dir, {
+      const out = await pointEdit(currentCfg(), dir, {
         quote: String(quote),
         instruction: String(instruction),
         replacement: typeof replacement === 'string' ? replacement : undefined,
@@ -831,7 +870,7 @@ async function handleRequest(req, res, url) {
       let out = null;
       for (const q of attempts) {
         try {
-          out = await pointEdit(cfg, dir, { quote: q, instruction: a.comment, dir, file: draftFile });
+          out = await pointEdit(currentCfg(), dir, { quote: q, instruction: a.comment, dir, file: draftFile });
           break;
         } catch (e) {
           out = null;
@@ -860,7 +899,7 @@ async function handleRequest(req, res, url) {
     const draftFile = path.join(dir, 'draft.md');
     if (!fs.existsSync(draftFile)) return json(res, 400, { error: '还没有成稿，无法改写' });
     try {
-      const out = await rewriteVariants(cfg, dir, {
+      const out = await rewriteVariants(currentCfg(), dir, {
         quote: String(quote),
         instruction: String(instruction),
         dir,
@@ -900,7 +939,7 @@ async function handleRequest(req, res, url) {
       return json(res, 400, { error: '还没有成稿，无法回译校验' });
     }
     try {
-      const r = await roundtripCheck(cfg, dir, {});
+      const r = await roundtripCheck(currentCfg(), dir, {});
       return json(res, 200, {
         ok: true,
         verdict: r.verdict,
@@ -1332,7 +1371,7 @@ async function handleRequest(req, res, url) {
     const id = String(url.searchParams.get('sessionId') || '');
     if (!readMeta(id)) return json(res, 404, { error: '会话不存在' });
     try {
-      const r = await checkConsistency(cfg, sessionDir(id));
+      const r = await checkConsistency(currentCfg(), sessionDir(id));
       return json(res, 200, r);
     } catch (e) {
       return json(res, 200, { score: 100, total: 0, recovered: [], unrecovered: [], note: String(e.message || '校验失败') });
@@ -1350,7 +1389,7 @@ async function handleRequest(req, res, url) {
     try {
       genre = ws.readState(dir)?.confirmed?.genre || '';
     } catch {}
-    const r = await academicNorm(cfg, dir, { genre });
+    const r = await academicNorm(currentCfg(), dir, { genre });
     return json(res, 200, {
       score: r.score,
       items: r.items,
@@ -1372,8 +1411,8 @@ async function handleRequest(req, res, url) {
     fs.mkdirSync(toolsDir, { recursive: true });
     const outBase = path.join(toolsDir, `out-${Date.now()}`);
     const r = p === '/api/doc/translate'
-      ? await docTranslate(cfg, dir, { file: src, lang: String(lang || 'en'), out: outBase })
-      : await docRestyle(cfg, dir, { file: src, style: String(style || ''), out: outBase });
+      ? await docTranslate(currentCfg(), dir, { file: src, lang: String(lang || 'en'), out: outBase })
+      : await docRestyle(currentCfg(), dir, { file: src, style: String(style || ''), out: outBase });
     return json(res, 200, {
       ok: r.ok,
       mode: r.mode,
@@ -1420,5 +1459,5 @@ server.listen(PORT, () => {
     `Sculptor Studio → http://localhost:${PORT}（${process.env.SCULPTOR_MOCK_LLM === '1' ? '离线 mock 模式' : '真实 LLM 模式'}）`,
   );
   console.log(`  会话数据: ${DATA_ROOT}`);
-  console.log(`  模型: ${cfg.model} · 密钥: ${cfg.apiKey ? '已配置' : '未配置（可在 .env.local 或环境变量里设）'}`);
+  console.log(`  模型: ${currentCfg().model} · 密钥: ${currentCfg().apiKey ? '已配置' : '未配置（可在 .env.local 或环境变量里设）'}`);
 });

@@ -97,8 +97,15 @@ function machineId() {
   return id;
 }
 
+function apiKey() {
+  return (localStorage.getItem('sculptor.llmKey') || '').trim();
+}
+
 function apiHeaders(extra = {}) {
-  return { 'X-Machine-Id': machineId(), ...extra };
+  const h = { 'X-Machine-Id': machineId(), ...extra };
+  const key = apiKey();
+  if (key) h.Authorization = 'Bearer ' + key;
+  return h;
 }
 
 async function apiGet(pathname) {
@@ -169,6 +176,21 @@ function bindAuth() {
   });
 }
 
+function bindByok() {
+  const input = $('llmKey');
+  const save = $('llmKeySave');
+  if (!input) return;
+  input.value = apiKey();
+  const apply = () => {
+    const v = input.value.trim();
+    if (v) localStorage.setItem('sculptor.llmKey', v);
+    else localStorage.removeItem('sculptor.llmKey');
+    toast(v ? 'Key 已保存（只存本地浏览器）' : '已清除 Key，改用服务端默认凭据');
+  };
+  if (save) save.addEventListener('click', apply);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') apply(); });
+}
+
 function fmtDate(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -179,6 +201,8 @@ function fmtDate(iso) {
 function downloadExport(sid, fmt, file) {
   const q = new URLSearchParams({ sessionId: sid, fmt });
   if (file) q.set('file', file);
+  const key = apiKey();
+  if (key) q.set('apiKey', key);
   const a = document.createElement('a');
   a.href = `/api/export?${q.toString()}`;
   document.body.appendChild(a);
@@ -2217,6 +2241,7 @@ document.addEventListener('keydown', (e) => {
 
 /* ── 初始化 ───────────────────────────────────────── */
 bindAuth();
+bindByok();
 ensureAuth();
 renderDash();
 ensureSplitBtn();

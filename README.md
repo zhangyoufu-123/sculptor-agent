@@ -109,6 +109,10 @@ cd web && npm start        # → http://localhost:5177
 cd web && npm run mock     # 离线 mock 模式，无 API 也能体验
 ```
 
+Web 端同样支持 **BYOK**：页面右上角粘贴你自己的 LLM API Key（只存本地浏览器），服务端就用这个
+key 调 LLM、并按 key 隔离会话——不烧服务端额度。不填 key 时回退到服务端环境变量里的凭据
+（适合本地自用）。对外部署时建议不要配 `SCULPTOR_LLM_API_KEY`，强制用户自带 key。
+
 ## 公开 API（FastAPI + BYOK）
 
 `api/` 把同一引擎包装成可自部署、可对外调用的 HTTP API。核心是 **BYOK（Bring Your Own Key）**：

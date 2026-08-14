@@ -164,6 +164,17 @@ body {
 
 .top-right { display: flex; align-items: center; gap: 10px; min-width: 120px; justify-content: flex-end; }
 
+.key-input {
+  width: 200px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid var(--ink-3, #d8cfbf);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink, #2b2118);
+}
+.key-input::placeholder { color: var(--muted, #8a7a65); }
+
 .session-pill {
   display: inline-block;
   max-width: 220px;
