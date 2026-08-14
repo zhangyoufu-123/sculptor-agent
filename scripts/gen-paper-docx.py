@@ -178,7 +178,16 @@ def build_equations():
         delim(frac(delim(seq(run('S'), delim(run('w | c, t')))), run('τ'))),
         run('　(12)'))
 
-    return [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12]
+    # 式 0：风格定义（不编号，居中显示）
+    sa = ssub(run('S'), run('a'))
+    pa = ssub(run('P'), run('a'))
+    p0 = ssub(run('P'), run('0'))
+    f_def = seq(
+        sa, delim(run('c')), run(' = '),
+        pa, delim(run('w | c')), run(' − '),
+        p0, delim(run('w | c')))
+
+    return [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f_def]
 
 
 EQUATIONS = build_equations()
@@ -377,6 +386,7 @@ def add_code(text):
 
 
 MATH_KEYS = [
+    (r'S_a(c) = P_a', 12),
     (r'\hat{v} =', 0),
     (r'\frac{v_j', 1),
     (r'\sqrt{\sum', 2),
