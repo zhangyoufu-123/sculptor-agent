@@ -46,8 +46,7 @@
         <button class="stage-item" data-stage="deliver" data-title="成稿">成稿</button>
       </nav>
       <div class="top-right">
-        <input type="password" id="llmKey" class="key-input" placeholder="🔑 粘贴你的 LLM API Key（BYOK）" title="填写你自己的 DeepSeek/OpenAI 兼容 Key；只存本地浏览器，用于你的请求计费" />
-        <button class="icon-btn" id="llmKeySave" title="保存 Key">保存</button>
+        <button class="icon-btn" id="settingsToggle" title="模型与 API Key（BYOK）">🔑 未配置 Key</button>
         <button class="icon-btn" id="contextToggle">上下文</button>
         <span class="session-pill" id="sessionPill">未选择项目</span>
       </div>
@@ -324,6 +323,52 @@
   </div>
 
   <div class="toast" id="toast" hidden></div>
+
+  <!-- 模型与 API Key（BYOK）设置：借鉴 DeepSeek Harness 的本地下载 + 自带 Key 形态 -->
+  <div class="modal" id="settingsModal" hidden>
+    <div class="modal-card" style="max-width:560px">
+      <div class="modal-head">
+        <h3>模型与 API Key</h3>
+        <button class="btn btn-ghost" id="settingsClose">关闭</button>
+      </div>
+      <div class="settings-body">
+        <p class="session-sub">
+          本地启动、自带密钥：选择服务商 → 粘贴你自己的 Key → 选模型。Key 只写入这台浏览器的
+          localStorage，请求时以 <code>Authorization: Bearer</code> 直达 LLM，服务端不留存、不代付。
+        </p>
+
+        <label class="settings-field">
+          <span class="settings-label">服务商</span>
+          <select id="settingsProvider"></select>
+        </label>
+
+        <label class="settings-field">
+          <span class="settings-label">Base URL（OpenAI 兼容端点）</span>
+          <input id="settingsBaseUrl" class="search" placeholder="https://api.deepseek.com/v1" spellcheck="false" />
+        </label>
+
+        <label class="settings-field">
+          <span class="settings-label">模型</span>
+          <input id="settingsModel" class="search" list="modelList" placeholder="deepseek-v4-flash" spellcheck="false" />
+          <datalist id="modelList"></datalist>
+        </label>
+
+        <label class="settings-field">
+          <span class="settings-label">API Key（只写，保存后掩码显示）</span>
+          <input type="password" id="settingsKey" class="search" placeholder="sk-…" autocomplete="off" spellcheck="false" />
+          <span class="settings-hint" id="settingsKeyHint">未配置</span>
+        </label>
+
+        <div class="settings-actions">
+          <button class="btn btn-gold" id="settingsSave">保存</button>
+          <button class="btn btn-ghost" id="settingsClear">清除全部</button>
+        </div>
+        <p class="settings-note">
+          留空 Key 时回退到服务端环境变量里的凭据（仅当部署方已配置）。清除后只删本机浏览器缓存，不影响服务端。
+        </p>
+      </div>
+    </div>
+  </div>
 
   <!-- 密码门（设置 STYLOTRACE_WEB_PASSWORD 时出现） -->
   <div class="modal" id="authModal" hidden>

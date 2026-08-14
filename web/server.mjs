@@ -205,8 +205,10 @@ function userNamespace(req, url) {
 function cfgForRequest(req, url) {
   const key = byokKeyOf(req, url);
   if (!key) return serverCfg;
-  const model = String(url.searchParams.get('model') || '').trim();
-  const baseUrl = String(url.searchParams.get('baseUrl') || '').trim();
+  const model =
+    String(req.headers['x-llm-model'] || url.searchParams.get('model') || '').trim();
+  const baseUrl =
+    String(req.headers['x-llm-base-url'] || url.searchParams.get('baseUrl') || '').trim();
   return loadConfig({
     ...process.env,
     STYLOTRACE_LLM_API_KEY: key,

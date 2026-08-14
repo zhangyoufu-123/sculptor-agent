@@ -97,14 +97,38 @@ function machineId() {
   return id;
 }
 
-function apiKey() {
-  return (localStorage.getItem('stylotrace.llmKey') || '').trim();
+// ── BYOK：Key / 模型 / Base URL 均存本地浏览器（借鉴 DeepSeek Harness 的本地下载 + 自带 Key 形态）──
+const PROVIDERS = [
+  { id: 'deepseek', name: 'DeepSeek（推荐）', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-v4-flash', models: ['deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-chat', 'deepseek-reasoner'] },
+  { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4.1-mini', models: ['gpt-4.1-mini', 'gpt-4.1', 'gpt-4o', 'gpt-4o-mini'] },
+  { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'openrouter/auto', models: ['openrouter/auto'] },
+  { id: 'moonshot', name: 'Moonshot（Kimi）', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'] },
+  { id: 'dashscope', name: '阿里云百炼（Qwen）', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', models: ['qwen-plus', 'qwen-max', 'qwen-turbo'] },
+  { id: 'zhipu', name: '智谱 AI（GLM）', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash', models: ['glm-4-flash', 'glm-4-plus', 'glm-4-air'] },
+  { id: 'gemini', name: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.0-flash', models: ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'] },
+  { id: 'custom', name: '自定义 OpenAI 兼容网关', baseUrl: '', model: '', models: [] },
+];
+
+function llmKey() { return (localStorage.getItem('stylotrace.llmKey') || '').trim(); }
+function llmModel() { return (localStorage.getItem('stylotrace.llmModel') || '').trim(); }
+function llmBaseUrl() { return (localStorage.getItem('stylotrace.llmBaseUrl') || '').trim(); }
+function llmProvider() { return (localStorage.getItem('stylotrace.llmProvider') || '').trim(); }
+
+function maskKey(key) {
+  const s = String(key || '').trim();
+  if (!s) return '';
+  if (s.length <= 6) return '******';
+  return '····' + s.slice(-4);
 }
 
 function apiHeaders(extra = {}) {
   const h = { 'X-Machine-Id': machineId(), ...extra };
-  const key = apiKey();
+  const key = llmKey();
   if (key) h.Authorization = 'Bearer ' + key;
+  const model = llmModel();
+  if (model) h['X-LLM-Model'] = model;
+  const baseUrl = llmBaseUrl();
+  if (baseUrl) h['X-LLM-Base-Url'] = baseUrl;
   return h;
 }
 
@@ -176,19 +200,114 @@ function bindAuth() {
   });
 }
 
-function bindByok() {
-  const input = $('llmKey');
-  const save = $('llmKeySave');
-  if (!input) return;
-  input.value = apiKey();
+function renderKeyState() {
+  const btn = $('settingsToggle');
+  if (!btn) return;
+  const key = llmKey();
+  if (key) {
+    const model = llmModel() || '默认模型';
+    btn.textContent = '🔑 ' + maskKey(key);
+    btn.title = `模型：${model}\nBase URL：${llmBaseUrl() || '默认'}\n点击修改`;
+    btn.classList.add('is-active');
+  } else {
+    btn.textContent = '🔑 未配置 Key';
+    btn.title = '点击配置模型与 API Key（BYOK）';
+    btn.classList.remove('is-active');
+  }
+  const hint = $('settingsKeyHint');
+  if (hint) hint.textContent = key ? '已配置 ' + maskKey(key) : '未配置';
+}
+
+function bindSettings() {
+  const modal = $('settingsModal');
+  const toggle = $('settingsToggle');
+  const close = $('settingsClose');
+  const providerSel = $('settingsProvider');
+  const baseUrlInput = $('settingsBaseUrl');
+  const modelInput = $('settingsModel');
+  const keyInput = $('settingsKey');
+  const save = $('settingsSave');
+  const clear = $('settingsClear');
+  const modelList = $('modelList');
+  if (!modal || !toggle) return;
+
+  PROVIDERS.forEach((p) => {
+    const o = document.createElement('option');
+    o.value = p.id;
+    o.textContent = p.name;
+    providerSel.appendChild(o);
+  });
+
+  function providerById(pid) {
+    return PROVIDERS.find((x) => x.id === pid) || PROVIDERS[0];
+  }
+
+  function fillModelList(p) {
+    modelList.innerHTML = (p.models || []).map((m) => `<option value="${m}"></option>`).join('');
+  }
+
+  function populate() {
+    const pid = PROVIDERS.some((p) => p.id === llmProvider()) ? llmProvider() : 'deepseek';
+    providerSel.value = pid;
+    const p = providerById(pid);
+    baseUrlInput.value = llmBaseUrl() || p.baseUrl;
+    modelInput.value = llmModel() || p.model;
+    keyInput.value = llmKey();
+    fillModelList(p);
+    renderKeyState();
+  }
+
+  providerSel.addEventListener('change', () => {
+    const p = providerById(providerSel.value);
+    fillModelList(p);
+    if (p.baseUrl) baseUrlInput.value = p.baseUrl;
+    if (p.model && !modelInput.value.trim()) modelInput.value = p.model;
+  });
+
+  toggle.addEventListener('click', () => { populate(); modal.hidden = false; });
+  close.addEventListener('click', () => { modal.hidden = true; });
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.hidden = true; });
+
   const apply = () => {
-    const v = input.value.trim();
-    if (v) localStorage.setItem('stylotrace.llmKey', v);
-    else localStorage.removeItem('stylotrace.llmKey');
-    toast(v ? 'Key 已保存（只存本地浏览器）' : '已清除 Key，改用服务端默认凭据');
+    const k = keyInput.value.trim();
+    const m = modelInput.value.trim();
+    const b = baseUrlInput.value.trim();
+    const pid = providerSel.value;
+    if (k) localStorage.setItem('stylotrace.llmKey', k); else localStorage.removeItem('stylotrace.llmKey');
+    if (m) localStorage.setItem('stylotrace.llmModel', m); else localStorage.removeItem('stylotrace.llmModel');
+    if (b) localStorage.setItem('stylotrace.llmBaseUrl', b); else localStorage.removeItem('stylotrace.llmBaseUrl');
+    if (pid) localStorage.setItem('stylotrace.llmProvider', pid); else localStorage.removeItem('stylotrace.llmProvider');
+    renderKeyState();
+    modal.hidden = true;
+    toast(k ? `已保存：${m || '默认模型'}（Key 只存本机浏览器）` : '已清除 Key，改用服务端默认凭据');
   };
-  if (save) save.addEventListener('click', apply);
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') apply(); });
+
+  save.addEventListener('click', apply);
+  keyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') apply(); });
+
+  clear.addEventListener('click', () => {
+    ['llmKey', 'llmModel', 'llmBaseUrl', 'llmProvider'].forEach((n) => localStorage.removeItem('stylotrace.' + n));
+    keyInput.value = '';
+    const p = providerById(providerSel.value);
+    baseUrlInput.value = p.baseUrl;
+    modelInput.value = p.model;
+    fillModelList(p);
+    renderKeyState();
+    toast('已清除本机 Key 与模型设置');
+  });
+}
+
+// 首次打开且本机/服务端都无 Key 时，像 DeepSeek Harness 一样主动引导填 Key（只弹一次）。
+async function maybePromptKey() {
+  if (llmKey()) { renderKeyState(); return; }
+  renderKeyState();
+  try {
+    const h = await fetch('/health', { headers: apiHeaders() }).then((r) => r.json());
+    if (h.key === 'missing' && h.mode !== 'mock' && !localStorage.getItem('stylotrace.settingsPrompted')) {
+      localStorage.setItem('stylotrace.settingsPrompted', '1');
+      $('settingsToggle')?.click();
+    }
+  } catch {}
 }
 
 function fmtDate(iso) {
@@ -201,8 +320,12 @@ function fmtDate(iso) {
 function downloadExport(sid, fmt, file) {
   const q = new URLSearchParams({ sessionId: sid, fmt });
   if (file) q.set('file', file);
-  const key = apiKey();
+  const key = llmKey();
   if (key) q.set('apiKey', key);
+  const model = llmModel();
+  if (model) q.set('model', model);
+  const baseUrl = llmBaseUrl();
+  if (baseUrl) q.set('baseUrl', baseUrl);
   const a = document.createElement('a');
   a.href = `/api/export?${q.toString()}`;
   document.body.appendChild(a);
@@ -2247,8 +2370,9 @@ document.addEventListener('keydown', (e) => {
 
 /* ── 初始化 ───────────────────────────────────────── */
 bindAuth();
-bindByok();
+bindSettings();
 ensureAuth();
+maybePromptKey();
 renderDash();
 ensureSplitBtn();
 $('worksCompare')?.addEventListener('click', () => {

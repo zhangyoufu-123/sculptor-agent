@@ -114,9 +114,12 @@ cd web && npm start        # → http://localhost:5177
 cd web && npm run mock     # 离线 mock 模式，无 API 也能体验
 ```
 
-Web 端同样支持 **BYOK**：页面右上角粘贴你自己的 LLM API Key（只存本地浏览器），服务端就用这个
-key 调 LLM、并按 key 隔离会话——不烧服务端额度。不填 key 时回退到服务端环境变量里的凭据
-（适合本地自用）。对外部署时建议不要配 `STYLOTRACE_LLM_API_KEY`，强制用户自带 key。
+Web 端采用 **BYOK（自带 Key）**，形态借鉴 DeepSeek Harness 的「下载到本地 + 浏览器里自己填 Key」：
+右上角点「🔑 模型与 API Key」，选服务商（DeepSeek / OpenAI / OpenRouter / Moonshot / Qwen / GLM /
+Gemini / 自定义 OpenAI 兼容网关）→ 粘 Key → 选模型 → 保存。Key 只写进本机浏览器的
+`localStorage`，每次请求以 `Authorization: Bearer` 直达 LLM，服务端不留存、不代付，并按 key 隔离会话。
+首次打开若本机和服务端都没有 Key，会主动弹一次引导。留空 Key 时回退到服务端环境变量里的凭据
+（适合本地自用）；对外部署时建议不要配 `STYLOTRACE_LLM_API_KEY`，强制用户自带 key。
 
 ## 公开 API（FastAPI + BYOK）
 
