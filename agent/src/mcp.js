@@ -490,6 +490,10 @@ async function callTool(name, args, cfg) {
     case 'agent_step': {
       const w = wsDir(args, cfg);
       const r = await agentStep(cfg, w, { lastInput: args.lastInput || '' });
+      try {
+        const st = ws.readState(ws.ensureWorkspace(w));
+        if (st?.decision?.reason) r.decision = st.decision;
+      } catch {}
       return { text: JSON.stringify(r, null, 2) };
     }
     case 'interview_step': {

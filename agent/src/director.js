@@ -57,11 +57,14 @@ const ACTION_STAGE = {
   write: 'write',
   revise: 'revise',
   audit: 'redteam',
+  review: 'audience',
+  audience: 'audience',
+  restyle: 'restyle',
   deliver: 'deliver',
 };
 
 /**
- * 自主决策（v1.1）：让 LLM 读当前进度与用户输入，自己决定下一步动作，
+ * 自主决策（v1.2）：让 LLM 读当前进度与用户输入，自己决定下一步动作，
  * 而不是走写死的状态机分支。返回 {action, phase, reason, source}；
  * LLM 不可用/失败时由调用方回退到确定性状态机。
  */
@@ -85,7 +88,7 @@ export async function decideNextAction(cfg, wsDir, { lastInput = '' } = {}) {
         {
           role: 'system',
           content:
-            '你是写作导演。根据当前进度与用户最新输入，从以下动作中选一个最合适的下一步：ask（继续澄清/追问）、outline（生成或调整大纲）、write（逐节写作）、revise（修订）、audit（审计）、deliver（交付）。只输出严格 JSON：{"action":"...","phase":"...","reason":"一句话"}',
+            '你是写作导演，负责根据当前进度与用户最新输入决定下一步动作。可选动作：ask（继续澄清/追问，仅当信息不足）、outline（生成或调整大纲）、write（逐节写作）、revise（复阅-修订已有初稿）、audit（反AI审计，找并修AI痕迹）、review（多身份评述/读者群像，让不同身份读者读稿给反馈）、restyle（按新方向重写全文）、deliver（交付）。判断原则：用户要"优化/改/润色一篇已有的文章"→优先 audit/review/restyle，不要从头 ask；没有大纲不要 write/deliver。只输出严格 JSON：{"action":"...","phase":"...","reason":"一句话"}',
         },
         { role: 'user', content: JSON.stringify(brief) },
       ],
@@ -93,7 +96,7 @@ export async function decideNextAction(cfg, wsDir, { lastInput = '' } = {}) {
     );
     const m = String(out).match(/\{[\s\S]*\}/);
     const j = JSON.parse(m ? m[0] : out);
-    const allowed = new Set(['ask', 'outline', 'write', 'revise', 'audit', 'deliver']);
+    const allowed = new Set(['ask', 'outline', 'write', 'revise', 'audit', 'review', 'audience', 'restyle', 'deliver']);
     const action = String(j.action || '').trim();
     return {
       ok: allowed.has(action),
@@ -205,21 +208,32 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
   };
   let { state, d } = load();
 
-  // ── 半自由 agent（v1.1）：默认走确定性状态机；仅当用户输入"天马行空/脱轨"时，
-  //    才用 LLM 动态规划下一步（自由流程）。LLM 失败/非法动作 → 回退状态机。 ──
-  if (detectDeviation(state, lastInput)) {
-    const decision = await decideNextAction(cfg, wsDir, { lastInput });
-    if (decision.ok && decision.source === 'llm' && ACTION_STAGE[decision.action]) {
-      const target = ACTION_STAGE[decision.action];
-      const noOutline = !state.outline?.sections?.length;
-      const unsafe = (target === 'write' || target === 'deliver') && noOutline;
-      if (!unsafe && target !== d.stage) {
-        state.director = state.director || {};
-        state.director.stage = target;
-        state.nextStep = decision.reason || state.nextStep;
-        ws.writeState(workspace, state);
-        ({ state, d } = load());
-      }
+  // ── 自由式 agent（v1.2）：每轮都让 LLM 读进度 + 用户输入，自主决定下一步（多轮判断）。
+  //    LLM 不可用 / 非法动作 / 前置条件不满足 → 回退确定性状态机（保留原工作流兜底）。──
+  let decision = null;
+  if (cfg.apiKey) {
+    decision = await decideNextAction(cfg, wsDir, { lastInput });
+  }
+  if (decision && decision.ok && decision.source === 'llm' && ACTION_STAGE[decision.action]) {
+    const target = ACTION_STAGE[decision.action];
+    const noOutline = !state.outline?.sections?.length;
+    const hasDraft = fs.existsSync(path.join(workspace, 'draft.md'));
+    const draftStages = new Set(['revise', 'redteam', 'quality', 'style_fix', 'audience', 'restyle']);
+    const unsafe =
+      (['write', 'deliver'].includes(target) && noOutline) ||
+      (draftStages.has(target) && !hasDraft);
+    if (!unsafe) {
+      state.director = state.director || {};
+      state.director.stage = target;
+      state.nextStep = decision.reason || state.nextStep;
+      state.decision = {
+        action: decision.action,
+        reason: decision.reason,
+        phase: decision.phase || state.phase,
+        ts: ws.nowIso(),
+      };
+      ws.writeState(workspace, state);
+      ({ state, d } = load());
     }
   }
 
@@ -814,10 +828,16 @@ export async function agentInteractive(cfg, wsDir) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
   let lastInput = '';
+  let lastDecisionTs = '';
   console.log('Stylotrace 导演模式：我主导流程，你只回答该你决定的问题（随时可打断）。\n');
   try {
     for (let i = 0; i < 200; i++) {
       const r = await agentStep(cfg, workspace, { lastInput });
+      const stNow = ws.readState(workspace);
+      if (stNow.decision?.ts && stNow.decision.ts !== lastDecisionTs && stNow.decision.reason) {
+        lastDecisionTs = stNow.decision.ts;
+        console.log(`  [导演判断] ${stNow.decision.reason}（→ ${stNow.decision.action}）`);
+      }
       if (r.kind === 'ask') {
         let p = `\n${r.question}`;
         if (r.recommendation) p += `\n我的建议: ${r.recommendation}`;
