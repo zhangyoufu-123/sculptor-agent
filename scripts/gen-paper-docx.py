@@ -165,11 +165,11 @@ def build_equations():
                 run(' + '),
                 ssub(run('β'), run('2')), run(' log '), ppers, delim(run('w | c')),
                 run(' + '),
-                ssub(run('λ'), run('K')), sk, delim(run('w, c'))),
+                ssub(run('λ'), run('K')), run(' '), sk, delim(run('w, c'))),
             seq(run(' + '),
-                ssub(run('λ'), run('D')), sd, delim(run('w')),
+                ssub(run('λ'), run('D')), run(' '), sd, delim(run('w')),
                 run(' + '),
-                run('R'), delim(run('t')), si, delim(run('w, t')),
+                run('R'), delim(run('t')), run(' '), si, delim(run('w, t')),
                 run('　(11)'))))
 
     # 式 12：softmax 采样（v0.60 新增）
