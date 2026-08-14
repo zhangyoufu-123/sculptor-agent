@@ -109,6 +109,26 @@ cd web && npm start        # → http://localhost:5177
 cd web && npm run mock     # 离线 mock 模式，无 API 也能体验
 ```
 
+## 公开 API（FastAPI + BYOK）
+
+`api/` 把同一引擎包装成可自部署、可对外调用的 HTTP API。核心是 **BYOK（Bring Your Own Key）**：
+用户带自己的 LLM API Key 调用，**服务端不存中心账号、不出任何 LLM 费用**；同一个 key 既是身份
+（区分会话）也是计费凭证（走这个 key 调 LLM）。自带一个浏览器聊天前端，也可直接用 curl 调用。
+
+```bash
+./run-api.sh                 # 一键启动 → http://localhost:8000
+SCULPTOR_MOCK_LLM=1 ./run-api.sh   # 离线冒烟
+```
+
+```bash
+curl -X POST http://localhost:8000/v1/chat \
+  -H "Authorization: Bearer sk-你的LLM密钥" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"我想写一篇关于故乡的散文"}'
+```
+
+完整端点、账号模型与 Docker 部署见 [api/README.md](api/README.md)。
+
 ## 理论与证据
 
 - [docs/THEORY.md](docs/THEORY.md)：Agent / 人工智能 / 数学 / 工程四维理论架构与竞品对照。
