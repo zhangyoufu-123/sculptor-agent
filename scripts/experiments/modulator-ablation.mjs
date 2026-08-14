@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 调制器消融（v1.7，2.5）：证明"学习权重 > 默认权重"，并量化每个特征的边际贡献。
+// 调制器消融（v1.7）：量化每个特征的边际贡献；诚实报告排序正确率是否饱和。
 // 任务：对"原文 vs 改后"做二选一排序，比较各消融变体的排序正确率。
 // 零 LLM、确定性、可复现。用法：node scripts/experiments/modulator-ablation.mjs
 import fs from 'node:fs';
@@ -116,7 +116,7 @@ for (const r of rows) {
 const positive = perFeature.filter((p) => p.drop > 0).map((p) => p.feature);
 const negative = perFeature.filter((p) => p.drop < 0).map((p) => p.feature);
 console.log('\n结论：');
-console.log(`  学习权重 ${(learned * 100).toFixed(1)}% > 默认权重 ${(defaults * 100).toFixed(1)}%（学习 +${((learned - defaults) * 100).toFixed(1)} pp）`);
+console.log(`  学习权重 ${(learned * 100).toFixed(1)}%、默认权重 ${(defaults * 100).toFixed(1)}%（差 ${((learned - defaults) * 100).toFixed(1)} pp；差为 0 即排序正确率饱和）`);
 console.log(`  正面特征（关闭即掉分）：${positive.length ? positive.join('、') : '无'}`);
 console.log(`  当前噪声特征（关闭反而更好）：${negative.length ? negative.join('、') : '无'}`);
 
@@ -129,7 +129,10 @@ const md = [
   '| --- | --- | --- |',
   ...rows.map(([l, a, d]) => `| ${l} | ${a} | ${d === '—' ? '—' : d + ' pp'} |`),
   '',
-  `结论：学习权重 ${(learned * 100).toFixed(1)}% 显著高于默认权重 ${(defaults * 100).toFixed(1)}%（+${((learned - defaults) * 100).toFixed(1)} pp），证明"编辑即标注"的学习有真实增益；正面特征 ${positive.join('、') || '无'}，噪声特征 ${negative.join('、') || '无'}。`,
+  (learned > defaults
+    ? `结论：学习权重 ${(learned * 100).toFixed(1)}% 高于默认权重 ${(defaults * 100).toFixed(1)}%（+${((learned - defaults) * 100).toFixed(1)} pp）。`
+    : `结论：学习权重与默认权重的留出正确率均饱和到 ${(learned * 100).toFixed(1)}%（编辑对差异过大，正确率无法区分二者）；"学习有真实增益"的可靠证据应看学习曲线的留出得分边距（3.1.2），而非本任务的正确率。`) +
+    `逐维关闭显示正面特征（关闭即掉分）${positive.join('、') || '无'}，噪声特征 ${negative.join('、') || '无'}。`,
   '',
 ];
 const outFile = path.join(ROOT, 'docs', 'competition', 'MODULATOR-ABLATION.md');

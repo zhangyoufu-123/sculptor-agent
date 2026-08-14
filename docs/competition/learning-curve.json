@@ -4,10 +4,10 @@
     "trained": true,
     "trainAcc": 1,
     "holdoutAcc": 1,
-    "holdoutMargin": 0.1752,
+    "holdoutMargin": 0.2468,
     "weights": {
       "personal": 0.0563,
-      "surface": 0,
+      "surface": 0.0483,
       "discourse": 0,
       "stance": 0,
       "knowledge": 0,
@@ -20,17 +20,17 @@
       "avoidance": 0.0858,
       "transform": 0.1062
     },
-    "weightCos": 0.9152
+    "weightCos": 0.856
   },
   {
     "n": 10,
     "trained": true,
-    "trainAcc": 0.9,
+    "trainAcc": 1,
     "holdoutAcc": 1,
-    "holdoutMargin": 0.2153,
+    "holdoutMargin": 0.4477,
     "weights": {
       "personal": 0.0785,
-      "surface": 0,
+      "surface": 0.1554,
       "discourse": 0,
       "stance": 0,
       "knowledge": 0,
@@ -43,40 +43,40 @@
       "avoidance": 0.0856,
       "transform": 0.0922
     },
-    "weightCos": 0.9551
+    "weightCos": 0.9773
   },
   {
     "n": 15,
     "trained": true,
-    "trainAcc": 0.9333333333333333,
+    "trainAcc": 1,
     "holdoutAcc": 1,
-    "holdoutMargin": 0.3264,
+    "holdoutMargin": 0.514,
     "weights": {
-      "personal": 0.0913,
-      "surface": 0,
+      "personal": 0.0967,
+      "surface": 0.1515,
       "discourse": 0,
       "stance": 0,
       "knowledge": 0,
       "defect": 0.0189,
-      "impedance": -0.0564,
+      "impedance": -0.0212,
       "vector": 0,
       "embedding": 0,
       "fineread": 0,
       "posture": 0,
-      "avoidance": 0.0842,
-      "transform": 0.0993
+      "avoidance": 0.0883,
+      "transform": 0.0953
     },
-    "weightCos": 0.93
+    "weightCos": 0.9897
   },
   {
     "n": 20,
     "trained": true,
-    "trainAcc": 0.95,
+    "trainAcc": 1,
     "holdoutAcc": 1,
-    "holdoutMargin": 0.3049,
+    "holdoutMargin": 0.5738,
     "weights": {
-      "personal": 0.0878,
-      "surface": 0,
+      "personal": 0.1092,
+      "surface": 0.1491,
       "discourse": 0,
       "stance": 0,
       "knowledge": 0,
@@ -86,20 +86,20 @@
       "embedding": 0,
       "fineread": 0,
       "posture": 0,
-      "avoidance": 0.079,
-      "transform": 0.0972
+      "avoidance": 0.0691,
+      "transform": 0.1154
     },
-    "weightCos": 0.9508
+    "weightCos": 0.9903
   },
   {
     "n": 25,
     "trained": true,
-    "trainAcc": 0.96,
+    "trainAcc": 1,
     "holdoutAcc": 1,
-    "holdoutMargin": 0.4648,
+    "holdoutMargin": 0.7434,
     "weights": {
-      "personal": 0.1018,
-      "surface": 0,
+      "personal": 0.1161,
+      "surface": 0.1474,
       "discourse": 0,
       "stance": 0,
       "knowledge": 0,
@@ -110,30 +110,30 @@
       "fineread": 0,
       "posture": 0,
       "avoidance": 0.072,
-      "transform": 0.092
+      "transform": 0.1108
     },
-    "weightCos": 0.961
+    "weightCos": 0.9924
   },
   {
     "n": 30,
     "trained": true,
-    "trainAcc": 0.9666666666666667,
+    "trainAcc": 1,
     "holdoutAcc": 1,
-    "holdoutMargin": 0.7915,
+    "holdoutMargin": 0.7186,
     "weights": {
-      "personal": 0.2003,
-      "surface": 0,
+      "personal": 0.1233,
+      "surface": 0.1506,
       "discourse": 0,
       "stance": 0,
       "knowledge": 0,
       "defect": 0.0131,
-      "impedance": -0.0053,
+      "impedance": -0.0226,
       "vector": 0,
       "embedding": 0,
       "fineread": 0,
       "posture": 0,
-      "avoidance": 0.1122,
-      "transform": 0.1694
+      "avoidance": 0.0699,
+      "transform": 0.0944
     },
     "weightCos": 1
   }
