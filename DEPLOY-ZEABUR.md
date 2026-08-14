@@ -7,7 +7,7 @@
 ## 一、准备
 
 - 一个 GitHub 账号（已有：zhangyoufu-123），仓库 `stylotrace` 需已推送（main 分支）。
-- 一个 LLM API Key（`SCULPTOR_LLM_API_KEY`），例如 DeepSeek 的 key。
+- 一个 LLM API Key（`STYLOTRACE_LLM_API_KEY`），例如 DeepSeek 的 key。
 - 仓库已内置 `Dockerfile`（node + python3 + python-docx）与 `.dockerignore`
   （排除 `.env*`、`web-data` 等敏感/运行数据，不被打进镜像）。
 
@@ -22,10 +22,10 @@
 
    | 变量 | 值 | 说明 |
    | --- | --- | --- |
-   | `SCULPTOR_LLM_API_KEY` | 你的 LLM Key | **必填**，写作/对话都用它 |
-   | `SCULPTOR_WEB_PASSWORD` | 自定义密码 | 建议设置，防止公网被随意访问 |
-   | `SCULPTOR_LLM_BASE_URL` | `https://api.deepseek.com/v1` | 可留空，默认即此值 |
-   | `SCULPTOR_LLM_MODEL` | `deepseek-v4-flash` | 可留空，默认即此值 |
+   | `STYLOTRACE_LLM_API_KEY` | 你的 LLM Key | **必填**，写作/对话都用它 |
+   | `STYLOTRACE_WEB_PASSWORD` | 自定义密码 | 建议设置，防止公网被随意访问 |
+   | `STYLOTRACE_LLM_BASE_URL` | `https://api.deepseek.com/v1` | 可留空，默认即此值 |
+   | `STYLOTRACE_LLM_MODEL` | `deepseek-v4-flash` | 可留空，默认即此值 |
 
    > `PORT` 由 Zeabur 自动注入，服务端已读取 `process.env.PORT`，无需手动设置。
 6. （推荐）为服务添加 **持久化存储卷**：挂载路径 `/var/data`，容量 1 GB。
@@ -40,11 +40,11 @@
 - 打开首页，确认能正常加载。
 - 访问 `/api/auth/status`：
   - 未设置密码：返回 `{"required":false,"ok":true}`；
-  - 设置了 `SCULPTOR_WEB_PASSWORD`：未登录访问应返回 401，输入密码后进入。
+  - 设置了 `STYLOTRACE_WEB_PASSWORD`：未登录访问应返回 401，输入密码后进入。
 - 新建一个会话，走一遍"澄清 → 大纲 → 写作 → 导出 docx"，确认 LLM 调用正常。
 
 ## 四、注意事项
 
 - 免费档服务闲置一段时间后自动休眠，下次访问冷启动约几秒，属正常现象。
-- 公网可访问，请务必设置 `SCULPTOR_WEB_PASSWORD`，避免他人消耗你的 LLM Key。
+- 公网可访问，请务必设置 `STYLOTRACE_WEB_PASSWORD`，避免他人消耗你的 LLM Key。
 - 免费档无 SLA、日志保留 48 小时；正式商用建议升级 Dev/Pro 计划或换回带持久盘的付费档。

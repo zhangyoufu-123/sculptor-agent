@@ -18,7 +18,7 @@ const ws = await import(path.join(HERE, '..', 'src', 'workspace.js'));
 const { pointEdit, rewriteVariants } = await import(path.join(HERE, '..', 'src', 'point-edit.js'));
 
 const cfg = { ...loadConfig(), apiKey: 'mock' };
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-pointedit-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-pointedit-'));
 const wsDir = ws.ensureWorkspace(tmp, { create: true });
 const draftFile = path.join(tmp, 'draft.md');
 const ORIG = '## 一、门口\n\n石阶被磨亮了一百年，门是深红色的。\n';

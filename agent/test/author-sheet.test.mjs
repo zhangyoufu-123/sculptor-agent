@@ -12,7 +12,7 @@ const asheet = await import(path.join(HERE, '..', 'src', 'author-sheet.js'));
 const mod = await import(path.join(HERE, '..', 'src', 'modulator.js'));
 const { contrastiveScore } = await import(path.join(HERE, '..', 'src', 'token-decode.js'));
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-sheet-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-sheet-'));
 const w = ws.ensureWorkspace(path.join(tmp, 'w'), { create: true });
 
 function seedState() {

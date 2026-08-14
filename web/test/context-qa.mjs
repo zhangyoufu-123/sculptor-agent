@@ -10,10 +10,10 @@ import { fileURLToPath } from 'node:url';
 import { pathToFileURL } from 'node:url';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const TMP = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'sculptor-web-ctx-'));
-process.env.SCULPTOR_MOCK_LLM = '1';
-process.env.SCULPTOR_LLM_API_KEY = 'mock';
-process.env.SCULPTOR_WEB_DATA = TMP;
+const TMP = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'stylotrace-web-ctx-'));
+process.env.STYLOTRACE_MOCK_LLM = '1';
+process.env.STYLOTRACE_LLM_API_KEY = 'mock';
+process.env.STYLOTRACE_WEB_DATA = TMP;
 
 let handler = null;
 http.createServer = (h) => { handler = h; return { listen() {} }; };

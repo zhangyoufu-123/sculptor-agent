@@ -1,5 +1,5 @@
 // Stylotrace Studio API 冒烟测试：不监听端口，直接捕获请求处理器逐路由验证。
-// 用法: SCULPTOR_WEB_DATA=$(mktemp -d) node web/test/api-smoke.mjs
+// 用法: STYLOTRACE_WEB_DATA=$(mktemp -d) node web/test/api-smoke.mjs
 import http from 'node:http';
 import { Writable } from 'node:stream';
 import { EventEmitter } from 'node:events';
@@ -10,10 +10,10 @@ import { pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..');
-const TMP = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'sculptor-web-smoke-'));
+const TMP = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'stylotrace-web-smoke-'));
 
-process.env.SCULPTOR_MOCK_LLM = '1';
-process.env.SCULPTOR_WEB_DATA = TMP;
+process.env.STYLOTRACE_MOCK_LLM = '1';
+process.env.STYLOTRACE_WEB_DATA = TMP;
 
 let handler = null;
 http.createServer = (h) => {

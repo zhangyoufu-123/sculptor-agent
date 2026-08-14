@@ -1,10 +1,10 @@
 # Changelog
 
-## 2026-08-14（项目更名：Sculptor → Stylotrace）
+## 2026-08-14（全面更名：Sculptor → Stylotrace）
 
-- GitHub 仓库 `sculptor-agent` → `stylotrace`；package 名、README、插件清单、Web/API/site 界面、SKILL 展示名统一为 Stylotrace；
-- 保留 `sculptor` 作为技能触发名、CLI 命令与安装路径（`~/.codex/skills/sculptor`、`~/.local/bin/sculptor`、`SCULPTOR_*` 环境变量、本地数据目录），避免破坏既有安装；
-- 论文与实验脚本（`docs/competition/`、`scripts/experiments/`、`scripts/finetune/` 等）保留 "SCULPTOR" 学术命名。
+- 全量改名：CLI 命令 `stylotrace`、技能触发名 `name: stylotrace`、环境变量 `STYLOTRACE_*`、安装路径 `~/.codex/skills/stylotrace` 与 `~/.local/share/stylotrace`；
+- 论文 `科技论文-Stylotrace.md/.docx` 及配套图表脚本同步更名；
+- 本机安装已迁移：`~/.codex/skills/sculptor` → `stylotrace`、`~/sculptor` → `~/stylotrace`、`~/.local/share/sculptor-agent` → `~/.local/share/stylotrace`。
 
 ## 2026-08-13（v1.0 商业化收口：词级文体计量 + 改迹变换 + 拟改层 + 消融）
 
@@ -38,7 +38,7 @@
   留出得分边距 0.286→0.498、权重稳定性 0.968→0.999 随 n 单调改善，n≈15–20 进入平台，
   论文新增 3.1.2 与图 8；
 - **盲评统计（D1）**：`agent/src/stats.js` 精确二项/Wilson CI/Cohen's h/CSV 解析，
-  CLI `sculptor experiment blind-stats <answers.csv>`；
+  CLI `stylotrace experiment blind-stats <answers.csv>`；
 - **embedding 统一**：`style-vector.js` 删除重复实现，统一走 `embedding.js`；
 - **doctor 检查**：新增神经风格编码/外层调制器/作者写作清单检查项；
 - 新增 `test/stats.test.mjs`（五组断言），agent 24 套 + web 11 套全绿；
@@ -67,7 +67,7 @@
   落盘 `vault/author-sheet.json`，签名变化自动重算；
 - **调制器第 10 维 fineRead**：候选文本对作者清单红线片段/关键词的命中进入评分，
   无清单时中性 0.5 降级；得分分解新增 fineread 字段；
-- **CLI**：`sculptor author-sheet [--refresh]` 查看/强制重算五问清单；
+- **CLI**：`stylotrace author-sheet [--refresh]` 查看/强制重算五问清单；
 - 新增 `test/author-sheet.test.mjs`（确定性兜底/LLM 归纳/红线保留/签名重算/fineRead），
   agent 23 套 + web 11 套全绿；
 - 论文：实现边界/5.7/6.6/局限/结论/未来工作升级到十维 + L3 作者清单，表 A1 新增
@@ -78,7 +78,7 @@
 用户要求：论文突出强调优势、劣势积极补上、暂不做商业化。本轮把上一轮诚实盘点出的
 功能短板逐项补强，并把补强写进论文：
 
-- **神经级风格编码**：新增 `agent/src/embedding.js`——配置 SCULPTOR_EMBED_* 后，
+- **神经级风格编码**：新增 `agent/src/embedding.js`——配置 STYLOTRACE_EMBED_* 后，
   作者语料编码为稠密语义原型（分块均值、落盘缓存、签名变化重算），作为调制器
   **第 9 维 embedding 特征**与候选文本做余弦；未配置时全部静默降级；
 - **知识库向量混合检索**：`matchKbHybrid`——BM25 + 语义余弦 0.6/0.4 融合，
@@ -88,9 +88,9 @@
 - **decodeSection 接入**：写作候选评分自动使用原型 + 候选 embedding（无配置零开销）；
 - 新增 `test/embedding.test.mjs`（原型/第 9 维/语义排序/增量更新），agent 22 套 + web 11 套全绿；
 - **论文升级**：6.3 新增"差异化优势与人文价值"（表 7 六维行业对比：Sudowrite/Claude/ChatGPT/
-  Grammarly/通用助手 vs SCULPTOR）、6.6 新增"针对行业短板的补强"、局限与未来工作同步更新，
+  Grammarly/通用助手 vs Stylotrace）、6.6 新增"针对行业短板的补强"、局限与未来工作同步更新，
   附录表改规范编号（表 A1/A2）；docx 重新渲染；
-- CLI：`sculptor knowledge search` 配置 embedding 后自动启用语义混合检索。
+- CLI：`stylotrace knowledge search` 配置 embedding 后自动启用语义混合检索。
 
 ## 2026-08-13（v0.64 外层调制器：签名正式升级为可学习模型）
 
@@ -109,7 +109,7 @@
   无编辑对时自动降级经验默认权重，不阻塞写作；
 - **接入推理**：`token-decode.js` 升级 V1.5——写作每节并行候选 → 八维调制评分选优 →
   得分分解（八维特征 + 权重 + 训练标记）；所有走 decodeSection 的路径自动生效；
-- **CLI**：`sculptor modulator [--train] [--export] [工作区]`；
+- **CLI**：`stylotrace modulator [--train] [--export] [工作区]`；
 - 新增 `test/modulator.test.mjs`（数据收集/权重学习/八维分解/降级/在线重训），
   agent 套件 21 套 + web 11 套全绿；设计文档 `docs/MODULATOR.md`；
 - 论文同步：摘要/C4/3.1.1/5.7/6.2/6.4/7/8 升级为"V1.5 外层调制器已落地"，
@@ -143,7 +143,7 @@
 - **候选对比解码（V1）**：`agent/src/token-decode.js`——写作每节并行生成 2 个候选，
   五路信号评分选优：S = 2.0·p_personal + 0.5·S_knowledge + 1.0·S_defect + 0.8·R(t)·S_impedance；
   得分分解（personal/defect/knowledge/impedance）逐候选可追溯；
-- **写作节级接入**：writeSection 走 decodeSection，`SCULPTOR_DECODE_N` 可调；
+- **写作节级接入**：writeSection 走 decodeSection，`STYLOTRACE_DECODE_N` 可调；
   无个人语料（<200 字符）自动降级为直接生成，不增加延迟与成本；
 - 回归：agent 20 套（新增 token-decode.test：个人模型可预测/缺陷与阻抗信号/对比选优/
   无语料降级）+ web 11 套全绿；
@@ -237,7 +237,7 @@ Web 端本轮（与上面的问询系统升级同一版本号，互相配合）�
 - **会话隔离与进度可见**：每个会话独立工作区（协议/素材/风格/知识互不串扰）；
   项目列表直接显示各会话 文体/大纲节数/素材条数/已确认项/风格底稿；
 - **联网检索开箱即用**：内置免费检索（必应中国 → 百度 → DDG → 维基，视频类优先
-  B站 API），Web 端默认 `SCULPTOR_SEARCH_PROVIDER=builtin`；"帮我查一查"直连检索、
+  B站 API），Web 端默认 `STYLOTRACE_SEARCH_PROVIDER=builtin`；"帮我查一查"直连检索、
   结果（标题/链接/摘要）回灌素材并标注"来源待确认"；查询词自动清洗（《书名》优先）；
 - **AI 主导知识筛选入库**：看过/读过/在B站/新闻/去过 → LLM 提炼（书/视频/新闻/
   文章/地方/观点）入库，正则只做入口；短句确认把低置信条目升级为"已查验"；
@@ -293,7 +293,7 @@ API 响应太长、用户反问/质疑时系统只会继续按模板问。本轮
 - **Web 新增"工具"面板**：学术规范审计（对当前会话成稿执行，LLM 深审 + 确定性兜底）、
   文档翻译与文档风格重写（上传 docx/md/txt，docx 自动走块级回填保留 run 级格式），
   产物可下载 md / docx / html；
-- **生产级鉴权**：设置 `SCULPTOR_WEB_PASSWORD` 后启用登录保护（HttpOnly Cookie，
+- **生产级鉴权**：设置 `STYLOTRACE_WEB_PASSWORD` 后启用登录保护（HttpOnly Cookie，
   12h 会话，/api 全部拦截，前端自动显示登录遮罩）；未设置保持单机免登录兼容；
 - **部署文档**：docs/INTEROP.md 新增 Web 部署章节（环境变量、HTTPS、数据备份、密钥安全）；
 - 测试：新增 web/test/tools-qa.mjs（鉴权流程 / norm / doc translate+下载 / doc restyle / 登出拦截），
@@ -308,7 +308,7 @@ API 响应太长、用户反问/质疑时系统只会继续按模板问。本轮
     → md/docx/html 导出 + 回译校验；
   - `docRestyle`：成品文档按作者风格重写（style 支持旧稿文件/方向描述/工作区档案），结构保留导出；
   - 无密钥确定性兜底：导出原文 md 并提示。
-- **CLI**：`sculptor doc translate|restyle <文件> [--lang] [--style] [--out]`；
+- **CLI**：`stylotrace doc translate|restyle <文件> [--lang] [--style] [--out]`；
 - **MCP**：新增 `doc_translate` / `doc_restyle` 工具，任何 MCP 客户端可调用；
 - **run 级格式保留（v0.56 追加）**：`.docx` 输入走 `scripts/io/docx_blocks.py` 块级管线——按文档顺序
   提取段落/表格单元格（P0、T0_R0_C0_P0）→ LLM 逐块翻译/重写（块数与 ID 一一对应、失败块单块重试、
@@ -317,10 +317,10 @@ API 响应太长、用户反问/质疑时系统只会继续按模板问。本轮
 - 测试：doc-pipeline.test.mjs 5 组（md 翻译/重写/兜底 + **docx 块级翻译与重写的 run 级格式保留实测**）；
   agent 套件 21 套全绿。
 
-## 2026-08-12（v0.55：学术规范审计——把"格式/语言专项评审"标准做进 Sculptor）
+## 2026-08-12（v0.55：学术规范审计——把"格式/语言专项评审"标准做进 Stylotrace）
 
 模拟大赛评审给出的"语法、语句、格式与学术规范"专项意见，直接固化为系统能力，
-让 Sculptor 对自己的成稿做同样标准的检查：
+让 Stylotrace 对自己的成稿做同样标准的检查：
 
 - **新增 `agent/src/academic-norm.js`**：学术规范审计——中英标点混用（半角括号紧贴
   中文、英文逗号后直接中文）、正式文体口语化（学术论文/报告/公文才触发，引号内
@@ -331,7 +331,7 @@ API 响应太长、用户反问/质疑时系统只会继续按模板问。本轮
   无密钥或 LLM 失败自动降级，只报告不擅自改稿（修改仍走定点修改）。
 - **质量门静默接入**：交付前 `state.quality.norm` 记录问题数与高优先级数；
   学术文体且配置密钥时自动触发 LLM 深审，不阻塞交付。
-- **CLI**：`sculptor norm [--file x.md] [工作区]`，报告落盘 `vault/norm-report.md`。
+- **CLI**：`stylotrace norm [--file x.md] [工作区]`，报告落盘 `vault/norm-report.md`。
 - 测试：academic-norm.test.mjs 8 组——确定性六类检查 + LLM mock 全链路 + 静默路径；
   agent 套件由 19 套增至 20 套。
 
@@ -347,7 +347,7 @@ API 响应太长、用户反问/质疑时系统只会继续按模板问。本轮
 - **确定性正则降级为兜底**：无 key 或 LLM 失败时自动降级（`deterministicFakeThinking`），不中断。
 - **redteam 主流程接入**：LLM 细读前置到红队修复（让修复看到姿态层问题并带上修法），
   修复后复查；结果写 `state.quality.fakeThinking` 供 Web `/api/report` 展示。
-- **CLI**：新增 `sculptor diagnose [--file]`；Web `/api/report` 返回 fakeThinking。
+- **CLI**：新增 `stylotrace diagnose [--file]`；Web `/api/report` 返回 fakeThinking。
 - 测试：fake-thinking.test.mjs 扩展至 7 组——LLM 六层细读（mock 返回 voice/ending 病灶）、
   无 key 兜底、细读提示词 RAG 作者对照注入；agent 19 套 + web 7 套 QA 全绿。
 
@@ -378,7 +378,7 @@ git 考古定位根因：结构性检测保留在事后审计，但写作提示�
 - **翻译以理解作者原意为第一标准**（roundtrip.js）：新增【原意解读】步骤——
   翻译前先读懂"作者想表达什么/语气/文体/关键意象/易损点"，原意块注入正向翻译与
   回译提示词（达意优先于逐字）；报告首行输出"原意理解"，只校验不擅自改稿。
-- **数学公式等特殊格式**：`sculptor export --latex out.tex` 把 md（含 $$…$$）导出为
+- **数学公式等特殊格式**：`stylotrace export --latex out.tex` 把 md（含 $$…$$）导出为
   LaTeX 论文（公式原样、标题映射、特殊符号转义）；`scripts/formula-render.py` 用
   PIL+Unicode 数学符号渲染 4 张核心公式 PNG（环境无 LaTeX/matplotlib 时的可嵌入方案），
   嵌入 STYLE-MATH.md。
@@ -391,10 +391,10 @@ git 考古定位根因：结构性检测保留在事后审计，但写作提示�
 - `scripts/style-vectors.py` 生成三张图 + `STYLE-MATH.md`：
   - 图1 多维风格向量热力网格（8 维 × 6 对象）；
   - 图2 风格距离矩阵（欧氏距离，公式 d(A,B)=√Σ(v̂ⱼᴬ−v̂ⱼᴮ)²）；
-  - 图3 写作能力全方位对比（5 维加权综合评分 C=Σwₖsₖ，SCULPTOR 实测 vs 通用模型/模板基线）。
-- 对比对象：SCULPTOR 作者、人类名家（史铁生/费孝通）、ChatGPT/DeepSeek 通用基线、模板公文基线；
-  实测：SCULPTOR↔名家 1.11/1.54，↔通用模型 1.46/1.49，↔模板 1.98；通用模型彼此仅 0.65（AI 腔趋同）；
-  综合能力 C：SCULPTOR 87.4 vs 38.6/38.6/34.0。
+  - 图3 写作能力全方位对比（5 维加权综合评分 C=Σwₖsₖ，Stylotrace 实测 vs 通用模型/模板基线）。
+- 对比对象：Stylotrace 作者、人类名家（史铁生/费孝通）、ChatGPT/DeepSeek 通用基线、模板公文基线；
+  实测：Stylotrace↔名家 1.11/1.54，↔通用模型 1.46/1.49，↔模板 1.98；通用模型彼此仅 0.65（AI 腔趋同）；
+  综合能力 C：Stylotrace 87.4 vs 38.6/38.6/34.0。
 - 论文与 THEORY.md 同步（docx 内嵌新图 2），删除旧 3 对象图避免数值打架。
 
 ## 2026-08-11（v0.49.1：术语通俗化 + 风格向量对比可视化）
@@ -402,9 +402,9 @@ git 考古定位根因：结构性检测保留在事后审计，但写作提示�
 - 术语优化："困惑度签名"→"语言新鲜度（不可预测性）"，"偏好对"→"亲手修改记录"，
   行文保留 AI/数学学术框架（信息论高熵、特征空间等）。
 - `scripts/style-visual.py` + `style-vector-compare.png`：8 维可解释风格特征
-  （节奏/口语/意象/情绪/词汇/新鲜度）对 SCULPTOR 作者、人类名家（史铁生《我与地坛》）、
+  （节奏/口语/意象/情绪/词汇/新鲜度）对 Stylotrace 作者、人类名家（史铁生《我与地坛》）、
   ChatGPT 三类文本做归一化向量，输出雷达图 + 欧氏距离矩阵 + 距离对比条；
-  实测距离：SCULPTOR↔名家 1.48、SCULPTOR↔ChatGPT 2.02、名家↔ChatGPT 2.05。
+  实测距离：Stylotrace↔名家 1.48、Stylotrace↔ChatGPT 2.02、名家↔ChatGPT 2.05。
 - THEORY.md 与参赛论文 md/docx 同步更新（论文 docx 内嵌对比图）。
 
 ## 2026-08-11（v0.49：真实 LLM 可靠性修复 + 理论架构文档）
@@ -466,7 +466,7 @@ git 考古定位根因：结构性检测保留在事后审计，但写作提示�
 
 - **改写候选卡（Sudowrite History 式）**：`point-edit.js` 新增 `rewriteVariants`
   （同一句生成 3 个方向不同的候选，不落盘）；`pointEdit` 支持直接应用指定候选
-  （replacement 参数：跳过 LLM，只做定位校验+写回+风格吸收）；CLI `sculptor rewrite`、
+  （replacement 参数：跳过 LLM，只做定位校验+写回+风格吸收）；CLI `stylotrace rewrite`、
   Web `/api/rewrite`。前端选区工具栏点击动作 → 候选卡（选一个应用 / 换一个 / 取消）。
 - **版本历史与回滚**：`pointEdit` 前自动快照（"每次 AI 改动都可回退"）；
   Web `/api/history` + `/api/rollback`；草稿区"版本"按钮 → 快照列表 → 一键回滚。
@@ -594,14 +594,14 @@ ACL 2025 StyleVector——激活空间风格向量；GhostWriter——隐式学�
 
 - **三线节奏曲线（对标行业"节奏分析"尺子）**：`style-pulse.js` 新增 `rhythmCurve`，
   按节输出 张力/信息密度/情绪强度/节奏变化 四条 0-100 曲线，落盘 `vault/curve.md`；
-  新 CLI `sculptor curve`、Web `/api/curve`、审计页迷你曲线。
+  新 CLI `stylotrace curve`、Web `/api/curve`、审计页迷你曲线。
 - **伏笔记账 + 跨章回收校验（对标行业"一致性"尺子）**：新增 `consistency.js`——
   小说/推理每写一节自动记账伏笔（LLM 提炼，确定性兜底），全文完成后跨章校验回收；
-  新 CLI `sculptor consistency`、Web `/api/consistency`、交付消息带悬空伏笔提示；
+  新 CLI `stylotrace consistency`、Web `/api/consistency`、交付消息带悬空伏笔提示；
   导演 revise 阶段自动触发，不打断流程。
 - **隐式风格信号流水（对标 GhostWriter + EMNLP 2025 结论）**：`style.js` 新增
   `recordImplicitSignals`，每轮对话被动采集写 `vault/style-signals.jsonl/md`，
-  压缩不丢风格；`sculptor style --signals` 可回看，风格档案导出包含流水。
+  压缩不丢风格；`stylotrace style --signals` 可回看，风格档案导出包含流水。
 - **架构梳理（docs/ARCHITECTURE.md）**：全量梳理导演状态机、Agent 合作体系与
   "LLM 优先 / 代码安全网"边界，附新增模块入场检查；修复 revise 阶段
   `checkConsistency` 写盘后被旧 state 覆盖的一致性丢失 bug（校验后重读）。
@@ -762,12 +762,12 @@ ACL 2025 StyleVector——激活空间风格向量；GhostWriter——隐式学�
 
 - **agent 自动触发**：交付前静默质量门新增内容保真检查——中译英→回译→信息点核对，
   结果写入 `state.quality.roundtrip`；`attention`（有丢失/漂移）时交付消息给出明确警告
-  （"运行 sculptor roundtrip 看明细"）。LLM 不可用自动降级，超 3000 字单批上限自动跳过，
-  `SCULPTOR_ROUNDTRIP=0` 可关闭；绝不阻塞交付。
+  （"运行 stylotrace roundtrip 看明细"）。LLM 不可用自动降级，超 3000 字单批上限自动跳过，
+  `STYLOTRACE_ROUNDTRIP=0` 可关闭；绝不阻塞交付。
 - **Web 一键入口**：审计（report）页新增"内容保真 · 回译校验"区块——显示交付时自动
   校验的结果，另有「运行回译校验」按钮（`POST /api/roundtrip`）即时出报告：
   判定 + 信息点核对 + 风格对比；`/api/report` 同步返回已存结果。
-- 配置：`SCULPTOR_ROUNDTRIP` 开关（默认开）。
+- 配置：`STYLOTRACE_ROUNDTRIP` 开关（默认开）。
 - 测试：api-smoke 扩至 13 组（含回译校验报告/核对/风格指标）；e2e 断言质量门真实写入
   `quality.roundtrip`；全套单测通过。
 
@@ -779,8 +779,8 @@ ACL 2025 StyleVector——激活空间风格向量；GhostWriter——隐式学�
   忠实回译 → 信息点核对（保留/丢失/漂移，LLM 判定 + 确定性兜底）→ 风格对比
   （原文 vs 回译文：句长σ / 句首去重 / TTR / AI 套话，复用 humanMetrics 与风格向量）。
   任何一步 LLM 不可用都确定性兜底，绝不中断。
-- **CLI `sculptor roundtrip [文本|文件] [--file x.md]`**：文本直接传或读文件，缺省读工作区
-  draft.md；`SCULPTOR_DEBUG=1` 可看完整堆栈。修复 CLI 工作区约定冲突
+- **CLI `stylotrace roundtrip [文本|文件] [--file x.md]`**：文本直接传或读文件，缺省读工作区
+  draft.md；`STYLOTRACE_DEBUG=1` 可看完整堆栈。修复 CLI 工作区约定冲突
   （文本在 positional[0] 时误把文本当工作区目录创建）。
 - **独立 skill `skills/translator/`**（随 install.sh 安装到 `.codex/skills/translator`）：
   零依赖独立脚本 `scripts/roundtrip.mjs`（Node ≥18），离线 `--metrics-only` 可跑，
@@ -796,8 +796,8 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 - **联网 RAG 闭环**：新增 `GET /api/rag/needs`（待检索队列）、`POST /api/rag/search`
   （直连检索 + 自动回灌）、`POST /api/rag/ingest`（粘贴资料/结构化 results 回灌）。
   回灌即写进素材并标记 `ragIngestedAt`，导演在下一轮自动重写缺口节。
-- **联网检索开箱即用**：引擎 `searchOnline` 支持主流服务商——`SCULPTOR_SEARCH_PROVIDER=tavily|serper`
-  + `SCULPTOR_SEARCH_API_KEY`（或沿用自建 `SCULPTOR_RAG_ENDPOINT`）；未配置时优雅降级
+- **联网检索开箱即用**：引擎 `searchOnline` 支持主流服务商——`STYLOTRACE_SEARCH_PROVIDER=tavily|serper`
+  + `STYLOTRACE_SEARCH_API_KEY`（或沿用自建 `STYLOTRACE_RAG_ENDPOINT`）；未配置时优雅降级
   （提示手动粘贴回灌），绝不阻塞写作。
 - **多模态上传**：`POST /api/upload`（base64，≤20MB）→ 落会话 uploads → `extractInput`
   提取 docx/xlsx/md/txt/图片/音频 → 直接进素材；前端"素材上传"按钮即传即用。
@@ -869,7 +869,7 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
   主区自动让位（宽屏下右侧 380px 面板），每个页签都完整可用。
 - **实时大纲页签**：澄清阶段显示整篇蓝图（可折叠）+ 确认清单（✓/…）；大纲生成后
   **逐节实时呈现**（标题/功能/字数/论点/要点），可**手改节标题、删节、新增一节**，
-  一键「提交大纲修改」→ 作为修改意见发给 Sculptor 重新生成；下方常驻「给 Sculptor 的建议」输入框，
+  一键「提交大纲修改」→ 作为修改意见发给 Stylotrace 重新生成；下方常驻「给 Stylotrace 的建议」输入框，
   任何阶段都能直接提建议（写作进行中会提示先等写完）。
 - **写作页签**：左侧对话、右侧手写——写作进度条（x/y 节）+ 可编辑草稿区（字数实时统计、
   保存写回 draft.md、查看成稿、导出 md/docx/pptx）+ 大纲只读参考。
@@ -890,8 +890,8 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
   可删除、可提升；"明确读过"仍走 `user-confirmed`。误报防护：站/坐/待等动词后的"在…里"不匹配，
   "这/那"开头的泛指（"那间教室"）不收录。
 - **RAG**：新增显式检索通路 `explicitSearchSuggestion`——检测"帮我查一查/查一下/搜一下/找一下/查证"
-  等意图（"检查一下/审查"等不误触发），立即：配置了 `SCULPTOR_RAG_ENDPOINT` 则直连检索并回灌素材
-  与知识库（web-rag 低置信书目）；未配置则排队宿主代检（requests.jsonl，`sculptor rag ingest` 回灌）。
+  等意图（"检查一下/审查"等不误触发），立即：配置了 `STYLOTRACE_RAG_ENDPOINT` 则直连检索并回灌素材
+  与知识库（web-rag 低置信书目）；未配置则排队宿主代检（requests.jsonl，`stylotrace rag ingest` 回灌）。
   同查询去重，且会把提示语返回给用户（"已排队检索「乡土中国 语言变简单」…"）。
 - **全链路**：CLI 与 Web 的澄清响应新增 `searchSuggestion` 字段并展示（Web 带 🔎 标识）。
 - 新增 `agent/test/explicit-search.test.mjs`（6 组：引用式收录/确认信号/意图触发/全链路/去重），
@@ -963,11 +963,11 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 
 ## 2026-08-10（Web 演示版：把写作流程搬进浏览器）
 
-- **`web/` 单会话演示版**：零依赖 Node HTTP 服务（`server.mjs`）把 Sculptor 导演状态机包成
+- **`web/` 单会话演示版**：零依赖 Node HTTP 服务（`server.mjs`）把 Stylotrace 导演状态机包成
   REST API（start / step / draft），聊天式前端（深色侧栏 + 阶段进度 + 大纲卡片 + 成稿展示）
   完整呈现 澄清→大纲→写作→审计→交付。
-- **离线 mock 模式**：`npm run mock`（`SCULPTOR_MOCK_LLM=1`）无需密钥即可本地跑通全流程，
-  适合先看效果与 CI 验证；真实模式 `npm start` 用 `SCULPTOR_LLM_API_KEY`。
+- **离线 mock 模式**：`npm run mock`（`STYLOTRACE_MOCK_LLM=1`）无需密钥即可本地跑通全流程，
+  适合先看效果与 CI 验证；真实模式 `npm start` 用 `STYLOTRACE_LLM_API_KEY`。
 - **部署指南**：`docs/DEPLOY.md`——平台对比（Railway 最合适 / Render 备选 / Vercel 不推荐 /
   Cloudflare Tunnel 应急）+ Railway/Render 一键部署步骤 + 安全限制说明。
 
@@ -975,13 +975,13 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 
 - **GitHub Pages 静态展示站**（`site/index.html`，零依赖单页）：产品叙事 + 三大理念 + 能力 +
   工作流 + 研究/实验 + 安装；`.github/workflows/pages.yml` 推送即部署，
-  访问 https://zhangyoufu-123.github.io/sculptor-agent/ （需在仓库 Settings → Pages 选择 GitHub Actions 源）。
+  访问 https://zhangyoufu-123.github.io/stylotrace/ （需在仓库 Settings → Pages 选择 GitHub Actions 源）。
 
 ## 0.24.0 (2026-08-10)
 
 ### Added（实验与数据采集引擎：把研究论文的实验设计落成工具）
 
-- **`sculptor experiment` 五个子命令**：
+- **`stylotrace experiment` 五个子命令**：
   - `metrics <file>`：人类化指标（句长标准差/段落变异系数/句首去重率/二元 TTR/困惑度签名/黑名单/重复比喻/句式复用），复用红队审计 + L3 签名；
   - `collect [工作区]`：采集作者语料包（旧稿样本/修改记录/对话话语/知识库/写作库/风格向量摘要）→ `vault/experiments/corpus.json`；
   - `run --topic "题目" [--authors "名=文件;名2=文件2"]`：对照实验——每位作者跑通用 LLM baseline vs 风格注入 variant，
@@ -998,7 +998,7 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 ## 2026-08-10（比赛成果 · 研究论文）
 
 - **新增 [docs/competition/RESEARCH-PAPER.md](docs/competition/RESEARCH-PAPER.md)**：
-  正式研究论文《SCULPTOR：以"作者建模"为中心的深度协作写作 Agent》——
+  正式研究论文《Stylotrace：以"作者建模"为中心的深度协作写作 Agent》——
   形式化"风格 = 个体表达对完美表达的结构化偏离"的差异弥补模型、四层风格表征、
   双风格分离原则、PKB 三纪律、认知写作流程实例化；并给出对照/消融/用户盲评
   三个实验的完整设计（待采集数据后补充结果章节）。
@@ -1016,15 +1016,15 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 ### Added（全盘优化：圣经 · 复阅循环 · 迁移 · 护栏 · 场景扩展）
 
 - **文章圣经**：长文/小说交付自动沉淀跨篇一致性文档（世界观/角色/时间线/伏笔/文风/连贯性），
-  `sculptor bible list|view|save|distill`；续写时读取注入。
+  `stylotrace bible list|view|save|distill`；续写时读取注入。
 - **复阅-修订循环**（Flower & Hayes）：初稿完成后、红队前全文复查（偏题/衔接/素材用足/字数），
   P0 自动局部修订一轮（长文 ≥3 节、最多 1 轮、静默）。
 - **多轮数据补给上限**：回灌重写后仍缺素材 → 再排队一轮（最多 2 轮），满上限交付带警告。
-- **知识库迁移**：`sculptor knowledge export|import`（按标题去重合并、含提问记录、隐私提示）。
+- **知识库迁移**：`stylotrace knowledge export|import`（按标题去重合并、含提问记录、隐私提示）。
 - **风格过拟合护栏**：侧写注入提示"习惯而非牢笼，可突破"；提示词动态预算裁剪
   （超预算优先保风格适配卡，裁侧写/统一素材）。
 - **修辞同一性**：侧写新增"与读者建立共鸣的方式"维度，并映射回风格向量。
-- **情绪曲线量化**：`sculptor emotion` 按节输出强度与主导情绪（平静/喜悦/哀伤/愤怒/张力）。
+- **情绪曲线量化**：`stylotrace emotion` 按节输出强度与主导情绪（平静/喜悦/哀伤/愤怒/张力）。
 - **场景扩展**：文体库新增投标书/申报书；改写矩阵新增 `classical`（古文风）、`desensitize`（脱敏）。
 - **联网内容分级**：网络来源书目入知识库默认置信度 0.5（⚠待核实），注入标注"联网资料·待核实"。
 - **测试**：`agent/test/v23.test.mjs`（19 项）；全套 337 项断言全绿。
@@ -1036,10 +1036,10 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 - **人物风格肖像（侧写）**：从个人知识库 + 个人写作库 + 修改记录 + 风格档案 + 复合向量，
   生成可查询的写作人格肖像（`vault/persona.md`：叙述视角/词汇/句式/情感/价值观/套路与盲区/引用习惯）；
   侧写注入大纲与写作（最高优先级），并映射回风格向量（`kind: persona`）。
-  `sculptor persona`（查询）/ `--refresh`（重新生成并映射）。
+  `stylotrace persona`（查询）/ `--refresh`（重新生成并映射）。
 - **内置库 RAG 化（不硬编码、联网优先）**：思想库（荐书）与资产库（文法/诗词/论证）改为
   **联网检索优先、内置 JSON 离线兜底**——未命中自动排队宿主代检（thought-search / asset-search），
-  `sculptor rag ingest-assets <results.json>` 回灌 `vault/asset-cache.json`；
+  `stylotrace rag ingest-assets <results.json>` 回灌 `vault/asset-cache.json`；
   回灌结果中的《书名》自动入个人知识库（source: web-rag，数据互通）；
   `unifiedBrief`/荐书联想缓存优先、内置库兜底；联网荐书可直接展示（`webRecommendation`）。
 - **灵活化**：保留确定性兜底（LLM 不可用时流程不崩），但默认路径是"知识库/检索/侧写"，不再只靠写死的列表。
@@ -1052,14 +1052,14 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 - **学术实质能力（不依赖外部学术 agent）**：学术论证链 known→gap→tension→insight→method→
   evidence→limitation（参考 AgenTex / BuildIntroArgumentChain）；澄清可补问缺口/方法/局限；
   大纲与写作按论证链位置推进；学术表达规范注入（限定词/让步反驳/证据纪律）；
-  `sculptor academic` 查看论证链 + 成稿完备性扫描（claim/evidence/warrant，结论节加 limitation）。
+  `stylotrace academic` 查看论证链 + 成稿完备性扫描（claim/evidence/warrant，结论节加 limitation）。
 - **荐书联想**：内置思想库（28 部经典书/理论，`templates/thought-library.json`），按用户主题
   匹配相近作品，用简明语言说明"理论是什么、为什么可以用"；只问一次、可拒绝；
-  确认后收入个人知识库；已收录的不重复推荐、相近条目互链。`sculptor recommend`。
+  确认后收入个人知识库；已收录的不重复推荐、相近条目互链。`stylotrace recommend`。
 - **角色预演（小说/推理）**：持久角色档案（背景/愿望/恐惧/秘密/说话方式/情绪/记忆，
   `vault/characters/`）；写作前按"理想-现实张力"让 LLM 以角色第一人称预测
   心里话/会说的话/具体动作/情绪/下一步（参考 MATE/DiriGent）；预演注入本节写作；
-  情绪记忆回写保持连续；无 LLM 确定性兜底。`sculptor character list|add|view|remove|simulate`。
+  情绪记忆回写保持连续；无 LLM 确定性兜底。`stylotrace character list|add|view|remove|simulate`。
 - **统一素材体系**：`unifiedBrief` = 个人知识库 + 检索回灌来源 + 内置写作资产
   （文法连接/诗词典故/论证骨架，`templates/asset-library.json`，确定性防幻觉）；
   大纲/写作联合注入、限量轮换；各库数据互通。
@@ -1073,7 +1073,7 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
   导演在交付态自动重写缺口节（用新素材），再重新反 AI 审计后才交付——用户/宿主回灌后
   只需再调用一次 `agent_step`（或说"继续"），无需手动重跑。
 - **自动参考文献草稿**：学术论文交付时，从检索回灌来源（rag-cache）自动生成 `references.md`
-  （GB/T 7714 / APA），并在交付消息提示；`sculptor citations --auto` 可手动触发。
+  （GB/T 7714 / APA），并在交付消息提示；`stylotrace citations --auto` 可手动触发。
 - **时序记录**：`state.ragIngestedAt`（回灌）与 `state.lastWriteAt`（写作）用于精确判断
   "数据晚于写作"这一自动续写条件；退让协议不变（外部改过的稿仍不覆盖，仅报告）。
 - **测试**：RAG 单测新增自动参考文献与回灌时间戳（19 项）；e2e 新增"回灌→自动重写缺口节
@@ -1083,11 +1083,11 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 
 ### Added（主导式协作 + 实时取数 + 场景全打通）
 
-- **主导式协作协议**：写作生态位内 Sculptor 自主决策（agent_step 状态机），宿主与
+- **主导式协作协议**：写作生态位内 Stylotrace 自主决策（agent_step 状态机），宿主与
   学术/数据分析 agent 作为执行与数据供给方；生态位外完全让位。`probe` 输出细分入口
   （academic/official/creative/style/outline/point-edit）与启动建议（agent/point-edit/none）。
 - **实时取数三通道**：澄清（clarify-data）、大纲缺素材节（outline-gap）、写作"素材不足"
-  标注（write-gap）自动排队检索；`sculptor rag needs` / MCP `data_needs` 查看待办，
+  标注（write-gap）自动排队检索；`stylotrace rag needs` / MCP `data_needs` 查看待办，
   `rag ingest` 回灌进素材并标记完成；请求去重、不阻塞流程。
 - **学术论文闭环**：素材缺口检测（论文/报告/新闻稿必须有可查证的文献/数据）、
   交付时自动检测《引文》并提示生成 GB/T 7714 参考文献；导出走 `export --academic`。
@@ -1104,42 +1104,42 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 - **地点与构想**："去过/参观过 ×" 收录为 `place`；主题明确且库中无相关时，每会话最多一次
   泛问"这个话题你读过什么书、或去过相关的地方吗？"。
 - **人可读存储**：`vault/knowledge/<id>.md`（JSON 头 + Markdown 笔记，0600），
-  可阅读、可编辑、可带走；CLI 管理 `sculptor knowledge list|search|view|add|remove`。
+  可阅读、可编辑、可带走；CLI 管理 `stylotrace knowledge list|search|view|add|remove`。
 - **轮换注入**：大纲与每节写作按主题 BM25 检索注入 `【作者知识库·辅助参考】`，
   未用条目 +0.2 / 用过的按次数递减（封顶 -0.45），绝不反复引用同一本。
 - **测试**：`agent/test/knowledge.test.mjs`（25 项：收录/去重/匹配/轮换/提问去重/归纳一问）；
   `npm test` = knowledge + e2e 全链路。
 - 设计参考：MemGPT 分层记忆 / Alexandria 来源可引 / memories-off 代码化管理 / read-aware 引导访谈
-  → `skills/sculptor/references/knowledge.md`
+  → `skills/stylotrace/references/knowledge.md`
 
 ## 2026-08-09（产品方向收敛）
 
-- **放弃应用路线**：删除独立 Web 应用（sculptor-app）与桌面 IDE（agent-studio）及全部应用产物/文档；
+- **放弃应用路线**：删除独立 Web 应用（stylotrace-app）与桌面 IDE（agent-studio）及全部应用产物/文档；
   本仓库（引擎 / CLI / skill / MCP）即产品，专注把 agent 做深做透并开源分发。
 
 ## 2026-08-07（仓库结构）
 
-- **Web 前端从本仓库移除**：拆分为独立应用仓库 `sculptor-app`（`../sculptor-app`，面向非技术用户，
+- **Web 前端从本仓库移除**：拆分为独立应用仓库 `stylotrace-app`（`../stylotrace-app`，面向非技术用户，
   自带引擎快照、零依赖、可 Docker 部署）。本仓库只保留引擎 / CLI / skill / MCP，不再含任何 Web 代码。
-  引擎同步：`bash ../sculptor-app/scripts/sync-engine.sh`（单一事实源仍是本仓库 `agent/`）。
+  引擎同步：`bash ../stylotrace-app/scripts/sync-engine.sh`（单一事实源仍是本仓库 `agent/`）。
 
 ## 0.17.0 (2026-08-07)
 
 ### Added（四层复合风格向量：把"风格 = 不规范表达与完美表达的差异"从理论落成实时向量）
 
-- **L1 连续向量**：作者语料 embedding（默认稀疏字符二元组，零依赖；`SCULPTOR_EMBED_BASE_URL/API_KEY/MODEL`
-  可升级真实 embedding）相对基线语料的方向差，EMA 增量更新（`SCULPTOR_STYLE_EMA` 调跟手度，
-  `SCULPTOR_BASELINE_TEXT` 提供通用基线）。
+- **L1 连续向量**：作者语料 embedding（默认稀疏字符二元组，零依赖；`STYLOTRACE_EMBED_BASE_URL/API_KEY/MODEL`
+  可升级真实 embedding）相对基线语料的方向差，EMA 增量更新（`STYLOTRACE_STYLE_EMA` 调跟手度，
+  `STYLOTRACE_BASELINE_TEXT` 提供通用基线）。
 - **L2 动态稀疏维度**：基础 write/read 高置信轴 + 意象子维（联想库/注意力焦点）+ 偏好轴（修改意图归类）
   + 素材维（反复实词自动衍生）。权重 × 新鲜度衰减，限量注入提示词。
 - **L3 困惑度签名**：确定性代理指标（少见二元组占比 + 低重复率 + 句长方差）累计作者 min/mean/max；
   红队审计对照本文——surprisal 明显低于作者基线 → 标记"比本人更顺"的 AI 平滑痕迹（软提示，不计硬失败）。
-  `SCULPTOR_PERPLEXITY_ENDPOINT` 可换真实端点。
+  `STYLOTRACE_PERPLEXITY_ENDPOINT` 可换真实端点。
 - **L4 偏好对**：point-edit / 修改建议 = (原文, 改后, 意图) 最高权重风格证据，落 preferencePairs 并同步偏好轴。
 - **混合检索**：风格记忆检索升级为 BM25 + 向量余弦加权（相关度 0.42 / 向量 0.26 / 时间衰减 0.18 / 重要性 0.14），
   无旧稿时也能注入实时向量维度与人类化签名。
 - **全链路每轮刷新**：澄清/大纲/写作/改写/定点修改/风格方向/修改建议 7 个触点自动刷新
-  `vault/style-vector.json`；新 CLI `sculptor style-vector [--refresh]` 查看/重算。
+  `vault/style-vector.json`；新 CLI `stylotrace style-vector [--refresh]` 查看/重算。
 - 压缩守卫 `refreshFingerprint` 纳入风格向量摘要（动态维度 + 困惑度签名 + 偏好对计数），
   压缩时风格不被遗忘。
 
@@ -1150,12 +1150,12 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 ### Added（一键安装与三处自更新）
 
 - `install.sh` 升级为**一次命令装/更新三个安装点**：`--all` = 全局 skill
-  （`~/.codex/skills/sculptor`）+ 当前项目 skill + 开发镜像（默认 `~/sculptor`）；
+  （`~/.codex/skills/stylotrace`）+ 当前项目 skill + 开发镜像（默认 `~/stylotrace`）；
   `--update` 先 `git pull` 再同步；`--dry-run` 全流程预览。
 - 镜像同步是**选择性同步**（agent/skills/scripts/examples/extras/.github/.claude-plugin/
   .codex-plugin + 根文档），保留你的 `.git`、`node_modules`、`.env.local`，不整树 --delete。
-- skill 内置自更新器 `skills/sculptor/scripts/update.sh`：安装后任意位置一条命令
-  `bash ~/.codex/skills/sculptor/scripts/update.sh [项目目录]` 即可刷新三处。
+- skill 内置自更新器 `skills/stylotrace/scripts/update.sh`：安装后任意位置一条命令
+  `bash ~/.codex/skills/stylotrace/scripts/update.sh [项目目录]` 即可刷新三处。
 
 ### Added（篇幅预算：根治长文注水）
 
@@ -1207,7 +1207,7 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
   write-read 差异（如"想写克制低气压，读者需要最后一点亮的余味"），合并进档案并带
   "对话整体提炼"证据——**用户没贴旧稿也能在进入大纲前建立高层次风格档案**
   （《再见》测试暴露的根因：深层提取只对旧稿样本跑，对话里的物象/暗喻/收束偏好被浪费）。
-- **深度审阅 Review（核心闭环）**：`sculptor review [--fix]` 聚合红队审计 + 校对 +
+- **深度审阅 Review（核心闭环）**：`stylotrace review [--fix]` 聚合红队审计 + 校对 +
   事实核查 + 原创性 + 风格保真 + 读者群像/交锋，输出 **P0 硬伤 / P1 建议 / P2 争议 /
   读者亮点**；`--fix` 自动修复 P0（红队修订 + 风格低分按建议重写）并复检。
   支持 `--file`（外部文稿，修复写回目标文件）与 `--quick`。MCP 工具 35 → 36（`review`）。
@@ -1220,14 +1220,14 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 
 ### Added
 
-- **凭据自动发现** `credentials.js`：未显式配置 `SCULPTOR_LLM_API_KEY` 时，自动读取宿主
+- **凭据自动发现** `credentials.js`：未显式配置 `STYLOTRACE_LLM_API_KEY` 时，自动读取宿主
   已配置的可用 API——Codex `~/.codex/config.toml`（model_providers 的 `base_url` +
   `experimental_bearer_token`/`env_key`）、Claude Code settings.json（env 块）、
-  OpenCode 配置、常见 `*_API_KEY` 环境变量。显式 `SCULPTOR_LLM_*` 永远优先；
+  OpenCode 配置、常见 `*_API_KEY` 环境变量。显式 `STYLOTRACE_LLM_*` 永远优先；
   只自动采用 OpenAI 兼容协议（Anthropic 仅检测提示）；密钥绝不打印（只显示来源与末 4 位）。
-  `SCULPTOR_CREDENTIALS=auto|ask|off` 控制模式（默认 auto）。
+  `STYLOTRACE_CREDENTIALS=auto|ask|off` 控制模式（默认 auto）。
 - **CLI `credentials`**：列出/采用候选（`--use N`）、交互选择或手动输入（`--ask`，
-  保存到 `.sculptor/credentials.json`，0600）、`--clear` 清除；`doctor` 显示凭据来源（脱敏）。
+  保存到 `.stylotrace/credentials.json`，0600）、`--clear` 清除；`doctor` 显示凭据来源（脱敏）。
 
 ### Changed
 
@@ -1243,14 +1243,14 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 ### Added
 
 - **联网 RAG** `rag.js`：事实核查 verify 项自动生成检索查询；配置
-  `SCULPTOR_RAG_ENDPOINT/SCULPTOR_RAG_API_KEY` 时直连 `POST /search {queries}` 并回灌，
-  否则把 web-search 请求写入 `protocol/requests.jsonl`（宿主代检，`sculptor rag ingest`
+  `STYLOTRACE_RAG_ENDPOINT/STYLOTRACE_RAG_API_KEY` 时直连 `POST /search {queries}` 并回灌，
+  否则把 web-search 请求写入 `protocol/requests.jsonl`（宿主代检，`stylotrace rag ingest`
   或 MCP `rag_ingest` 回灌缓存与素材）。缓存 `vault/rag-cache.json`；
   CLI `rag status/search/ingest`，MCP `rag_search/rag_ingest`。
 - **静默内部质量门（真实触发、不刷屏）**：导演交付前自动执行——风格保真评估（低分自动
   微调最多 2 轮）、原创性检查（文内重复句/与个人库自我复用/模板句）、校对扫描、事实核查 +
   RAG 检索请求；全部写入 `state.quality` 与 context 日志，交付消息不再罗列评估过程。
-- **内置原创性检查** `originality.js`：`sculptor originality [--file]` 手动查看；
+- **内置原创性检查** `originality.js`：`stylotrace originality [--file]` 手动查看；
   交付前静默自动执行，MCP `originality`。
 
 ### Changed
@@ -1266,12 +1266,12 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
   continue 续写 / polish 润色 / imitate 仿写 / tone:formal|casual|warm|authoritative
   改语气。复用 restyle 的分节改写 + 退让协议（独立实现，不耦合既有模块），改写前后自动快照。
 - **版本快照 + 回滚** `history.js`：write / restyle / redteam --fix / transform 前自动
-  快照到 `vault/history/`（内容相同跳过，最多 30 份）；`sculptor history` / `rollback [N]`
+  快照到 `vault/history/`（内容相同跳过，最多 30 份）；`stylotrace history` / `rollback [N]`
   （回滚前先存当前版本）。修复 redteam-fix 与 rollback 后草稿哈希不同步、导致误判"外部修改"的问题。
-- **全局风格档案** `profile.js`：`sculptor profile export/import` —— 导出 write/read 档案、
+- **全局风格档案** `profile.js`：`stylotrace profile export/import` —— 导出 write/read 档案、
   旧稿样本、修改记录、适配卡为 bundle；导入合并语义保守（本地高置信维度不覆盖、证据并集、
   样本/修改按内容去重、本地适配卡不覆盖）。
-- **引文管理**：`sculptor citations [--file]` 提取文中《引文》清单；
+- **引文管理**：`stylotrace citations [--file]` 提取文中《引文》清单；
   `--append refs.json [--style gbt7714|apa]` 先快照再追加参考文献附录。
 - MCP 工具 26 → 32（transform / history / rollback / profile_export / profile_import / citations）；
   e2e 170 项全绿。
@@ -1284,18 +1284,18 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 
 ### Added（补齐 P0：语音口述 / 格式与导出 / 校对纠错）
 
-- **语音口述**：`sculptor dictate <音频...> [--to-draft]` —— whisper/whisper.cpp 转录为素材
-  （`SCULPTOR_WHISPER_CMD` 可指定命令；默认自动检测；`--to-draft` 整理成口述草稿）；
+- **语音口述**：`stylotrace dictate <音频...> [--to-draft]` —— whisper/whisper.cpp 转录为素材
+  （`STYLOTRACE_WHISPER_CMD` 可指定命令；默认自动检测；`--to-draft` 整理成口述草稿）；
   未配置转录器时明确降级提示。外部进程带超时，绝不阻塞主流程。
 - **文体库 +4**：学术论文（摘要/关键词/引言/方法/结果/结论/参考文献）、新闻稿（5W1H 导语、
   倒金字塔）、邮件（主题/称呼/正文/落款）、视频脚本（【画面】【旁白】【字幕】分列）；
   个人写作库自动分类同步支持。
-- **参考文献生成**：`sculptor cite "<条目>" --style gbt7714|apa` —— 期刊/图书/网页/
+- **参考文献生成**：`stylotrace cite "<条目>" --style gbt7714|apa` —— 期刊/图书/网页/
   报纸/学位论文/报告，GB/T 7714-2015 与 APA 7 确定性格式化。
 - **多格式导出**：`--html`（纯 Node 零依赖）、`--pdf`（reportlab 内置中文 CID 字体）、
   `--srt`（视频脚本台词转字幕，4 字/秒估算）、`--academic`（学术 docx：宋体小四/黑体标题/
   1.5 倍行距）。
-- **校对纠错**：`sculptor proofread [--file]` —— 错别字/易混词/叠字/标点/引号配对
+- **校对纠错**：`stylotrace proofread [--file]` —— 错别字/易混词/叠字/标点/引号配对
   （确定性、毫秒级）+ 语病/搭配（LLM，apiKey 守卫）；`redteam --proofread` 同跑；
   导演交付时确定性校对并提示"N 处需核对"。
 - **顺手修复**：`extractInput` 对图片/音频返回 Promise，ingest/clarify 之前未 await
@@ -1313,14 +1313,14 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 - **新增风格脉搏（Style Pulse）**：`style-pulse.js` —— 澄清每轮、大纲生成后、每节写作后
   的轻量风格采集与即时反馈（确定性、零 LLM、几十毫秒）；每节写作的脉搏建议自动注入
   **下一节**提示词，问题不带进下一节。记录落 `vault/style-pulses.jsonl` + `state.stylePulses`；
-  `sculptor style --pulses` 可查看。
+  `stylotrace style --pulses` 可查看。
 - **用户修改建议 = 评估反馈**：`applyCorrectionFeedback` —— "这句太文艺了/太啰嗦/更口语/
   结尾收一点"直接收紧/修正档案维度（含负置信微调）并记 correction 脉搏；导演收到这类建议后
   自动按它重写全文（不再只回"要改哪一处？"）。大纲修改意见同样吸收。
 - **导演交付链去重**：移除交付前全稿 style-eval 自动环节（每节写作已即时评估）；交付消息
-  不再罗列评估过程；风格适配卡改为"素材有变化才重蒸馏"；`SCULPTOR_QUICK=1` 快速模式
+  不再罗列评估过程；风格适配卡改为"素材有变化才重蒸馏"；`STYLOTRACE_QUICK=1` 快速模式
   （读者 3 人、跳过交锋与适配卡重蒸馏）。
-- 深度全稿评估保留为手动命令 `sculptor style-eval`（不自动跑）。
+- 深度全稿评估保留为手动命令 `stylotrace style-eval`（不自动跑）。
 
 ### Changed
 
@@ -1333,17 +1333,17 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 - **读者交锋辩论（MAJ-EVAL 式多智能体评审）**：8 位"第一读者"反应后，选分歧最大的
   3 位进入交锋——互看最尖锐意见 → 收敛出共识（直接改）/ 争议（作者拍板）/
   优先级（按对读者的伤害排序）；LLM 失败时确定性主题聚类兜底。
-  CLI `sculptor debate`，MCP 工具 `reader_debate`；导演交付链自动执行。
+  CLI `stylotrace debate`，MCP 工具 `reader_debate`；导演交付链自动执行。
 - **风格持续微调基建（Panza 式：<100 样本 + PeFT + RAG）**：
   `style-adapter.js` —— ① `--distill` 把旧稿/个人写作库/亲手修改对压缩成风格适配卡
   （写作/大纲/重写时最高优先级限量注入）；② `--dataset` 生成 Reverse Instructions 式
   偏好对 JSONL（point-edit 修改对即偏好对）；③ `--lora` 走 OpenAI 兼容微调接口
   （上传 /files → 创建 /fine_tuning/jobs），未配置端点时给出本地 LoRA 指引；
   新增 `scripts/finetune/style_lora.py`（torch+transformers+peft 本地训练）。
-  CLI `sculptor style-adapter`，MCP 工具 `style_adapter`；导演交付时自动蒸馏适配卡。
+  CLI `stylotrace style-adapter`，MCP 工具 `style_adapter`；导演交付时自动蒸馏适配卡。
 - **事实核查**：`fact-check.js` —— 确定性扫描数字/年代/引文/人名/机构（零 LLM），
   LLM 复核分级 material（来自素材）/ common（低风险）/ verify（交付前必须核对）；
-  记录落 `vault/fact-check.jsonl`。CLI `sculptor fact-check`，MCP 工具 `fact_check`；
+  记录落 `vault/fact-check.jsonl`。CLI `stylotrace fact-check`，MCP 工具 `fact_check`；
   导演交付时确定性扫描并在交付消息里提示"N 处需核对"。
 - **风格评估集成评分**：LLM 判断 + 确定性统计按 0.82/0.18 加权（参考 arxiv 2508.06374：
   集成指标优于单一指标）。
@@ -1363,14 +1363,14 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
   与 WritingPreferenceBench 的偏好对比思路）。LLM 逐句对照打分（14 维），失败时确定性
   统计兜底（词汇重叠/句长分布/反 AI 黑名单），评估历史落 `vault/style-eval.jsonl`；
   低分时把漂移证据写回风格档案（只加 evidence、不覆盖维度值）。导演交付链自动执行，
-  低分自动针对性重写一轮。CLI `sculptor style-eval`，MCP 工具 `style_eval`。
+  低分自动针对性重写一轮。CLI `stylotrace style-eval`，MCP 工具 `style_eval`。
 - **大纲评审-修订回路（CogWriter / WriteHERE 式规划→评审→重规划）**：大纲生成后按
   立意贯穿/论点-功能匹配/逻辑递进/素材利用/篇幅分配/文体规范评审，低分且有 LLM 修订版
   时自动替换（用户仍需最终确认）；评审记录入 `state.outlineReviews`。
-  CLI `sculptor outline-review`，MCP 工具 `outline_review`。
+  CLI `stylotrace outline-review`，MCP 工具 `outline_review`。
 - **公文国标升级**：文体库补全党政机关公文 15 文种（请示/批复/函/通报/公告/通告/意见/
-  决定/决议/命令/公报/议案 + 原通知/纪要/报告/公文）；`sculptor genre` 展示
-  GB/T 9704-2012 排版规范；`sculptor export --official [--redhead]` 按国标导出
+  决定/决议/命令/公报/议案 + 原通知/纪要/报告/公文）；`stylotrace genre` 展示
+  GB/T 9704-2012 排版规范；`stylotrace export --official [--redhead]` 按国标导出
   A4 公文 docx（37/35/28/26 页边距、2号小标宋标题、3号仿宋正文、黑体/楷体层级标题、
   右空四字落款、一字线页码、红头可选）。
 
@@ -1384,14 +1384,14 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 ### Added
 
 - **文体库（公式化内容）**：公文/合同/通知/会议纪要/报告/议论文/散文/演讲稿/记叙文——
-  每种有结构骨架与行文规范（`sculptor genre <名称>` 查看）；对话中识别文体
+  每种有结构骨架与行文规范（`stylotrace genre <名称>` 查看）；对话中识别文体
   （"写一份关于××的通知/合同"）并在大纲/写作/重写阶段按范式产出。
 - **个人写作库**：作品自动分类归档 `vault/library/<类别>/`（议论文/散文/公文/合同…），
   蒸馏成"这类文体你个人的写法"（`vault/skills/personal/<类别>.md`），写作时限量注入
-  （不污染上下文）；`sculptor library / scan / view / add` 供查看与维护。
+  （不污染上下文）；`stylotrace library / scan / view / add` 供查看与维护。
 - **多模态输入输出**：对话中给文件路径自动提取（docx 用 python-docx、xlsx 用内置
-  zipfile 解析、图片走视觉模型 SCULPTOR_VISION_MODEL）；`sculptor ingest` 提取素材、
-  `sculptor export` 导出 docx（导演交付自动导出 draft.docx）。
+  zipfile 解析、图片走视觉模型 STYLOTRACE_VISION_MODEL）；`stylotrace ingest` 提取素材、
+  `stylotrace export` 导出 docx（导演交付自动导出 draft.docx）。
 - 导演交付后自动：归档作品 → 蒸馏个人 skill → 导出 docx。
 
 ### Changed
@@ -1402,12 +1402,12 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 
 ### Added
 
-- **导演模式（Director，自主决策 · 主导对话）**：`sculptor agent`（或 MCP `agent_step`）
+- **导演模式（Director，自主决策 · 主导对话）**：`stylotrace agent`（或 MCP `agent_step`）
   每次收到用户消息自动决定并执行下一步——澄清→大纲→逐节写作→反 AI 审计→读者群像→交付，
   用户不用催"继续"；只在真正的用户决策点停下（主题/立场/素材/立意/论点/大纲确认/风格方向）。
   交付后说风格方向 → 全文按新方向重写并再走一轮审计与群像。MCP 工具 19 → 20。
 - **仓库纯净化**：移除旧控制台/Web/并行 TS MCP 残留（`integration/engine-mcp`、
-  旧安装器 `scripts/install.sh`）；主仓库重组为 agent 单包（`packages/sculptor-agent` → 根）。
+  旧安装器 `scripts/install.sh`）；主仓库重组为 agent 单包（`packages/stylotrace` → 根）。
 - **install.sh 定位修复**：按脚本自身位置判断本地仓库，任意目录调用都成立。
 
 ### Changed
@@ -1419,14 +1419,14 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 
 ### Added
 
-- **skill 内嵌完整引擎**：`skills/sculptor/scripts/engine/` 是 agent 的完整快照
-  （bin + src + templates + package.json），`scripts/sculptor.mjs` 为启动器——
+- **skill 内嵌完整引擎**：`skills/stylotrace/scripts/engine/` 是 agent 的完整快照
+  （bin + src + templates + package.json），`scripts/stylotrace.mjs` 为启动器——
   装完 skill 即拥有全部工作流（interview/outline/write/redteam/audience/dissect/
-  restyle/style/point-edit/mcp），**不再依赖外部安装的 sculptor CLI**。
+  restyle/style/point-edit/mcp），**不再依赖外部安装的 stylotrace CLI**。
 - **引擎同步脚本** `scripts/sync-skill-engine.sh`：agent/ 为单一事实源，
   `--check` 模式供 CI 校验漂移。
 - **一键安装** `install.sh`：curl | bash 或 git clone；默认目录级安装
-  （`<项目>/.codex/skills/sculptor`），可 `--global` / `--cli` / `--mcp-codex`；
+  （`<项目>/.codex/skills/stylotrace`），可 `--global` / `--cli` / `--mcp-codex`；
   已有安装自动备份（`.bak.<时间戳>`）可回滚；装完自动验证引擎可独立运行。
 - **hook 命令**：宿主生命周期事件（session/user/assistant/compact/stop）→
   观察日志 + 压缩守卫（压缩前刷新风格指纹）。
@@ -1441,27 +1441,27 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 
 ### Added
 
-- **需求访谈 `sculptor interview`**：多轮一问 + 实时确认清单（✓/…、进度 x/9、剩余项），
+- **需求访谈 `stylotrace interview`**：多轮一问 + 实时确认清单（✓/…、进度 x/9、剩余项），
   收尾打包"确认清单 + 风格档案进度 + 剩余步骤"；与 clarify 共享同一状态机。
-- **读者群像 `sculptor audience`**：8 个"第一读者"（老教师/挑剔编辑/中学生/挑剔评论家/
+- **读者群像 `stylotrace audience`**：8 个"第一读者"（老教师/挑剔编辑/中学生/挑剔评论家/
   焦虑家长/历史爱好者/随性读者/年轻作家）逐段记录第一次阅读的心理反应，交付前强制环节；
   LLM 不可用时确定性兜底，永不缺席。
-- **定点引用 `sculptor quote`**：一键生成可粘贴的「〔Sculptor 引用〕《原句》/修改指令」块；
+- **定点引用 `stylotrace quote`**：一键生成可粘贴的「〔Stylotrace 引用〕《原句》/修改指令」块；
   `point-edit` 支持两行引用块单参数粘贴。
 - **风格全程被动采集**：每句话/素材/修改理由即时写入 write/read 档案（带证据）；
   同文体旧稿（≥80 字）自动落盘并做 14 维风格提取（联想/技巧/注意力焦点）；
-  `sculptor style [--backfill|--extract]` 让"风格被读到了"全程可见。
+  `stylotrace style [--backfill|--extract]` 让"风格被读到了"全程可见。
 - **风格记忆检索（RAG 增强注入）**：写作/大纲/扩写/红队修订前按
   "论题 + 文体 + 本节论点 + 高置信风格维度"检索作者旧稿片段与亲手修改对
   （原文→修改→意图），BM25 中文二元组打分，相关度/时间衰减/重要性加权排序，
-  以少样本 + 联想库 + 反例块注入提示词；CLI 新增 `sculptor style --memory <查询>` 预览，
+  以少样本 + 联想库 + 反例块注入提示词；CLI 新增 `stylotrace style --memory <查询>` 预览，
   MCP 新增 `style_memory` 工具（17 → 18 个）。
 - **整篇文章蓝图（grilling 式共同理解）**：澄清全程维护蓝图（主题/为什么写/核心张力/
   读者带走什么/结构顺序/论点/素材/情感/结尾），核心信息齐后回显整篇蓝图请用户确认，
   修正意见带进大纲生成；追问设计师被要求"每个问题都是蓝图的下一个拼图"。
 - **风格方向与全文重写**：用户说"整篇更克制/更豪迈…"即时记录 `styleDirections` 并标记
   需要重写；CLI/MCP 新增 `restyle`（缺省读取最近方向，全文或指定节重写，保留结构与论点）；
-  `sculptor style --export` 导出人类可读档案 `vault/style-profile.md`。MCP 工具 18 → 19。
+  `stylotrace style --export` 导出人类可读档案 `vault/style-profile.md`。MCP 工具 18 → 19。
 - MCP 新增 `interview_step / audience / quote / style_status`（13 → 17 个工具）。
 - skill 独立形态新增 `checklist / quote` 子命令（零依赖）。
 
@@ -1478,11 +1478,11 @@ Web 端补齐与 agent+codex 的差距，核心写作链路仍与 CLI/agent 同�
 
 - 完整 Agent CLI（零依赖）：澄清（立意/论点深挖、单问句强制）、带论点挂载的大纲、
   双风格写作（字数门槛/扩写）、确定性红队、感性解剖、定点修改（并发守卫）。
-- 生态位探测器 `sculptor probe`：主动触发判断，提议一次、被拒即退让。
+- 生态位探测器 `stylotrace probe`：主动触发判断，提议一次、被拒即退让。
 - MCP stdio 服务器（13 个工具），供 Codex / Claude Code / OpenCode 调用。
-- `sculptor setup`：一键自动接入（检测宿主 → 原生注册 → 项目级 skill → 凭据复用 0600）。
+- `stylotrace setup`：一键自动接入（检测宿主 → 原生注册 → 项目级 skill → 凭据复用 0600）。
 - 引擎 MCP 接入包（integration/engine-mcp）：把原引擎全部深度暴露为 MCP。
-- macOS 右键"在 Sculptor 中修改"服务（extras/）。
+- macOS 右键"在 Stylotrace 中修改"服务（extras/）。
 - 一键安装：`curl -fsSL …/install.sh | bash`；项目级注册，绝不写全局。
 
 ### Changed

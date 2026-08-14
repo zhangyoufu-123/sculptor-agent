@@ -1,24 +1,24 @@
-# Sculptor 项目交接摘要（v0.68 · 上下文检查点）
+# Stylotrace 项目交接摘要（v0.68 · 上下文检查点）
 
 > 用途：换模型 / 换对话 / 换机器时，把本文件（或本文件摘要）交给新会话即可无缝续作。
 
 ## 当前状态
 
-- 仓库：`/Users/wallace/Documents/Codex/2026-08-04/bang/sculptor-agent`
+- 仓库：`/Users/wallace/Documents/Codex/2026-08-04/bang/stylotrace`
 - 版本：**v0.68**，最新提交 `bef66bf`（已推送 `b84656b..bef66bf main -> main`）；工作区有少量待提交改动，详见"工作区状态"节
 - 测试基线：agent 24 套 + web 11 套全绿
   - agent 全量：`cd agent && npm test`（约 2–3 分钟，含 e2e 真实 LLM 调用）
   - web 全量：`cd web && npm test`
   - 单测：`node test/<name>.test.mjs`（modulator / stats / token-decode / embedding / author-sheet 等）
-- 技能安装点（均已同步 v0.68）：`~/.codex/skills/sculptor`、`/Users/wallace/Documents/Codex/2026-08-06/zhi/.codex/skills/sculptor`、`/Users/wallace/sculptor`
+- 技能安装点（均已同步 v0.68）：`~/.codex/skills/stylotrace`、`/Users/wallace/Documents/Codex/2026-08-06/zhi/.codex/skills/stylotrace`、`/Users/wallace/stylotrace`
 
 ## 工作区状态（2026-08-13 核实）
 
 - 分支 `main`，与 `origin/main` 同步于提交 `bef66bf`。
 - **存在未提交改动**（交接前需处理，见下）：
   - `README.md`：版本号 v0.60 → v0.68，"最近的关键升级"改为改迹调制/回避库/姿态层/L3/外层调制器路线
-  - `agent/package.json`、`web/package.json`、`skills/sculptor/scripts/engine/package.json`：版本号 0.64.0 → 0.68.0
-  - `agent/src/credentials.js` 与 `skills/sculptor/scripts/engine/src/credentials.js`：DeepSeek 默认端点改为 `https://api.deepseek.com/v1`、默认模型 `deepseek-v4-flash`，并支持 `DEEPSEEK_BASE_URL / DEEPSEEK_MODEL` 覆盖（避免 .env.local 的模型被硬编码默认值吞掉）
+  - `agent/package.json`、`web/package.json`、`skills/stylotrace/scripts/engine/package.json`：版本号 0.64.0 → 0.68.0
+  - `agent/src/credentials.js` 与 `skills/stylotrace/scripts/engine/src/credentials.js`：DeepSeek 默认端点改为 `https://api.deepseek.com/v1`、默认模型 `deepseek-v4-flash`，并支持 `DEEPSEEK_BASE_URL / DEEPSEEK_MODEL` 覆盖（避免 .env.local 的模型被硬编码默认值吞掉）
   - `docs/UPGRADE-PLAN.md`：标注 Phase 1 已完成、命名改为改迹调制、十二维
   - `docs/HANDOVER-v0.68.md`：本交接文档（未跟踪）
 - 建议：交接前把上述改动作为 v0.68 的收尾提交（如 `chore(v0.68): 版本号与 DeepSeek 凭据覆盖修复`），提交后重跑 agent/web 测试并重同步三个技能安装点。
@@ -26,20 +26,20 @@
 ## GitHub 迁移与网络状态（2026-08-13 更新）
 
 - **两个 Git 仓库（迁移范围候选）**：
-  1. 开发工作区：`/Users/wallace/Documents/Codex/2026-08-04/bang/sculptor-agent`，remote = `zhangyoufu-123/sculptor-agent`，当前 HEAD `88acd1d`（DeepSeek V4 logprobs 探测，已推送），工作区干净
-  2. 发布/镜像仓库：`/Users/wallace/sculptor`，remote = `zhangyoufu-123/sculptor-harness`，本地 **13 个提交未推送**（含 v0.68 打包布局、logprobs 结果同步），工作区干净
+  1. 开发工作区：`/Users/wallace/Documents/Codex/2026-08-04/bang/stylotrace`，remote = `zhangyoufu-123/stylotrace`，当前 HEAD `88acd1d`（DeepSeek V4 logprobs 探测，已推送），工作区干净
+  2. 发布/镜像仓库：`/Users/wallace/stylotrace`，remote = `zhangyoufu-123/stylotrace-harness`，本地 **13 个提交未推送**（含 v0.68 打包布局、logprobs 结果同步），工作区干净
 - **gh 凭据**：`gh auth status` 显示 token 已失效（zhangyoufu-123），`gh api` 连不上 api.github.com
 - **网络**：git 全局配置仍指向代理 `http://127.0.0.1:7897`，但代理进程已关；绕过代理直连 github.com 超时。**当前本机到 GitHub 完全不通**，推送与 gh 操作均不可用；DeepSeek API 直连正常
 - **迁移待办**（用户确认范围后执行）：
-  - 确认是否两个仓库都迁到 org（建议：dev → `org/sculptor-agent` 为主，harness → `org/sculptor-harness`）
+  - 确认是否两个仓库都迁到 org（建议：dev → `org/stylotrace` 为主，harness → `org/stylotrace-harness`）
   - 恢复本机到 GitHub 的网络（重开代理/VPN，或改用可直连的路由并 `git config --unset http.proxy https.proxy`）
   - org/空仓库建好后：`git remote set-url origin https://github.com/<org>/<repo>.git` + `git push -u origin main`
-  - 同步更新 README.md、install.sh、agent/package.json 里的 `zhangyoufu-123/sculptor-agent` 旧 URL
+  - 同步更新 README.md、install.sh、agent/package.json 里的 `zhangyoufu-123/stylotrace` 旧 URL
 
 ## 论文状态（科创大赛参赛论文）
 
-- **源文件**：`docs/competition/科技论文-SCULPTOR.md`（68,561 字节，约 545 行，8 章 + 附录 A/B + 致谢 + 参考文献）
-- **成品 docx**：`docs/competition/科技论文-SCULPTOR.docx`（945 KB，27 页，生成于 2026-08-13 10:59，晚于 md 10:56，内容为最新）
+- **源文件**：`docs/competition/科技论文-Stylotrace.md`（68,561 字节，约 545 行，8 章 + 附录 A/B + 致谢 + 参考文献）
+- **成品 docx**：`docs/competition/科技论文-Stylotrace.docx`（945 KB，27 页，生成于 2026-08-13 10:59，晚于 md 10:56，内容为最新）
   - 生成命令：`python3 scripts/gen-paper-docx.py`（OMML 规范公式 69 处，8 张图片已嵌入，图 8 = 学习曲线）
   - 两者均已纳入 git 提交（`bef66bf`）
 - **章节结构**：摘要 → 1 引言（问题/研究空白/RQ/贡献）→ 2 相关工作（5 节）→ 3 方法（含 3.1.1 改迹调制 C1、3.1.2 样本复杂度、3.2 四层签名、3.4 澄清协议 C2、3.6 姿态层、3.7 翻译、3.8-3.12 工程形态/大纲/知识库/互操作）→ 4 实验设置（语料/指标/统计口径/盲评/测试规范/可复现性）→ 5 结果（契约测试/文本统计/风格距离/注入对照/作者识别 81.7%/外溢互操作/改迹现状）→ 6 讨论（含四类质疑回应、过程改进、行业补强）→ 7 局限 → 8 结论与展望 → 附录
@@ -50,7 +50,7 @@
 ## 目录与文件存放位置
 
 ```
-sculptor-agent/
+stylotrace/
 ├── README.md                 # 项目说明（v0.68，未提交改动）
 ├── CHANGELOG.md              # 完整版本历史（到 v0.68）
 ├── install.sh                # 安装脚本（agent/技能/CLI）
@@ -62,7 +62,7 @@ sculptor-agent/
 │   ├── test/                 # 24 套测试（stats/author-sheet/embedding/fake-thinking/e2e 等）
 │   └── package.json
 ├── web/                      # 单会话 Web 演示版：server.mjs + public/ + test/（11 套 QA）
-├── skills/sculptor/          # 技能包（与 agent/src 同步的 scripts/engine/src）
+├── skills/stylotrace/          # 技能包（与 agent/src 同步的 scripts/engine/src）
 ├── scripts/                  # gen-paper-docx.py / style-vectors.py / style-mds.py /
 │   │                         #   author-id.py / author-predict.py / formula-render.py /
 │   │                         #   paper-drive.mjs / overflow-summary.mjs / sync-skill-engine.sh
@@ -77,7 +77,7 @@ sculptor-agent/
 ## 模型配置（两层，勿混淆）
 
 1. **Codex 对话模型**：由用户在 Codex 界面（模型选择器/设置）选择，Agent 无法自行切换。官方 OpenAI 文档只覆盖 OpenAI 模型；DeepSeek 是否出现在选择器取决于本机环境配置。
-2. **Sculptor 引擎调用的模型**：由 `agent/src/config.js` 读取 `SCULPTOR_LLM_BASE_URL / SCULPTOR_LLM_API_KEY / SCULPTOR_LLM_MODEL`（`.env.local` 里为 `DEEPSEEK_BASE_URL / DEEPSEEK_MODEL`），当前默认 **deepseek-v4-flash**。想切 `deepseek-v4-pro` 改环境变量即可，改完用 e2e/experiment 测试直接验证。
+2. **Stylotrace 引擎调用的模型**：由 `agent/src/config.js` 读取 `STYLOTRACE_LLM_BASE_URL / STYLOTRACE_LLM_API_KEY / STYLOTRACE_LLM_MODEL`（`.env.local` 里为 `DEEPSEEK_BASE_URL / DEEPSEEK_MODEL`），当前默认 **deepseek-v4-flash**。想切 `deepseek-v4-pro` 改环境变量即可，改完用 e2e/experiment 测试直接验证。
 3. 本环境协作工具支持子代理模型覆盖：`deepseek-v4-flash` / `deepseek-v4-pro`（如需 DeepSeek v4 Pro 继续干活，可经子代理运行）。
 
 ## 核心理论主线：改迹调制（revision-trace modulation）
@@ -102,7 +102,7 @@ sculptor-agent/
 
 ### 评分接入
 
-`agent/src/token-decode.js` 的 `decodeSection(cfg, workspace, {messages, temperature, maxTokens, t, generate})` —— 写作每节并行生成 n 候选（`SCULPTOR_DECODE_N` 可调，个人语料 <200 字符自动降级直接生成），十二维评分选优，返回 `{text, mode, reason, n, breakdown}`（breakdown 含每候选各维得分与 rationale）。`write.js` 的 `writeSection` 已接入。
+`agent/src/token-decode.js` 的 `decodeSection(cfg, workspace, {messages, temperature, maxTokens, t, generate})` —— 写作每节并行生成 n 候选（`STYLOTRACE_DECODE_N` 可调，个人语料 <200 字符自动降级直接生成），十二维评分选优，返回 `{text, mode, reason, n, breakdown}`（breakdown 含每候选各维得分与 rationale）。`write.js` 的 `writeSection` 已接入。
 
 ## 已批准升级方案（docs/UPGRADE-PLAN.md，用户已拍板）
 
@@ -117,7 +117,7 @@ sculptor-agent/
 - B7 可解释层（贡献分解 + 人话理由，写入得分分解）
 - C1 embedding 统一（`style-vector.js` 删除 embedDense 重复实现）
 - C4 doctor 检查（新增神经风格编码/调制器/作者清单项）
-- D1 盲评统计：`agent/src/stats.js`（精确二项 `exactBinomialP`、Wilson CI、Cohen's h、`parseBlindCsv`）；CLI `sculptor experiment blind-stats <answers.csv>`（表头 pairIndex,choice,correct，choice A/B/'' 或 none）；新增 `test/stats.test.mjs`
+- D1 盲评统计：`agent/src/stats.js`（精确二项 `exactBinomialP`、Wilson CI、Cohen's h、`parseBlindCsv`）；CLI `stylotrace experiment blind-stats <answers.csv>`（表头 pairIndex,choice,correct，choice A/B/'' 或 none）；新增 `test/stats.test.mjs`
 
 ### Phase 2 清单（未开工，下一步候选）
 
@@ -148,16 +148,16 @@ B6 V2 logprobs 探测（先探测 API 是否支持再决定，不支持就文档
 
 ## 关键文件地图
 
-- 论文源：`docs/competition/科技论文-SCULPTOR.md`；生成 docx：`python3 scripts/gen-paper-docx.py` → `docs/competition/科技论文-SCULPTOR.docx`（27 页，OMML 69 处，图 8 已嵌入）
+- 论文源：`docs/competition/科技论文-Stylotrace.md`；生成 docx：`python3 scripts/gen-paper-docx.py` → `docs/competition/科技论文-Stylotrace.docx`（27 页，OMML 69 处，图 8 已嵌入）
 - 设计文档：`docs/MODULATOR.md`、`docs/STYLE-SYSTEM.md`、`docs/UPGRADE-PLAN.md`、`docs/问询系统升级-v1.md`
 - 引擎核心：`agent/src/{modulator,token-decode,personal-model,embedding,avoidance,author-sheet,stats,fake-thinking,knowledge}.js`
-- CLI：`agent/src/cli.js`（`sculptor modulator [--train] [--export]`、`sculptor author-sheet [--refresh]`、`sculptor experiment blind-stats`；doctor 新增检查）
-- 技能引擎须与 agent/src 同步：`skills/sculptor/scripts/engine/src/`（改动 agent/src 后需同步；`diff -rq agent/src skills/sculptor/scripts/engine/src` 检查）
+- CLI：`agent/src/cli.js`（`stylotrace modulator [--train] [--export]`、`stylotrace author-sheet [--refresh]`、`stylotrace experiment blind-stats`；doctor 新增检查）
+- 技能引擎须与 agent/src 同步：`skills/stylotrace/scripts/engine/src/`（改动 agent/src 后需同步；`diff -rq agent/src skills/stylotrace/scripts/engine/src` 检查）
 
 ## 实验数据（论文中用的关键数字）
 
 - 学习曲线（图 8）：n=5→30，留出边距 0.286→0.498，权重稳定 0.968→0.999
-- 风格距离：SCULPTOR 与匿名真人样本平均 0.96（ChatGPT 1.24 / DeepSeek 1.10）
+- 风格距离：Stylotrace 与匿名真人样本平均 0.96（ChatGPT 1.24 / DeepSeek 1.10）
 - 作者识别 n=180：融合 81.7%（TF-IDF 基线 82.2%，**未超过，如实报告**）
 - 续写选择 n=72：融合 72.2%（随机 50%）
 - 契约测试：agent 24 套 + web 11 套（300+ 断言）
@@ -166,10 +166,10 @@ B6 V2 logprobs 探测（先探测 API 是否支持再决定，不支持就文档
 
 - 全量 agent 测试约 2–3 分钟；`author-sheet.test.mjs` 第 3 步已注入 mock LLM（勿改回真实调用，否则每个测试 10 秒）
 - e2e 会真实调用 DeepSeek（有密钥），doctor 检查含 LLM 连通
-- 新增/修改 agent/src 后要同步 `skills/sculptor/scripts/engine/src/`，否则技能安装点落后
+- 新增/修改 agent/src 后要同步 `skills/stylotrace/scripts/engine/src/`，否则技能安装点落后
 
 ## 下一步建议
 
-1. 若用户切换模型：区分 Codex 对话模型（用户侧 UI 选择）与 Sculptor 引擎模型（改 `SCULPTOR_LLM_MODEL=deepseek-v4-pro` 并跑测试验证）
+1. 若用户切换模型：区分 Codex 对话模型（用户侧 UI 选择）与 Stylotrace 引擎模型（改 `STYLOTRACE_LLM_MODEL=deepseek-v4-pro` 并跑测试验证）
 2. Phase 2 建议从 B3 意图分流训练 或 E1/E2 Web 可视化 开始
-3. 盲评样本收集依赖用户找人（工具已就绪：`sculptor experiment run` → blind.json → blind-stats）
+3. 盲评样本收集依赖用户找人（工具已就绪：`stylotrace experiment run` → blind.json → blind-stats）

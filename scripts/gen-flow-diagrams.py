@@ -58,7 +58,7 @@ def new_ax(w, h):
 
 def fig_architecture():
     fig, ax = new_ax(11, 7)
-    ax.set_title("SCULPTOR 系统总览：数据流（实线）· 控制流（点线）· 学习/更新流（虚线）",
+    ax.set_title("Stylotrace 系统总览：数据流（实线）· 控制流（点线）· 学习/更新流（虚线）",
                  fontsize=13, color=INK, pad=12)
     # 主流程
     stages = [("澄清", "主张/前提\n推理/来源"), ("大纲", "实时大纲\n节级规划"),

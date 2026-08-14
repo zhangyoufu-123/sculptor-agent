@@ -7,12 +7,12 @@
 #   git clone https://github.com/zhangyoufu-123/stylotrace && cd stylotrace && ./install.sh --all
 #
 # Options:
-#   --project <dir>   project-scoped install into <dir>/.codex/skills/sculptor (default: current dir)
-#   --global          install/update into ~/.codex/skills/sculptor (all Codex sessions)
-#   --mirror [dir]    also mirror the dev workspace into <dir> (default ~/sculptor; selective sync, preserves your files)
+#   --project <dir>   project-scoped install into <dir>/.codex/skills/stylotrace (default: current dir)
+#   --global          install/update into ~/.codex/skills/stylotrace (all Codex sessions)
+#   --mirror [dir]    also mirror the dev workspace into <dir> (default ~/stylotrace; selective sync, preserves your files)
 #   --all             shorthand for --global --mirror (project stays the default target)
 #   --update          pull latest from GitHub (when the repo is a clone), then refresh all chosen points
-#   --cli             also symlink the standalone CLI to ~/.local/bin/sculptor (optional)
+#   --cli             also symlink the standalone CLI to ~/.local/bin/stylotrace (optional)
 #   --mcp-codex       print Codex MCP config snippet (never modifies host config on its own)
 #   --no-setup        skip auto-register after install (default: auto-register project Codex)
 #   --setup-all       also register Claude Code / OpenCode after install (auto-detected)
@@ -29,8 +29,8 @@ WITH_CLI=0
 MCP_CODEX=0
 AUTO_SETUP=1
 SETUP_ALL=0
-REPO_URL="${SCULPTOR_REPO_URL:-https://github.com/zhangyoufu-123/stylotrace}"
-STORE_DIR="${SCULPTOR_INSTALL_DIR:-${HOME}/.local/share/sculptor-agent}"
+REPO_URL="${STYLOTRACE_REPO_URL:-https://github.com/zhangyoufu-123/stylotrace}"
+STORE_DIR="${STYLOTRACE_INSTALL_DIR:-${HOME}/.local/share/stylotrace}"
 
 usage() {
   sed -n '1,20p' "$0"
@@ -64,7 +64,7 @@ say() { [ "$DRY_RUN" -eq 1 ] && printf '[dry-run] %s\n' "$*" || printf '%s\n' "$
 
 # 1/5 locate the repository (local checkout, or clone/pull into the store)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-if [ -f "$SCRIPT_DIR/agent/package.json" ] && [ -d "$SCRIPT_DIR/skills/sculptor" ]; then
+if [ -f "$SCRIPT_DIR/agent/package.json" ] && [ -d "$SCRIPT_DIR/skills/stylotrace" ]; then
   REPO_DIR="$SCRIPT_DIR"
   REPO_IS_CLONE=0
   step "1/5 use local repo: $REPO_DIR"
@@ -94,20 +94,20 @@ if [ "$UPDATE" -eq 1 ] && [ "$REPO_IS_CLONE" -eq 1 ] && [ "$DRY_RUN" -eq 0 ]; th
   git -C "$REPO_DIR" pull --rebase
 fi
 
-SRC_SKILL="$REPO_DIR/skills/sculptor"
+SRC_SKILL="$REPO_DIR/skills/stylotrace"
 SRC_TRANSLATOR="$REPO_DIR/skills/translator"
 
 # 2/5 targets
 declare -a TARGETS=()
 if [ "$GLOBAL" -eq 1 ]; then
-  TARGETS+=("${HOME}/.codex/skills/sculptor:global")
+  TARGETS+=("${HOME}/.codex/skills/stylotrace:global")
 fi
 if [ -n "$PROJECT_DIR" ] || [ "$GLOBAL" -eq 0 ]; then
   PROJECT_DIR="${PROJECT_DIR:-$PWD}"
-  TARGETS+=("$PROJECT_DIR/.codex/skills/sculptor:project")
+  TARGETS+=("$PROJECT_DIR/.codex/skills/stylotrace:project")
 fi
 if [ "$MIRROR" -eq 1 ]; then
-  MIRROR_DIR="${MIRROR_DIR:-${HOME}/sculptor}"
+  MIRROR_DIR="${MIRROR_DIR:-${HOME}/stylotrace}"
 fi
 
 step "2/5 install/update points"
@@ -138,7 +138,7 @@ sync_skill() { # dest label
   else
     mkdir -p "$(dirname "$dest")"
     rsync -a --delete "${SRC_SKILL}/" "$dest/"
-    chmod +x "$dest/scripts/sculptor.mjs" "$dest/scripts/install.sh" "$dest/scripts/update.sh" "$dest/hooks/sculptor-hook.sh" 2>/dev/null || true
+    chmod +x "$dest/scripts/stylotrace.mjs" "$dest/scripts/install.sh" "$dest/scripts/update.sh" "$dest/hooks/stylotrace-hook.sh" 2>/dev/null || true
   fi
 }
 
@@ -182,7 +182,7 @@ for t in "${TARGETS[@]}"; do
   dest="${t%%:*}"
   label="${t##*:}"
   sync_skill "$dest" "$label"
-  sync_translator "${dest%/sculptor}/translator" "$label"
+  sync_translator "${dest%/stylotrace}/translator" "$label"
 done
 [ "$MIRROR" -eq 1 ] && sync_mirror "$MIRROR_DIR"
 
@@ -193,10 +193,10 @@ for t in "${TARGETS[@]}"; do
   dest="${t%%:*}"
   label="${t##*:}"
   if [ "$DRY_RUN" -eq 1 ]; then
-    echo "[dry-run] node $dest/scripts/sculptor.mjs --help | grep -q interview"
+    echo "[dry-run] node $dest/scripts/stylotrace.mjs --help | grep -q interview"
   else
-    if node "$dest/scripts/sculptor.mjs" --help | grep -q 'interview' &&
-       node "$dest/scripts/sculptor.mjs" --help | grep -q 'redteam'; then
+    if node "$dest/scripts/stylotrace.mjs" --help | grep -q 'interview' &&
+       node "$dest/scripts/stylotrace.mjs" --help | grep -q 'redteam'; then
       echo "OK [$label]: engine works - clarify/interview/outline/write/redteam/audience/dissect/restyle all available"
       VERIFIED=1
     else
@@ -209,29 +209,29 @@ done
 
 # 5/5 LLM config, optional CLI/MCP, auto-register, summary
 step "5/5 LLM config & next steps"
-if [ -n "${SCULPTOR_LLM_API_KEY:-}" ] || [ -n "${DEEPSEEK_API_KEY:-}" ]; then
-  echo "OK: LLM key detected (SCULPTOR_LLM_API_KEY / DEEPSEEK_API_KEY)"
+if [ -n "${STYLOTRACE_LLM_API_KEY:-}" ] || [ -n "${DEEPSEEK_API_KEY:-}" ]; then
+  echo "OK: LLM key detected (STYLOTRACE_LLM_API_KEY / DEEPSEEK_API_KEY)"
 else
   echo "NOTE: no LLM key detected. Before writing, configure:"
-  echo "  export SCULPTOR_LLM_API_KEY=sk-xxx"
-  echo "  # optional: export SCULPTOR_LLM_BASE_URL=...  export SCULPTOR_LLM_MODEL=..."
+  echo "  export STYLOTRACE_LLM_API_KEY=sk-xxx"
+  echo "  # optional: export STYLOTRACE_LLM_BASE_URL=...  export STYLOTRACE_LLM_MODEL=..."
 fi
 if [ "$MCP_CODEX" -eq 1 ]; then
   echo
   echo "Codex MCP config snippet (append to project .codex/config.toml or ~/.codex/config.toml):"
   cat <<EOF
-[mcp_servers.sculptor]
+[mcp_servers.stylotrace]
 command = "node"
-args = ["$SRC_SKILL/scripts/sculptor.mjs", "mcp"]
+args = ["$SRC_SKILL/scripts/stylotrace.mjs", "mcp"]
 EOF
 fi
 if [ "$WITH_CLI" -eq 1 ]; then
-  step "optional: symlink standalone CLI to ${HOME}/.local/bin/sculptor"
+  step "optional: symlink standalone CLI to ${HOME}/.local/bin/stylotrace"
   if [ "$DRY_RUN" -eq 1 ]; then
-    echo "[dry-run] ln -sf $SRC_SKILL/scripts/sculptor.mjs ${HOME}/.local/bin/sculptor"
+    echo "[dry-run] ln -sf $SRC_SKILL/scripts/stylotrace.mjs ${HOME}/.local/bin/stylotrace"
   else
     mkdir -p "${HOME}/.local/bin"
-    ln -sf "$SRC_SKILL/scripts/sculptor.mjs" "${HOME}/.local/bin/sculptor"
+    ln -sf "$SRC_SKILL/scripts/stylotrace.mjs" "${HOME}/.local/bin/stylotrace"
   fi
 fi
 
@@ -240,11 +240,11 @@ if [ "$DRY_RUN" -eq 0 ] && [ "$AUTO_SETUP" -eq 1 ]; then
   if command -v node >/dev/null 2>&1; then
     HOSTS="codex"
     [ "$SETUP_ALL" -eq 1 ] && HOSTS="codex,claude,opencode"
-    if ! node "$SRC_SKILL/scripts/sculptor.mjs" setup --dir "$PROJECT_DIR" --hosts "$HOSTS"; then
-      echo "（自动接入未完全成功；稍后可手动运行: node $SRC_SKILL/scripts/sculptor.mjs setup --dir $PROJECT_DIR）"
+    if ! node "$SRC_SKILL/scripts/stylotrace.mjs" setup --dir "$PROJECT_DIR" --hosts "$HOSTS"; then
+      echo "（自动接入未完全成功；稍后可手动运行: node $SRC_SKILL/scripts/stylotrace.mjs setup --dir $PROJECT_DIR）"
     fi
   else
-    echo "（未检测到 Node，跳过自动接入；安装 Node >= 18 后运行: node $SRC_SKILL/scripts/sculptor.mjs setup --dir $PROJECT_DIR）"
+    echo "（未检测到 Node，跳过自动接入；安装 Node >= 18 后运行: node $SRC_SKILL/scripts/stylotrace.mjs setup --dir $PROJECT_DIR）"
   fi
 fi
 
@@ -252,14 +252,14 @@ VERSION="$(node -p "require('$REPO_DIR/agent/package.json').version" 2>/dev/null
 cat <<EOF
 
 DONE (v${VERSION}).
-- Global skill:  ${HOME}/.codex/skills/sculptor
-- Project skill: ${PROJECT_DIR}/.codex/skills/sculptor
+- Global skill:  ${HOME}/.codex/skills/stylotrace
+- Project skill: ${PROJECT_DIR}/.codex/skills/stylotrace
 - Dev mirror:    ${MIRROR_DIR:-（未启用 --mirror）}
-- Rollback:      restore ${HOME}/.codex/skills/sculptor.bak.* / $PROJECT_DIR/.codex/skills/sculptor.bak.*
+- Rollback:      restore ${HOME}/.codex/skills/stylotrace.bak.* / $PROJECT_DIR/.codex/skills/stylotrace.bak.*
 - Docs:          https://github.com/zhangyoufu-123/stylotrace
 
 以后更新三处（推荐，skill 自带更新器，随处可跑）:
-  bash ${HOME}/.codex/skills/sculptor/scripts/update.sh [项目目录]
+  bash ${HOME}/.codex/skills/stylotrace/scripts/update.sh [项目目录]
 或在仓库目录:
   ./install.sh --all --update
 EOF

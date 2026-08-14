@@ -73,7 +73,7 @@ const { respond } = await import(path.join(HERE, 'mock-llm.mjs'));
     return { ok: true, status: 200, json: async () => ({ choices: [{ message: { role: 'assistant', content } }] }) };
   };
   const cfg = { ...loadConfig(), apiKey: 'mock' };
-  const w = ws.ensureWorkspace(fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-fake-llm-')), {
+  const w = ws.ensureWorkspace(fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-fake-llm-')), {
     create: true,
   });
   const r = await diagnoseFakeThinking(cfg, w, {
@@ -91,7 +91,7 @@ const { respond } = await import(path.join(HERE, 'mock-llm.mjs'));
 
 // 6) 无 key → 确定性兜底（主路径不可用也不中断）
 {
-  const w = ws.ensureWorkspace(fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-fake-det-')), {
+  const w = ws.ensureWorkspace(fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-fake-det-')), {
     create: true,
   });
   const r = await diagnoseFakeThinking({ apiKey: '' }, w, {

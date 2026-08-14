@@ -81,7 +81,7 @@ $$S(x \mid c, t) = w_0 + \sum_i w_i\, f_i(x, c, t) + w_{\mathrm{personal}}\, \lo
 - `agent/test/author-sheet.test.mjs`：作者写作清单五问、红线强制保留、第 10 维 fineRead；
 - `agent/test/stats.test.mjs`：精确二项/95%CI/效应量/CSV 解析（盲评显著性）；
 - agent 全量 24 套 + web 11 套回归全绿；
-- CLI：`sculptor modulator [--train] [--export] [工作区]` 查看状态/强制重训/导出权重。
+- CLI：`stylotrace modulator [--train] [--export] [工作区]` 查看状态/强制重训/导出权重。
 
 ## 七、与论文理论的关系
 

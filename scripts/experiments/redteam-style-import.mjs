@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// 真实文风导入红队测试（v1.0）：把名家真实摘录作为 style-samples 给 Sculptor，
-// 由 Sculptor 的 buildStyleShot（风格少样本提取）解析学习，再写一个"不同内容"的新题，
+// 真实文风导入红队测试（v1.0）：把名家真实摘录作为 style-samples 给 Stylotrace，
+// 由 Stylotrace 的 buildStyleShot（风格少样本提取）解析学习，再写一个"不同内容"的新题，
 // 由 LLM 以人类审阅者身份完全盲评——检验"从真实文章解析风格并迁移到新题材"的能力。
 // 用法：node scripts/experiments/redteam-style-import.mjs [--out result.json]
 import fs from 'node:fs';
@@ -20,8 +20,8 @@ function loadEnvLocal() {
   }
 }
 loadEnvLocal();
-process.env.SCULPTOR_DECODE_N = '2';
-process.env.SCULPTOR_CONCRETIZE = '0';
+process.env.STYLOTRACE_DECODE_N = '2';
+process.env.STYLOTRACE_CONCRETIZE = '0';
 
 const { loadConfig } = await import(path.join(ROOT, 'agent', 'src', 'config.js'));
 const { chatWithRetry } = await import(path.join(ROOT, 'agent', 'src', 'llm.js'));

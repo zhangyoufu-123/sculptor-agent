@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """多维风格向量对比（v0.61）：
-9 个对象（SCULPTOR 作者 / 匿名真人作者×2 / 真人模拟×3 / 通用大模型×2 / 模板公文）× 8 维风格特征，
+9 个对象（Stylotrace 作者 / 匿名真人作者×2 / 真人模拟×3 / 通用大模型×2 / 模板公文）× 8 维风格特征，
 输出三张图：
   图1 style-vectors-heatmap.png   —— 对象×维度 归一化热力网格
   图2 style-vectors-distance.png  —— 对象×对象 欧氏距离矩阵热力 + 数值
@@ -14,11 +14,11 @@ import os
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-BASE = '/Users/wallace/Documents/Codex/2026-08-04/bang/sculptor-agent/docs/competition'
+BASE = '/Users/wallace/Documents/Codex/2026-08-04/bang/stylotrace/docs/competition'
 
 # ── 样本（匿名真人写作样本 ×2 + 真人模拟样本 ×3 + 通用模型 ×2 + 模板）──
 SAMPLES = {
-    'SCULPTOR 作者': (
+    'Stylotrace 作者': (
         '那年秋天，我第二次走进北大红楼。石阶还是旧的，被一百年的脚步磨出了光泽。'
         '窗台上积着灰，我伸手一抹，指腹上留下一道深色的痕。红砖墙在暮色里发暗，'
         '我想起课本里那句"破晓的号角"，忽然明白历史不是摆在玻璃柜里的展品，'
@@ -156,7 +156,7 @@ SM = F(FS, 16)
 NM = F(FN, 17)
 
 COLORS = {
-    'SCULPTOR 作者': '#b06a3b',
+    'Stylotrace 作者': '#b06a3b',
     '真人作者 A': '#3b5ba0',
     '真人作者 B': '#4f7a5c',
     '样本1': '#7a5fa0',
@@ -227,7 +227,7 @@ def fig_distance():
     )
     ai_pair = dist[('ChatGPT 通用基线', 'DeepSeek 通用基线')]
     note = f'深红 = 风格差别很大；浅米 = 风格接近。{len(humans)} 组匿名真人作者/模拟样本彼此平均距离 {hh:.2f}，'
-    note2 = f'而两个通用模型彼此仅 {ai_pair:.2f}——AI 腔互相趋同；SCULPTOR 作者站在人类一侧。'
+    note2 = f'而两个通用模型彼此仅 {ai_pair:.2f}——AI 腔互相趋同；Stylotrace 作者站在人类一侧。'
     d.text((W // 2, y0 + len(names) * (ch + gap) + 10), note, font=SM, fill='#6f5f4b', anchor='mm')
     d.text((W // 2, y0 + len(names) * (ch + gap) + 36), note2, font=SM, fill='#6f5f4b', anchor='mm')
     img.save(f'{BASE}/style-vectors-distance.png')
@@ -249,10 +249,10 @@ def ability_scores():
             pipeline = 12 if '模板' in n else 20
             multi = 22 if '模板' in n else 92
         else:
-            human_metric = 92 if n.startswith('SCULPTOR') else 96
-            anti_ai = 96 if n.startswith('SCULPTOR') else 88
-            pipeline = 96 if n.startswith('SCULPTOR') else 50
-            multi = 90 if n.startswith('SCULPTOR') else 40
+            human_metric = 92 if n.startswith('Stylotrace') else 96
+            anti_ai = 96 if n.startswith('Stylotrace') else 88
+            pipeline = 96 if n.startswith('Stylotrace') else 50
+            multi = 90 if n.startswith('Stylotrace') else 40
         s[n] = {
             '离 AI 腔距离': round(100 * min(1.0, d_to_ai[n] / 2.1), 1),
             '人类化指标': human_metric,
@@ -269,8 +269,8 @@ def fig_ability():
     img = Image.new('RGB', (W, H), '#fbf7f0')
     d = ImageDraw.Draw(img)
     d.text((W // 2, 34), '图3　写作能力全方位对比（综合评分 C = Σ wₖ·sₖ）', font=TITLE, fill='#2b2118', anchor='mm')
-    d.text((W // 2, 70), 'w = (0.25, 0.20, 0.20, 0.20, 0.15)；SCULPTOR 各维来自实测（24+11 套 QA / 反 AI 审计 / 人类化指标）', font=SUB, fill='#6f5f4b', anchor='mm')
-    objs = [n for n in names if n.startswith('SCULPTOR') or '通用' in n or '模板' in n]
+    d.text((W // 2, 70), 'w = (0.25, 0.20, 0.20, 0.20, 0.15)；Stylotrace 各维来自实测（24+11 套 QA / 反 AI 审计 / 人类化指标）', font=SUB, fill='#6f5f4b', anchor='mm')
+    objs = [n for n in names if n.startswith('Stylotrace') or '通用' in n or '模板' in n]
     x0, y0 = 190, 150
     bw, bh, gap = 150, 34, 12
     for i, ab in enumerate(ABILITIES):
@@ -291,7 +291,7 @@ def fig_ability():
     comp = {n: round(sum(w * sc[n][a] for w, a in zip([0.25, 0.2, 0.2, 0.2, 0.15], ABILITIES)), 1) for n in objs}
     comp_line = '综合评分 C：' + '　'.join(f'{n} {comp[n]}' for n in objs)
     d.text((W // 2, y0 + 5 * (bh + 26) + 92), comp_line, font=SUB, fill='#4a3c2b', anchor='mm')
-    d.text((W // 2, y0 + 5 * (bh + 26) + 124), '注：通用模型与模板的"全流程协作/人类化"为代表性基线估计（无公开全链路证据）；SCULPTOR 为实测。', font=SM, fill='#8a7a64', anchor='mm')
+    d.text((W // 2, y0 + 5 * (bh + 26) + 124), '注：通用模型与模板的"全流程协作/人类化"为代表性基线估计（无公开全链路证据）；Stylotrace 为实测。', font=SM, fill='#8a7a64', anchor='mm')
     img.save(f'{BASE}/style-vectors-ability.png')
     return comp
 
@@ -332,20 +332,20 @@ for a in names:
     lines.append('| ' + ' | '.join(row) + ' |')
 
 humans = [k for k in names if k.startswith('真人') or k.startswith('样本')]
-d_h = sum(dist[('SCULPTOR 作者', h)] for h in humans) / max(1, len(humans))
-d_gpt = dist[('SCULPTOR 作者', 'ChatGPT 通用基线')]
-d_ds = dist[('SCULPTOR 作者', 'DeepSeek 通用基线')]
+d_h = sum(dist[('Stylotrace 作者', h)] for h in humans) / max(1, len(humans))
+d_gpt = dist[('Stylotrace 作者', 'ChatGPT 通用基线')]
+d_ds = dist[('Stylotrace 作者', 'DeepSeek 通用基线')]
 d_hh = sum(dist[(humans[i], humans[j])] for i in range(len(humans)) for j in range(i + 1, len(humans))) / max(
     1, len(humans) * (len(humans) - 1) // 2
 )
 d_ai = dist[('ChatGPT 通用基线', 'DeepSeek 通用基线')]
-d_tpl = dist[('SCULPTOR 作者', '模板公文基线')]
+d_tpl = dist[('Stylotrace 作者', '模板公文基线')]
 lines += [
     '',
-    f'**关键读数**：SCULPTOR 作者与 {len(humans)} 组匿名真人作者/模拟样本的平均距离（{d_h:.2f}）'
+    f'**关键读数**：Stylotrace 作者与 {len(humans)} 组匿名真人作者/模拟样本的平均距离（{d_h:.2f}）'
     f'显著近于与通用模型的距离（ChatGPT {d_gpt:.2f} / DeepSeek {d_ds:.2f} / 模板公文 {d_tpl:.2f}）；'
     f'{len(humans)} 组真人样本彼此平均 {d_hh:.2f}；而两个通用模型之间仅 {d_ai:.2f}——AI 腔互相趋同。',
-    '这说明：SCULPTOR 学到的风格落在"人类"一侧，而不是模型的平均脸。',
+    '这说明：Stylotrace 学到的风格落在"人类"一侧，而不是模型的平均脸。',
     '',
     '## 5. 可复现性',
     '',

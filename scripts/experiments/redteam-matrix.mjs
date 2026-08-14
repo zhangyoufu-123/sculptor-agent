@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 真正的红队测试（v1.0）：10 种风格 × 10 种文体，完全由 Sculptor 引擎完成写作
+// 真正的红队测试（v1.0）：10 种风格 × 10 种文体，完全由 Stylotrace 引擎完成写作
 // （decodeSection：候选生成 + 13 维调制评分 + 拟改），再由 LLM 以"人类审阅者"身份
 // 完全盲人状态下独立打分（风格 + 文体双维度）。
 // 用法：node scripts/experiments/redteam-matrix.mjs [--out result.json]
@@ -20,8 +20,8 @@ function loadEnvLocal() {
   }
 }
 loadEnvLocal();
-process.env.SCULPTOR_DECODE_N = '2'; // 启用候选对比解码（13 维评分）
-process.env.SCULPTOR_CONCRETIZE = '0'; // 无编辑对，关拟改以省调用
+process.env.STYLOTRACE_DECODE_N = '2'; // 启用候选对比解码（13 维评分）
+process.env.STYLOTRACE_CONCRETIZE = '0'; // 无编辑对，关拟改以省调用
 
 const { loadConfig } = await import(path.join(ROOT, 'agent', 'src', 'config.js'));
 const { chatWithRetry } = await import(path.join(ROOT, 'agent', 'src', 'llm.js'));
@@ -43,7 +43,7 @@ const MATRIX = [
   { style: '学术严谨', genre: '序言', topic: '为一本文集作序' },
 ];
 
-async function writeBySculptor(item) {
+async function writeByStylotrace(item) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'redteam-matrix-'));
   const workspace = ws.ensureWorkspace(path.join(tmp, 'w'), { create: true });
   const messages = [
@@ -83,7 +83,7 @@ async function judge(item, text) {
 const results = [];
 for (const item of MATRIX) {
   try {
-    const w = await writeBySculptor(item);
+    const w = await writeByStylotrace(item);
     const j = await judge(item, w.text);
     results.push({ ...item, ...w, judge: j });
     console.log(`\n[${item.style} · ${item.genre}] mode=${w.mode} n=${w.n}`);

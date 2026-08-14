@@ -13,7 +13,7 @@ const { pendingDataNeeds, explicitSearchSuggestion } = await import(path.join(HE
 const ws = await import(path.join(HERE, '..', 'src', 'workspace.js'));
 
 const cfg = { ...loadConfig(), apiKey: '' };
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-search-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-search-test-'));
 
 // 1) 无书名号、无"读过"确认的引用式提及 → 低置信收录
 {

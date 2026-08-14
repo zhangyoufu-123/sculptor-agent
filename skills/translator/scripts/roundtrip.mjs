@@ -9,7 +9,7 @@
 //   node roundtrip.mjs --metrics-only "文本"  只算风格指标（离线，不调 LLM）
 //
 // 环境变量（OpenAI 兼容）:
-//   SCULPTOR_LLM_API_KEY / SCULPTOR_LLM_BASE_URL / SCULPTOR_LLM_MODEL
+//   STYLOTRACE_LLM_API_KEY / STYLOTRACE_LLM_BASE_URL / STYLOTRACE_LLM_MODEL
 //   缺省回退 OPENAI_API_KEY / https://api.openai.com/v1 / gpt-4o-mini
 import fs from 'node:fs';
 
@@ -33,9 +33,9 @@ function args() {
 
 function llmConfig() {
   return {
-    apiKey: process.env.SCULPTOR_LLM_API_KEY || process.env.OPENAI_API_KEY || '',
-    baseUrl: (process.env.SCULPTOR_LLM_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, ''),
-    model: process.env.SCULPTOR_LLM_MODEL || 'gpt-4o-mini',
+    apiKey: process.env.STYLOTRACE_LLM_API_KEY || process.env.OPENAI_API_KEY || '',
+    baseUrl: (process.env.STYLOTRACE_LLM_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, ''),
+    model: process.env.STYLOTRACE_LLM_MODEL || 'gpt-4o-mini',
   };
 }
 

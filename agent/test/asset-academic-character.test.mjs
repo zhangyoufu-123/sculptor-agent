@@ -25,7 +25,7 @@ function check(name, cond, extra = '') {
   if (!cond) failures += 1;
 }
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-v21-'));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-v21-'));
 const wsDir = path.join(root, 'ws');
 ws.ensureWorkspace(wsDir, { create: true });
 

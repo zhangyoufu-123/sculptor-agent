@@ -87,7 +87,7 @@ const ws = await import(path.join(HERE, '..', 'src', 'workspace.js'));
 // 7) 全链路（LLM mock）：确定性 + LLM 深审合并、落盘、渲染
 {
   const cfg = { ...loadConfig(), apiKey: 'mock' };
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-norm-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-norm-'));
   const w = ws.ensureWorkspace(path.join(tmp, 'w1'), { create: true });
   const text =
     '## 摘要\n' + '这是一段用于测试的摘要文字。'.repeat(35) +

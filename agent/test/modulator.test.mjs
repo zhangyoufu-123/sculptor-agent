@@ -25,7 +25,7 @@ const {
 const avoidanceMod = await import(path.join(HERE, '..', 'src', 'avoidance.js'));
 const { contrastiveScore } = await import(path.join(HERE, '..', 'src', 'token-decode.js'));
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-mod-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-mod-'));
 const w = ws.ensureWorkspace(path.join(tmp, 'w'), { create: true });
 
 const authorA = [

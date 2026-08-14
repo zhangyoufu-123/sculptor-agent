@@ -48,7 +48,7 @@ rewrite_gaps ≤2 轮）、`mcp.js`（被动工具协议）、写前重读校验
 **理论**：能力必须长在用户所在的地方——CLI/MCP 给会用 Agent 的人，Web 工作台给不会的人。
 同一导演状态机，两种皮肤，保证"产品形态不稀释核心能力"。
 
-**实现**：`agent/bin/sculptor.js`（CLI）+ `mcp.js`（stdio JSON-RPC）+ `web/server.mjs`
+**实现**：`agent/bin/stylotrace.js`（CLI）+ `mcp.js`（stdio JSON-RPC）+ `web/server.mjs`
 （REST 包装同一 `agentStep`）；20+7 套 QA 双端同源验证。
 
 ---

@@ -33,12 +33,12 @@ import {
 } from '../src/credentials.js';
 import { loadConfig } from '../src/config.js';
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-e2e-'));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-e2e-'));
 const work = path.join(root, 'work');
 fs.mkdirSync(work, { recursive: true });
 const workspace = path.join(root, 'ws');
-process.env.SCULPTOR_WORKSPACE = workspace;
-process.env.SCULPTOR_LLM_API_KEY = 'e2e-mock-key'; // 配合下方 fetch stub：有密钥才走 LLM 分支，实际请求全部离线 mock
+process.env.STYLOTRACE_WORKSPACE = workspace;
+process.env.STYLOTRACE_LLM_API_KEY = 'e2e-mock-key'; // 配合下方 fetch stub：有密钥才走 LLM 分支，实际请求全部离线 mock
 
 let failures = 0;
 function check(name, cond, extra = '') {
@@ -108,7 +108,7 @@ try {
   // 0. bin 启动器冒烟（--help / doctor 不走网络）
   let smoke = spawnSync(
     process.execPath,
-    [new URL('../bin/sculptor.js', import.meta.url).pathname, '--help'],
+    [new URL('../bin/stylotrace.js', import.meta.url).pathname, '--help'],
     { encoding: 'utf8' },
   );
   check('bin 启动器 --help', smoke.status === 0 && smoke.stdout.includes('Stylotrace Agent'));
@@ -183,7 +183,7 @@ try {
 
   // 2.5 需求访谈：独立工作区跑多轮，返回确认清单与进度
   const ws2 = path.join(root, 'ws2');
-  process.env.SCULPTOR_WORKSPACE = ws2;
+  process.env.STYLOTRACE_WORKSPACE = ws2;
   r = await run(['init'], {});
   check('interview 前 init', r.code === 0);
   r = await run(['interview', '--once'], { input: '\n' });
@@ -213,11 +213,11 @@ try {
     r.out.includes('确认清单') && r.out.includes('下一步'),
     r.out.slice(0, 120),
   );
-  process.env.SCULPTOR_WORKSPACE = workspace;
+  process.env.STYLOTRACE_WORKSPACE = workspace;
 
   // 2.8 导演模式：自主决策、主导全程（agent --once，逐条转发用户消息）
   const ws3 = path.join(root, 'ws3');
-  process.env.SCULPTOR_WORKSPACE = ws3;
+  process.env.STYLOTRACE_WORKSPACE = ws3;
   r = await run(['init'], {});
   check('导演前 init', r.code === 0);
   r = await run(['agent', '--once'], { input: '\n' });
@@ -348,7 +348,7 @@ try {
       r.out.slice(0, 100),
     );
   }
-  process.env.SCULPTOR_WORKSPACE = workspace;
+  process.env.STYLOTRACE_WORKSPACE = workspace;
 
   // 2.9 文体库：公式化内容的结构范式
   r = await run(['genre', '合同']);
@@ -473,7 +473,7 @@ try {
     JSON.stringify(b1000),
   );
   const ws9 = path.join(root, 'ws9');
-  process.env.SCULPTOR_WORKSPACE = ws9;
+  process.env.STYLOTRACE_WORKSPACE = ws9;
   r = await run(['interview', '--once'], { input: '写一份关于安全生产的通知\n' });
   const iOfficial = JSON.parse(r.out);
   check(
@@ -483,7 +483,7 @@ try {
       !iOfficial.checklist?.some((x) => x.label.includes('论点')),
     JSON.stringify(iOfficial.checklist?.map((x) => x.label)),
   );
-  process.env.SCULPTOR_WORKSPACE = workspace;
+  process.env.STYLOTRACE_WORKSPACE = workspace;
   const ws10 = path.join(root, 'ws10');
   const { ensureWorkspace: ensureWs, writeState: writeWs } = await import('../src/workspace.js');
   const { gate } = await import('../src/outline.js');
@@ -509,7 +509,7 @@ try {
 
   // 2.10 个人写作库：分类 + 蒸馏 + 查看 + 限量注入
   const ws4 = path.join(root, 'ws4');
-  process.env.SCULPTOR_WORKSPACE = ws4;
+  process.env.STYLOTRACE_WORKSPACE = ws4;
   r = await run(['init'], {});
   const essayFile = path.join(root, 'essay.md');
   fs.writeFileSync(
@@ -541,7 +541,7 @@ try {
     loadPersonalSkill(ws4, { category: '议论文' }).includes('个人写作 skill') &&
       loadPersonalSkill(ws4, { category: '议论文', limit: 50 }).length <= 60,
   );
-  process.env.SCULPTOR_WORKSPACE = workspace;
+  process.env.STYLOTRACE_WORKSPACE = workspace;
 
   // 2.11 多模态输入：docx / xlsx 提取为素材
   const ioDir = path.join(root, 'io');
@@ -607,14 +607,14 @@ try {
     '#!/bin/sh\necho "今天参观北大红楼，站在门口很久，想到了百年前的青年们。"\n',
   );
   spawnSync('chmod', ['+x', fakeWhisper]);
-  process.env.SCULPTOR_WHISPER_CMD = fakeWhisper;
+  process.env.STYLOTRACE_WHISPER_CMD = fakeWhisper;
   r = await run(['dictate', audioFile]);
   check(
     'dictate 语音口述转录为素材（whisper 命令不阻塞、超时可控）',
     r.code === 0 && r.out.includes('voice') && r.out.includes('已加入素材'),
     r.out.slice(0, 160),
   );
-  delete process.env.SCULPTOR_WHISPER_CMD;
+  delete process.env.STYLOTRACE_WHISPER_CMD;
 
   // 2.6 quote 引用块
   r = await run(['quote', '那扇窗沉默地注视着一切。']);
@@ -865,8 +865,8 @@ try {
       r.out.includes('优先级'),
     r.out.slice(0, 140),
   );
-  // skill 形态（scripts/sculptor.mjs）也必须提供读者群像与重写命令
-  const skillScript = new URL('../../skills/sculptor/scripts/sculptor.mjs', import.meta.url)
+  // skill 形态（scripts/stylotrace.mjs）也必须提供读者群像与重写命令
+  const skillScript = new URL('../../skills/stylotrace/scripts/stylotrace.mjs', import.meta.url)
     .pathname;
   const skillAud = spawnSync(process.execPath, [skillScript, 'audience', workspace, '--quick'], {
     encoding: 'utf8',
@@ -991,7 +991,7 @@ try {
     fs.existsSync(evalLog) && fs.readFileSync(evalLog, 'utf8').trim().length > 0,
   );
   const wsNoRef = path.join(root, 'ws-noref');
-  process.env.SCULPTOR_WORKSPACE = wsNoRef;
+  process.env.STYLOTRACE_WORKSPACE = wsNoRef;
   r = await run(['init'], {});
   check('无参照系工作区 init', r.code === 0);
   fs.writeFileSync(
@@ -1004,7 +1004,7 @@ try {
     r.code === 0 && r.out.includes('参照'),
     r.out.slice(0, 120),
   );
-  process.env.SCULPTOR_WORKSPACE = workspace;
+  process.env.STYLOTRACE_WORKSPACE = workspace;
 
   // 8.6 风格持续微调基建：适配卡蒸馏 + 偏好对数据集 + 本地 LoRA 指引
   r = await run(['style-adapter']);
@@ -1109,7 +1109,7 @@ try {
     r.out.slice(0, 100),
   );
   const ws6 = path.join(root, 'ws6');
-  process.env.SCULPTOR_WORKSPACE = ws6;
+  process.env.STYLOTRACE_WORKSPACE = ws6;
   r = await run(['init'], {});
   check('profile 导入前 init', r.code === 0);
   r = await run(['profile', 'import', profileFile]);
@@ -1126,7 +1126,7 @@ try {
     (importedWrite.dimensions?.temperature?.confidence || 0) > 0,
     JSON.stringify(importedWrite.dimensions?.temperature),
   );
-  process.env.SCULPTOR_WORKSPACE = workspace;
+  process.env.STYLOTRACE_WORKSPACE = workspace;
   const citeTextFile = path.join(root, 'cites.md');
   fs.writeFileSync(citeTextFile, '文中引用了《我与地坛》和《国史大纲》，值得进一步展开。\n');
   r = await run(['citations', '--file', citeTextFile]);
@@ -1151,7 +1151,7 @@ try {
     ]),
   );
   const ws7 = path.join(root, 'ws7');
-  process.env.SCULPTOR_WORKSPACE = ws7;
+  process.env.STYLOTRACE_WORKSPACE = ws7;
   r = await run(['init'], {});
   check('citations 前 init', r.code === 0);
   fs.writeFileSync(path.join(ws7, 'draft.md'), '正文内容，引用《我与地坛》。\n');
@@ -1163,7 +1163,7 @@ try {
       fs.readFileSync(path.join(ws7, 'draft.md'), 'utf8').includes('我与地坛[J]'),
     r.out.slice(0, 120),
   );
-  process.env.SCULPTOR_WORKSPACE = workspace;
+  process.env.STYLOTRACE_WORKSPACE = workspace;
 
   // 8.9 联网 RAG + 内置原创性检查
   const ragQueries = buildSearchQueries('1987年《光明日报》刊登报道，三百多座红砖楼', {
@@ -1266,7 +1266,7 @@ try {
     'Codex 候选同样脱敏',
     !describeCandidate(codexCand[0]).includes('sk-xyz7890'),
   );
-  const cfgExplicit = loadConfig({ SCULPTOR_LLM_API_KEY: 'sk-explicit', OPENAI_API_KEY: 'sk-env' });
+  const cfgExplicit = loadConfig({ STYLOTRACE_LLM_API_KEY: 'sk-explicit', OPENAI_API_KEY: 'sk-env' });
   check('显式 STYLOTRACE 配置优先于宿主发现', cfgExplicit.apiKey === 'sk-explicit');
   const cf = saveCredentials(ws6, {
     baseUrl: 'https://example.com/v1',
@@ -1292,7 +1292,7 @@ try {
 
   // 8.11 装完即用：agent/interview/clarify 无需先 init
   const ws8 = path.join(root, 'ws8');
-  process.env.SCULPTOR_WORKSPACE = ws8;
+  process.env.STYLOTRACE_WORKSPACE = ws8;
   r = await run(['agent', '--once']);
   check(
     'agent 自动初始化工作区并提问（无需先 init）',
@@ -1309,7 +1309,7 @@ try {
     r.code === 0 && Boolean(JSON.parse(r.out).question),
     r.out.slice(0, 100),
   );
-  process.env.SCULPTOR_WORKSPACE = workspace;
+  process.env.STYLOTRACE_WORKSPACE = workspace;
 
   // 8.12 深度审阅 review（红队 + 校对 + 事实 + 原创 + 风格保真 + 读者交锋，--fix 一键修复）
   r = await run(['review']);
@@ -1339,7 +1339,7 @@ try {
   check('doctor + LLM 连通', r.code === 0 && r.out.includes('LLM 连通: ✓'), r.out.slice(0, 120));
 
   // 10. 冲突检查：工作区外零写入
-  const stray = fs.readdirSync(work).filter((f) => f !== '.sculptor');
+  const stray = fs.readdirSync(work).filter((f) => f !== '.stylotrace');
   check('工作区外无杂散文件', stray.length === 0, JSON.stringify(stray));
 
   // 10.5 深度定点修改：只改选中的那一处
@@ -1430,7 +1430,7 @@ try {
       .split('\n')
       .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
   );
-  check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'sculptor');
+  check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'stylotrace');
   check('MCP tools/list 39 个工具', byId[2]?.result?.tools?.length === 39);
   check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Stylotrace 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
@@ -1654,10 +1654,10 @@ try {
     );
 
     // CLI 可查看
-    const oldWs = process.env.SCULPTOR_WORKSPACE;
-    process.env.SCULPTOR_WORKSPACE = vecWs;
+    const oldWs = process.env.STYLOTRACE_WORKSPACE;
+    process.env.STYLOTRACE_WORKSPACE = vecWs;
     const vr = await run(['style-vector']);
-    process.env.SCULPTOR_WORKSPACE = oldWs;
+    process.env.STYLOTRACE_WORKSPACE = oldWs;
     check(
       'CLI style-vector 可运行',
       vr.code === 0 && (vr.out.includes('风格向量') || vr.out.includes('实时动态维度')),
@@ -1690,9 +1690,9 @@ try {
   // 13. 实时取数闭环：学术场景自动排队 → rag needs 可查 → 回灌进素材并标记完成
   {
     const dataWs = path.join(root, 'data-ws');
-    const prevWs = process.env.SCULPTOR_WORKSPACE;
+    const prevWs = process.env.STYLOTRACE_WORKSPACE;
     fs.mkdirSync(dataWs, { recursive: true });
-    process.env.SCULPTOR_WORKSPACE = dataWs;
+    process.env.STYLOTRACE_WORKSPACE = dataWs;
     r = await run(['init']);
     check('数据工作区初始化', r.code === 0);
     r = await run(['clarify', '--once'], { input: '我想写一篇关于AI教育公平的学术论文' });
@@ -1731,15 +1731,15 @@ try {
       .split('\n')
       .some((l) => l.includes('"status": "pending"'));
     check('回灌后待办标记完成', stillPending === false);
-    process.env.SCULPTOR_WORKSPACE = prevWs;
+    process.env.STYLOTRACE_WORKSPACE = prevWs;
   }
 
   // 14. 回灌后自动续写：交付态检测到【素材不足】节 + 回灌晚于写作 → 自动重写并重新审计
   {
     const rwWs = path.join(root, 'rewrite-ws');
-    const prevWs = process.env.SCULPTOR_WORKSPACE;
+    const prevWs = process.env.STYLOTRACE_WORKSPACE;
     fs.mkdirSync(rwWs, { recursive: true });
-    process.env.SCULPTOR_WORKSPACE = rwWs;
+    process.env.STYLOTRACE_WORKSPACE = rwWs;
     r = await run(['init']);
     const draftText =
       '## 三、数据缺口\n\n本节需要真实数据支撑【素材不足：还需要 2025 年 AI 教育统计】\n';
@@ -1788,7 +1788,7 @@ try {
       step2.kind === 'working' && step2.phase === 'redteam',
       r.out.slice(0, 60),
     );
-    process.env.SCULPTOR_WORKSPACE = prevWs;
+    process.env.STYLOTRACE_WORKSPACE = prevWs;
   }
 } finally {
   delete globalThis.fetch;

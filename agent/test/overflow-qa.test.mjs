@@ -12,7 +12,7 @@ const ws = await import(path.join(HERE, '..', 'src', 'workspace.js'));
 const { clarifyStep } = await import(path.join(HERE, '..', 'src', 'clarify.js'));
 
 const cfg = { ...loadConfig(), apiKey: '' };
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-overflow-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-overflow-'));
 const w = ws.ensureWorkspace(path.join(tmp, 'w'), { create: true });
 
 // 1) 红线外溢：用户定死台词/约束 → 入 constraints + overflow-log（确定性兜底）

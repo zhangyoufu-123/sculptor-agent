@@ -1,18 +1,18 @@
 #!/usr/bin/env node
-// 从"手动修改"提取风格的红队测试：只给 Sculptor 一组"原文→改后"的修改对（都体现
+// 从"手动修改"提取风格的红队测试：只给 Stylotrace 一组"原文→改后"的修改对（都体现
 // "抽象改具体、删连接词、长句改短句"），让它从修改中学习，再写一个全新主题，盲评是否带出该风格。
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = '/Users/wallace/Documents/Codex/2026-08-04/bang/sculptor-agent';
+const ROOT = '/Users/wallace/Documents/Codex/2026-08-04/bang/stylotrace';
 for (const line of fs.readFileSync(path.join(ROOT, '.env.local'), 'utf8').split('\n')) {
   const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
   if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
 }
-process.env.SCULPTOR_DECODE_N = '2';
-process.env.SCULPTOR_CONCRETIZE = '0';
+process.env.STYLOTRACE_DECODE_N = '2';
+process.env.STYLOTRACE_CONCRETIZE = '0';
 
 const { loadConfig } = await import(path.join(ROOT, 'agent/src/config.js'));
 const { chatWithRetry } = await import(path.join(ROOT, 'agent/src/llm.js'));

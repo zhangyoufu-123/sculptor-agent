@@ -27,7 +27,7 @@ function check(name, cond, extra = '') {
   if (!cond) failures += 1;
 }
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-kb-'));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-kb-'));
 const ws = path.join(root, 'ws');
 fs.mkdirSync(ws, { recursive: true });
 

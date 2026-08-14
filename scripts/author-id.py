@@ -24,7 +24,7 @@ OUT = os.path.join(BASE, 'docs', 'competition', 'AUTHOR-ID.md')
 
 # 与 scripts/style-vectors.py 同源的真实样本（名家用原文、通用模型用典型 AI 腔、模板用公式化公文）
 SAMPLES = {
-    'SCULPTOR 作者': (
+    'Stylotrace 作者': (
         '那年秋天，我第二次走进北大红楼。石阶还是旧的，被一百年的脚步磨出了光泽。'
         '窗台上积着灰，我伸手一抹，指腹上留下一道深色的痕。红砖墙在暮色里发暗，'
         '我想起课本里那句"破晓的号角"，忽然明白历史不是摆在玻璃柜里的展品，'

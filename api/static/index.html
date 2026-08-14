@@ -66,8 +66,8 @@
     const keyInput = $('#key'), chat = $('#chat'), input = $('#input'), status = $('#status');
     let sessionId = null;
 
-    function apiKey() { return localStorage.getItem('sculptor_key') || ''; }
-    function setKey(k) { localStorage.setItem('sculptor_key', k); }
+    function apiKey() { return localStorage.getItem('stylotrace_key') || ''; }
+    function setKey(k) { localStorage.setItem('stylotrace_key', k); }
     keyInput.value = apiKey();
     $('#saveKey').onclick = () => { setKey(keyInput.value.trim()); status.textContent = keyInput.value.trim() ? 'Key 已保存（仅本地）' : '请先保存 Key'; };
 

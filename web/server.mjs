@@ -6,7 +6,7 @@
 //   风格肖像（write/read 14+7 维 + 复合风格向量 + 人物侧写）
 //   知识库可视化（vault/knowledge 条目列表/删除）
 //   导出：md / docx / pptx（python-docx / python-pptx 可用时）
-// SCULPTOR_MOCK_LLM=1 时用内置 mock（离线验证）。
+// STYLOTRACE_MOCK_LLM=1 时用内置 mock（离线验证）。
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,14 +19,14 @@ import crypto from 'node:crypto';
 const PORT = Number(process.env.PORT || 5177);
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const PUBLIC = path.resolve(HERE, 'public');
-const DATA_ROOT = path.resolve(process.env.SCULPTOR_WEB_DATA || path.resolve(HERE, '..', 'web-data'));
+const DATA_ROOT = path.resolve(process.env.STYLOTRACE_WEB_DATA || path.resolve(HERE, '..', 'web-data'));
 
-// ── 最小密码门：设置 SCULPTOR_WEB_PASSWORD 即启用，未设置则开放（个人/演示）──
-const AUTH_PASSWORD = String(process.env.SCULPTOR_WEB_PASSWORD || '');
-const AUTH_COOKIE = 'sculptor_auth';
+// ── 最小密码门：设置 STYLOTRACE_WEB_PASSWORD 即启用，未设置则开放（个人/演示）──
+const AUTH_PASSWORD = String(process.env.STYLOTRACE_WEB_PASSWORD || '');
+const AUTH_COOKIE = 'stylotrace_auth';
 
 function authToken() {
-  return crypto.createHash('sha256').update(`sculptor:${AUTH_PASSWORD}`).digest('hex');
+  return crypto.createHash('sha256').update(`stylotrace:${AUTH_PASSWORD}`).digest('hex');
 }
 
 function parseCookies(header) {
@@ -62,8 +62,8 @@ function machineIdOf(req, url) {
   return raw.replace(/[^a-z0-9-]/gi, '').slice(0, 64) || 'default';
 }
 
-// 离线 mock（与单测同一套）：SCULPTOR_MOCK_LLM=1 时启用，用于本地/CI 验证
-if (process.env.SCULPTOR_MOCK_LLM === '1') {
+// 离线 mock（与单测同一套）：STYLOTRACE_MOCK_LLM=1 时启用，用于本地/CI 验证
+if (process.env.STYLOTRACE_MOCK_LLM === '1') {
   const { respond } = await import(
     pathToFileURL(path.resolve(HERE, '..', 'agent', 'test', 'mock-llm.mjs')).href
   );
@@ -155,11 +155,11 @@ const {
 
 // Web 端默认收紧 LLM 超时与重试（避免"慢响应 + 长重试"叠加成几十秒的等待）；
 // CLI/Agent 端不受影响（保持默认 300s / 4 次重试）。
-if (!process.env.SCULPTOR_LLM_TIMEOUT_MS) process.env.SCULPTOR_LLM_TIMEOUT_MS = '120000';
-if (!process.env.SCULPTOR_LLM_RETRIES) process.env.SCULPTOR_LLM_RETRIES = '2';
+if (!process.env.STYLOTRACE_LLM_TIMEOUT_MS) process.env.STYLOTRACE_LLM_TIMEOUT_MS = '120000';
+if (!process.env.STYLOTRACE_LLM_RETRIES) process.env.STYLOTRACE_LLM_RETRIES = '2';
 // Web 端默认开启内置免费检索（DuckDuckGo → 维基兜底），"帮我查一查"在部署即能用；
 // CLI 端不设默认（保持"未配置→排队宿主代检"的原行为）。
-if (!process.env.SCULPTOR_SEARCH_PROVIDER) process.env.SCULPTOR_SEARCH_PROVIDER = 'builtin';
+if (!process.env.STYLOTRACE_SEARCH_PROVIDER) process.env.STYLOTRACE_SEARCH_PROVIDER = 'builtin';
 
 // 自动加载仓库根目录 .env.local（DEEPSEEK_* 等），让 `npm start` 开箱即用。
 function loadEnvLocal(file) {
@@ -173,11 +173,11 @@ function loadEnvLocal(file) {
 }
 loadEnvLocal(path.resolve(HERE, '..', '.env.local'));
 
-// Web 端默认使用 deepseek-v4-flash（快、省），显式 SCULPTOR_LLM_MODEL 仍可覆盖为 pro。
-if (!process.env.SCULPTOR_LLM_MODEL) process.env.SCULPTOR_LLM_MODEL = 'deepseek-v4-flash';
+// Web 端默认使用 deepseek-v4-flash（快、省），显式 STYLOTRACE_LLM_MODEL 仍可覆盖为 pro。
+if (!process.env.STYLOTRACE_LLM_MODEL) process.env.STYLOTRACE_LLM_MODEL = 'deepseek-v4-flash';
 
 // 服务端兜底凭据（本地/开发者自用）：仅在没有 BYOK key 时使用。
-// 对外部署时建议不配 SCULPTOR_LLM_API_KEY，强制用户自带 key，避免烧服务端额度。
+// 对外部署时建议不配 STYLOTRACE_LLM_API_KEY，强制用户自带 key，避免烧服务端额度。
 const serverCfg = loadConfig();
 
 // ── BYOK：用户带自己的 LLM key 调用，key 既是身份也是计费凭证 ──
@@ -209,10 +209,10 @@ function cfgForRequest(req, url) {
   const baseUrl = String(url.searchParams.get('baseUrl') || '').trim();
   return loadConfig({
     ...process.env,
-    SCULPTOR_LLM_API_KEY: key,
-    SCULPTOR_CREDENTIALS: 'off',
-    ...(model ? { SCULPTOR_LLM_MODEL: model } : {}),
-    ...(baseUrl ? { SCULPTOR_LLM_BASE_URL: baseUrl } : {}),
+    STYLOTRACE_LLM_API_KEY: key,
+    STYLOTRACE_CREDENTIALS: 'off',
+    ...(model ? { STYLOTRACE_LLM_MODEL: model } : {}),
+    ...(baseUrl ? { STYLOTRACE_LLM_BASE_URL: baseUrl } : {}),
   });
 }
 
@@ -422,7 +422,7 @@ function sendFile(res, file, name, type) {
 
 /** 大纲/成稿 → pptx（python-pptx；零模板，标题行分页）。 */
 function exportPptx(mdText, outFile) {
-  const tmpMd = path.join(os.tmpdir(), `.sculptor-ppt-${Date.now()}.md`);
+  const tmpMd = path.join(os.tmpdir(), `.stylotrace-ppt-${Date.now()}.md`);
   fs.writeFileSync(tmpMd, mdText);
   try {
     execFileSync(
@@ -491,7 +491,7 @@ const server = http.createServer((req, res) => {
 async function handleRequest(req, res, url) {
   const p = url.pathname;
 
-  // ── 鉴权：设置 SCULPTOR_WEB_PASSWORD 时，所有 /api/* 需登录（health/静态资源除外）──
+  // ── 鉴权：设置 STYLOTRACE_WEB_PASSWORD 时，所有 /api/* 需登录（health/静态资源除外）──
   const publicPath = p === '/health' || p === '/api/auth/status' || p === '/api/auth/login';
   if (AUTH_PASSWORD && p.startsWith('/api/') && !publicPath && !isAuthed(req)) {
     return json(res, 401, { error: '需要密码' });
@@ -512,7 +512,7 @@ async function handleRequest(req, res, url) {
   if (req.method === 'GET' && p === '/health') {
     return json(res, 200, {
       ok: true,
-      mode: process.env.SCULPTOR_MOCK_LLM === '1' ? 'mock' : 'live',
+      mode: process.env.STYLOTRACE_MOCK_LLM === '1' ? 'mock' : 'live',
       model: currentCfg().model,
       key: currentCfg().apiKey ? 'configured' : 'missing',
       byok: true,
@@ -1309,7 +1309,7 @@ async function handleRequest(req, res, url) {
           })();
     }
     if (!mdText.trim()) return json(res, 400, { error: '还没有成稿或大纲，无法导出' });
-    const base = `${meta.title || 'sculptor'}-${new Date().toISOString().slice(0, 10)}`;
+    const base = `${meta.title || 'stylotrace'}-${new Date().toISOString().slice(0, 10)}`;
     if (fmt === 'md') {
       const f = path.join(os.tmpdir(), `${base}.md`);
       fs.writeFileSync(f, mdText);
@@ -1456,7 +1456,7 @@ if (typeof server.on === 'function') {
 
 server.listen(PORT, () => {
   console.log(
-    `Stylotrace Studio → http://localhost:${PORT}（${process.env.SCULPTOR_MOCK_LLM === '1' ? '离线 mock 模式' : '真实 LLM 模式'}）`,
+    `Stylotrace Studio → http://localhost:${PORT}（${process.env.STYLOTRACE_MOCK_LLM === '1' ? '离线 mock 模式' : '真实 LLM 模式'}）`,
   );
   console.log(`  会话数据: ${DATA_ROOT}`);
   console.log(`  模型: ${currentCfg().model} · 密钥: ${currentCfg().apiKey ? '已配置' : '未配置（可在 .env.local 或环境变量里设）'}`);

@@ -11,9 +11,9 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..');
-const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-web-qa-'));
-process.env.SCULPTOR_MOCK_LLM = '1';
-process.env.SCULPTOR_WEB_DATA = TMP;
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-web-qa-'));
+process.env.STYLOTRACE_MOCK_LLM = '1';
+process.env.STYLOTRACE_WEB_DATA = TMP;
 
 let handler = null;
 http.createServer = (h) => { handler = h; return { listen() {} }; };

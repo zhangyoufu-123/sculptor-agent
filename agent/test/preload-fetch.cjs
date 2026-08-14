@@ -1,5 +1,5 @@
 // CJS preload：把 globalThis.fetch 指向本地 mock LLM。
-// 用法：node --require ./test/preload-fetch.cjs <sculptor-bin> <命令...>
+// 用法：node --require ./test/preload-fetch.cjs <stylotrace-bin> <命令...>
 // 用途：离线安装验证 / CI（沙箱无外网时跑通全流程）。
 const { pathToFileURL } = require('node:url');
 const path = require('node:path');

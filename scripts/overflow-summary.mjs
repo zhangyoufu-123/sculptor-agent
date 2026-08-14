@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..');
-const DATA = process.env.SCULPTOR_WEB_DATA || path.join(REPO, 'web-data');
+const DATA = process.env.STYLOTRACE_WEB_DATA || path.join(REPO, 'web-data');
 const OUT = path.join(REPO, 'docs', 'questioning-upgrades.md');
 
 const rows = [];

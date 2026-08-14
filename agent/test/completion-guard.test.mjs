@@ -41,7 +41,7 @@ globalThis.fetch = async (url, opts) => {
   };
 };
 
-const w = ws.ensureWorkspace(fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-guard-')), {
+const w = ws.ensureWorkspace(fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-guard-')), {
   create: true,
 });
 const st = ws.readState(w);

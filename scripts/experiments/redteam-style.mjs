@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 名家风格红队测试（v1.0）：Sculptor 引擎只按"风格描述"（不看原文）模仿名家，
+// 名家风格红队测试（v1.0）：Stylotrace 引擎只按"风格描述"（不看原文）模仿名家，
 // 再由 LLM 作为"完全盲人"评委独立打分——判断输出是否真的具有该名家鲜明风格。
 // 用法：node scripts/experiments/redteam-style.mjs [--out result.json]
 import fs from 'node:fs';

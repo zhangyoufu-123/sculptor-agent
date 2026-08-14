@@ -15,7 +15,7 @@ const mod = await import(path.join(HERE, '..', 'src', 'modulator.js'));
 const pm = await import(path.join(HERE, '..', 'src', 'personal-model.js'));
 const { audit } = await import(path.join(HERE, '..', 'src', 'redteam.js'));
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-redteam-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-redteam-'));
 const w = ws.ensureWorkspace(path.join(tmp, 'w'), { create: true });
 
 const ADVERSARIAL = ['', ' ', '。', '……', '💥💥💥', 'a'.repeat(1000), '在当今在当今在当今', '\u0000\u0001\u0002'];

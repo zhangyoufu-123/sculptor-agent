@@ -9,7 +9,7 @@ import {
   collectAuthorCorpus,
   corpusStats,
   baselineText,
-  sculptorVariant,
+  stylotraceVariant,
   runPairExperiment,
   runAblation,
   userSurveyTemplate,
@@ -40,7 +40,7 @@ globalThis.fetch = async (url, opts) => {
   };
 };
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-exp-'));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-exp-'));
 const wsDir = path.join(root, 'ws');
 ws.ensureWorkspace(wsDir, { create: true });
 const cfg = { apiKey: 'mock', baseURL: 'http://mock', model: 'mock' };
@@ -71,9 +71,9 @@ check('语料包采集（样本/修改/话语）', stats.samples >= 1 && stats.e
 // ── 对照组 / 实验组 ────────────────────────────────────
 const b = await baselineText(cfg, { topic: '百年历久，北大红楼', targetWords: 200 });
 check('对照组生成', b.ok === true && b.text.length > 0);
-const v = await sculptorVariant(cfg, { topic: '百年历久，北大红楼', targetWords: 200, sample: humanText });
+const v = await stylotraceVariant(cfg, { topic: '百年历久，北大红楼', targetWords: 200, sample: humanText });
 check('实验组（风格注入）生成', v.ok === true && v.text.length > 0);
-const vNoKey = await sculptorVariant({ apiKey: '' }, { topic: 'x', sample: humanText });
+const vNoKey = await stylotraceVariant({ apiKey: '' }, { topic: 'x', sample: humanText });
 check('无密钥确定性降级', vNoKey.ok === false && vNoKey.skipped === true);
 
 // ── 对照实验批跑 ────────────────────────────────────────

@@ -6,8 +6,8 @@
 ## 第 1 步：生成盲评对（本地，一次）
 
 ```bash
-cd /Users/wallace/Documents/Codex/2026-08-04/bang/sculptor-agent/agent
-node bin/sculptor.js experiment run \
+cd /Users/wallace/Documents/Codex/2026-08-04/bang/stylotrace/agent
+node bin/stylotrace.js experiment run \
   --topic "写一篇关于夏天离别的散文" \
   --genre 散文 \
   --words 600 \
@@ -20,7 +20,7 @@ node bin/sculptor.js experiment run \
 ## 第 2 步：导出问卷（一次）
 
 ```bash
-node bin/sculptor.js experiment blind <run目录> --out blind-survey.md
+node bin/stylotrace.js experiment blind <run目录> --out blind-survey.md
 ```
 
 把 `blind-survey.md` 转成问卷/表格发给读者。每人只回答："哪篇更像作者 A？A 还是 B"。
@@ -42,7 +42,7 @@ pairIndex,choice,correct
 ## 第 4 步：自动统计（一次）
 
 ```bash
-node bin/sculptor.js experiment blind-stats answers.csv
+node bin/stylotrace.js experiment blind-stats answers.csv
 ```
 
 自动输出：有效作答数、命中数、命中率、精确二项 p 值（H0 命中率 50%）、Wilson 95% 置信区间、Cohen's h 效应量，以及"显著 / 未达显著"结论。

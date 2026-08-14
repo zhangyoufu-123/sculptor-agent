@@ -16,7 +16,7 @@ description: 翻译与回译校验工具。仅在用户明确要求翻译、回�
 - 拿翻译做校对（"把这段翻成英文再翻回来看看"）
 - 翻译前后风格对比（"翻译后风格会不会变"）
 
-不触发：普通写作、改写、润色（那些走 sculptor skill）。
+不触发：普通写作、改写、润色（那些走 stylotrace skill）。
 
 ## 运行
 
@@ -29,11 +29,11 @@ node scripts/roundtrip.mjs "直接给文本"
 node scripts/roundtrip.mjs --json "文本"      # 机器可读
 node scripts/roundtrip.mjs --metrics-only "文本"  # 离线，只算风格指标
 
-# 完整引擎（若已安装 sculptor）
-sculptor roundtrip --file 文章.md
+# 完整引擎（若已安装 stylotrace）
+stylotrace roundtrip --file 文章.md
 ```
 
-LLM 配置走环境变量 `SCULPTOR_LLM_API_KEY / SCULPTOR_LLM_BASE_URL / SCULPTOR_LLM_MODEL`（无则回退 `OPENAI_API_KEY`）；未配置时自动降级为"仅风格指标"离线模式，不中断。
+LLM 配置走环境变量 `STYLOTRACE_LLM_API_KEY / STYLOTRACE_LLM_BASE_URL / STYLOTRACE_LLM_MODEL`（无则回退 `OPENAI_API_KEY`）；未配置时自动降级为"仅风格指标"离线模式，不中断。
 
 ## 工作流（脚本已内置，按需解释给用户）
 
@@ -55,6 +55,6 @@ LLM 配置走环境变量 `SCULPTOR_LLM_API_KEY / SCULPTOR_LLM_BASE_URL / SCULPT
 
 ## 注意
 
-- 只做校验和报告，**不擅自改用户的稿子**；用户要改，走 sculptor 的定点修改。
+- 只做校验和报告，**不擅自改用户的稿子**；用户要改，走 stylotrace 的定点修改。
 - 翻译损耗（成语、双关、意境的丢失）≠ 用户原文的问题，报告里要区分"翻译造成的"和"原文本来就模糊的"。
 - 长文按段落分批跑，单批不超过 3000 字，避免超上下文。

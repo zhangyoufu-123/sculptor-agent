@@ -12,7 +12,7 @@ BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(BASE, 'docs', 'competition', 'style-space.png')
 FONT = '/System/Library/Fonts/Hiragino Sans GB.ttc'
 
-labels = ['SCULPTOR', '真人A', '真人B', '样本1', '样本2', '样本3', 'ChatGPT', 'DeepSeek', '模板公文']
+labels = ['Stylotrace', '真人A', '真人B', '样本1', '样本2', '样本3', 'ChatGPT', 'DeepSeek', '模板公文']
 D = np.array([
     [0.00, 1.07, 1.32, 0.90, 1.10, 0.41, 1.24, 1.10, 1.68],
     [1.07, 0.00, 1.46, 1.28, 1.42, 0.93, 1.50, 1.43, 1.98],
@@ -66,7 +66,7 @@ d.line([x0, y0, x0, y1], fill='#5c6b7a', width=2)
 d.text(((x0 + x1) / 2, y1 + 38), 'MDS 维度 1（风格主成分）', font=f(24), fill='#5c6b7a', anchor='mm')
 d.text((x0 - 46, (y0 + y1) / 2), 'MDS 维度 2', font=f(24), fill='#5c6b7a', anchor='rm')
 groups = [
-    ([0, 1, 2, 3, 4, 5], '#8fb8e8', '#2f6fb0', '人类侧（SCULPTOR 与匿名真人作者/模拟样本同域）'),
+    ([0, 1, 2, 3, 4, 5], '#8fb8e8', '#2f6fb0', '人类侧（Stylotrace 与匿名真人作者/模拟样本同域）'),
     ([6, 7], '#f2b8b8', '#c0504d', '通用模型（AI 腔趋同域）'),
     ([8], '#d8d8d8', '#8a8a8a', '模板公文（机械域）'),
 ]

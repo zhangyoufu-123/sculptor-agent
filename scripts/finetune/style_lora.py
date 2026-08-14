@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Panza 式本地 LoRA 训练：用 Sculptor 生成的 JSONL 数据集（Reverse Instructions 风格）
+"""Panza 式本地 LoRA 训练：用 Stylotrace 生成的 JSONL 数据集（Reverse Instructions 风格）
 对一个小型开源模型做参数高效微调，让模型学会"这位作者怎么写"。
 
 用法:
-  sculptor style-adapter --dataset                       # 先生成数据集
+  stylotrace style-adapter --dataset                       # 先生成数据集
   python3 scripts/finetune/style_lora.py \\
       --dataset vault/style-adapter-dataset.jsonl \\
       --model Qwen/Qwen2.5-1.5B-Instruct \\
       --out ./lora-out \\
       --epochs 1
 
-依赖（按需安装，不影响 Sculptor 本体）:
+依赖（按需安装，不影响 Stylotrace 本体）:
   pip install torch transformers peft datasets accelerate
 
 设计依据: Panza（arXiv:2407.10994）—— <100 样本 + PeFT + RAG；
@@ -66,7 +66,7 @@ def train(args):
         print(
             f"缺少依赖: {e}\n"
             "请安装: pip install torch transformers peft datasets accelerate\n"
-            "（这是可选的本地训练路径，不影响 Sculptor 本体）"
+            "（这是可选的本地训练路径，不影响 Stylotrace 本体）"
         )
         sys.exit(1)
 
@@ -122,7 +122,7 @@ def train(args):
 
 def main():
     p = argparse.ArgumentParser(description="Panza 式本地 LoRA 风格微调")
-    p.add_argument("--dataset", required=True, help="Sculptor 生成的 JSONL 数据集")
+    p.add_argument("--dataset", required=True, help="Stylotrace 生成的 JSONL 数据集")
     p.add_argument("--model", default="Qwen/Qwen2.5-1.5B-Instruct", help="基础模型")
     p.add_argument("--out", default="./lora-out", help="适配器输出目录")
     p.add_argument("--epochs", type=int, default=1)

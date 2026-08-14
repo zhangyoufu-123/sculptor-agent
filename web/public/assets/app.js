@@ -89,16 +89,16 @@ function toast(msg) {
 }
 
 function machineId() {
-  let id = localStorage.getItem('sculptor.machineId');
+  let id = localStorage.getItem('stylotrace.machineId');
   if (!id) {
     id = 'm-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-    localStorage.setItem('sculptor.machineId', id);
+    localStorage.setItem('stylotrace.machineId', id);
   }
   return id;
 }
 
 function apiKey() {
-  return (localStorage.getItem('sculptor.llmKey') || '').trim();
+  return (localStorage.getItem('stylotrace.llmKey') || '').trim();
 }
 
 function apiHeaders(extra = {}) {
@@ -183,8 +183,8 @@ function bindByok() {
   input.value = apiKey();
   const apply = () => {
     const v = input.value.trim();
-    if (v) localStorage.setItem('sculptor.llmKey', v);
-    else localStorage.removeItem('sculptor.llmKey');
+    if (v) localStorage.setItem('stylotrace.llmKey', v);
+    else localStorage.removeItem('stylotrace.llmKey');
     toast(v ? 'Key 已保存（只存本地浏览器）' : '已清除 Key，改用服务端默认凭据');
   };
   if (save) save.addEventListener('click', apply);
@@ -1130,7 +1130,7 @@ async function renderReport() {
               `<span class="bar">节奏 ${s.pacing} ${bar(s.pacing)}</span></div></div>`,
           )
           .join('');
-        curveHtml = `<div class="report-list"><h3>节奏曲线（张力 / 密度 / 情绪 / 节奏）</h3>${rows}<div class="ctx-line" style="margin-top:6px">分值 0–100，供二次编辑参考；CLI 可运行 <code>sculptor curve</code></div></div>`;
+        curveHtml = `<div class="report-list"><h3>节奏曲线（张力 / 密度 / 情绪 / 节奏）</h3>${rows}<div class="ctx-line" style="margin-top:6px">分值 0–100，供二次编辑参考；CLI 可运行 <code>stylotrace curve</code></div></div>`;
       }
     } catch {}
     // 伏笔回收时间线（v0.47，P2 可视化）：已回收 → 未回收（悬空）

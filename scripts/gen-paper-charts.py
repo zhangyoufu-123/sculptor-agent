@@ -47,7 +47,7 @@ BLUE = "#3d6a8f"
 
 # ── 9 类文本（与 style-vectors.py 完全一致）────────────────
 SAMPLES = {
-    "SCULPTOR 作者": (
+    "Stylotrace 作者": (
         "那年秋天，我第二次走进北大红楼。石阶还是旧的，被一百年的脚步磨出了光泽。"
         "窗台上积着灰，我伸手一抹，指腹上留下一道深色的痕。红砖墙在暮色里发暗，"
         "我想起课本里那句“破晓的号角”，忽然明白历史不是摆在玻璃柜里的展品，"
@@ -162,7 +162,7 @@ def style_data():
         lo, hi = min(vals), max(vals)
         norm[d] = {n: 0.5 if hi - lo < 1e-9 else (rows[n][d] - lo) / (hi - lo) for n in names}
     vec = {n: np.array([norm[d][n] for d in dims]) for n in names}
-    dist = {n: float(np.linalg.norm(vec["SCULPTOR 作者"] - vec[n])) for n in names}
+    dist = {n: float(np.linalg.norm(vec["Stylotrace 作者"] - vec[n])) for n in names}
     return names, dims, rows, norm, vec, dist
 
 
@@ -211,8 +211,8 @@ def fig_style_distance():
                 va="center", ha="left", color=INK, fontsize=10)
     ax.axvline(0.96, color=ACCENT, ls="--", lw=1)
     ax.text(0.96, -0.5, "5 组真人样本均值 0.96", color=ACCENT, fontsize=9, va="bottom")
-    ax.set_xlabel("与 SCULPTOR 作者的 8 维归一化欧氏距离（越小越接近）")
-    ax.set_title("SCULPTOR 到各对象的风格距离", color=INK, fontsize=13)
+    ax.set_xlabel("与 Stylotrace 作者的 8 维归一化欧氏距离（越小越接近）")
+    ax.set_title("Stylotrace 到各对象的风格距离", color=INK, fontsize=13)
     ax.set_xlim(0, max(vals) * 1.18)
     ax.grid(axis="x", alpha=0.25, ls="--")
     ax.spines[["top", "right"]].set_visible(False)
@@ -252,7 +252,7 @@ def fig_mds():
     ax.scatter(coords[human_idx, 0], coords[human_idx, 1], c=HUMAN, s=90, label="真人/模拟样本")
     ax.scatter(coords[model_idx, 0], coords[model_idx, 1], c=MODEL, s=90, label="通用模型")
     ax.scatter(coords[tmpl_idx, 0], coords[tmpl_idx, 1], c=OTHER, s=90, label="模板公文")
-    ax.scatter(coords[0, 0], coords[0, 1], c=ACCENT, s=160, marker="*", label="SCULPTOR 作者")
+    ax.scatter(coords[0, 0], coords[0, 1], c=ACCENT, s=160, marker="*", label="Stylotrace 作者")
     for i, n in enumerate(names):
         label = n.replace(" 通用基线", "").replace("真人作者 ", "真人 ")
         ax.annotate(label, (coords[i, 0], coords[i, 1]), textcoords="offset points",

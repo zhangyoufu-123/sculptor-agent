@@ -18,7 +18,7 @@ function py(script, args = []) {
   return execFileSync('python3', ['-c', script, ...args], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }).trim();
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-docpipe-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-docpipe-'));
 const w = ws.ensureWorkspace(path.join(tmp, 'w1'), { create: true });
 const input = path.join(tmp, 'input.md');
 fs.writeFileSync(

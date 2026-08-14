@@ -61,7 +61,7 @@
 | C1 | embedding 统一服务 | 合并 `style-vector.js` 的 embedDense 与 `embedding.js`（双缓存/双实现 → 单实现单缓存），refreshStyleVector 引用统一服务 | 重写（小范围） | 低-中 | P1 |
 | C2 | decodeSection 四段式重写 | 生成 → 特征 → 评分 → 解释 四段解耦，为 B7/B4 铺路；行为契约不变（返回值兼容） | 重写（核心） | 中-高 | P1/P2 边界 |
 | C3 | 导演决策日志 | director 每次决策写 `director-log.jsonl`（决策类型/依据/轮次），可追溯可展示 | 增量 | 低 | P2 |
-| C4 | 配置统一与 doctor 检查 | embedding/细读/搜索配置集中校验；`sculptor doctor` 增加 embed/author-sheet 检查项 | 增量 | 低 | P1 |
+| C4 | 配置统一与 doctor 检查 | embedding/细读/搜索配置集中校验；`stylotrace doctor` 增加 embed/author-sheet 检查项 | 增量 | 低 | P1 |
 | C5 | 技能同步自动化 | 固化 `scripts/sync-skill.sh`（替代手动 rsync）；CI 检查 skills 与 agent/src 一致 | 增量 | 低-中 | P2 |
 | C6 | 测试体系扩展 | A2–A4/B1–B7 对应单测；e2e 拆"快速集 + 深度集"（当前全量约 3 分钟） | 增量 | 中 | 随各升级项 |
 | C7 | 版本自动化 | version bump + CHANGELOG 模板脚本 | 增量 | 低 | P3 |

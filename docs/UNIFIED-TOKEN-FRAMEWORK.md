@@ -72,7 +72,7 @@ $$P(w \mid c, t) = \operatorname{softmax}\bigl(S(w \mid c, t) / \tau\bigr)$$
 → 得分分解落盘。实现：`agent/src/personal-model.js`（本地字符级 n-gram 个人模型，
 作者语料训练，能预测"作者更可能怎么写"）+ `agent/src/token-decode.js`（五路评分
 S = 2.0·p_personal + 0.5·S_knowledge + 1.0·S_defect + 0.8·R(t)·S_impedance）；
-写作节级接入（writeSection，`SCULPTOR_DECODE_N` 可调，无个人语料自动降级直接生成）。
+写作节级接入（writeSection，`STYLOTRACE_DECODE_N` 可调，无个人语料自动降级直接生成）。
 单元测试（token-decode.test）验证：个人模型偏好作者风格文本、AI 腔缺陷分更低、
 对比选优选出更像作者的候选、得分分解可追溯。
 

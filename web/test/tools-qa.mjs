@@ -10,12 +10,12 @@ import { pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..');
-const TMP = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'sculptor-web-tools-'));
+const TMP = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'stylotrace-web-tools-'));
 
-process.env.SCULPTOR_MOCK_LLM = '1';
-process.env.SCULPTOR_LLM_API_KEY = 'mock';
-process.env.SCULPTOR_WEB_PASSWORD = 'secret123';
-process.env.SCULPTOR_WEB_DATA = TMP;
+process.env.STYLOTRACE_MOCK_LLM = '1';
+process.env.STYLOTRACE_LLM_API_KEY = 'mock';
+process.env.STYLOTRACE_WEB_PASSWORD = 'secret123';
+process.env.STYLOTRACE_WEB_DATA = TMP;
 
 let handler = null;
 http.createServer = (h) => {
@@ -62,7 +62,7 @@ function check(name, cond, extra = '') {
 
 const b64 = (s) => Buffer.from(s, 'utf8').toString('base64');
 
-// 1) 鉴权（v1.0）：设置 SCULPTOR_WEB_PASSWORD 时需登录
+// 1) 鉴权（v1.0）：设置 STYLOTRACE_WEB_PASSWORD 时需登录
 {
   const st = JSON.parse((await call('/api/auth/status')).body);
   check('auth/status 需要登录', st.required === true && st.ok === false);

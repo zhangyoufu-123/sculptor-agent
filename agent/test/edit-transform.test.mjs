@@ -11,7 +11,7 @@ const { collectEditTransform, editFitScore, applyAuthorEdits } = await import(
   path.join(HERE, '..', 'src', 'edit-transform.js')
 );
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-edit-transform-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-edit-transform-'));
 const w = ws.ensureWorkspace(path.join(tmp, 'w'), { create: true });
 const vault = path.join(w, 'vault');
 fs.mkdirSync(vault, { recursive: true });

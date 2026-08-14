@@ -7,7 +7,7 @@
   1) 调用 LLM（用户自己付费）；
   2) 区分账号（对 key 做 sha256，前 16 位作为会话命名空间）。
 
-可选访问门：设置环境变量 SCULPTOR_ACCESS_TOKEN 后，只有 Bearer 等于该值的请求能进
+可选访问门：设置环境变量 STYLOTRACE_ACCESS_TOKEN 后，只有 Bearer 等于该值的请求能进
 （用于只把服务开给特定人）；不设置则任何自带 key 的人都能用（BYOK 语义下天然安全）。
 
 会话数据落盘在 api-data/users/<key 哈希>/<session_id>/（复用 Stylotrace 工作区协议）。
@@ -17,7 +17,7 @@
   pip install -r requirements.txt
   uvicorn api.main:app --host 0.0.0.0 --port 8000
 离线冒烟：
-  SCULPTOR_MOCK_LLM=1 uvicorn api.main:app --port 8000
+  STYLOTRACE_MOCK_LLM=1 uvicorn api.main:app --port 8000
 """
 import hashlib
 import json
@@ -34,14 +34,14 @@ from pydantic import BaseModel
 
 ROOT = Path(__file__).resolve().parent.parent
 NODE = ROOT / "agent" / "bin" / "headless.mjs"
-DATA_ROOT = Path(os.environ.get("SCULPTOR_API_DATA", ROOT / "api-data"))
+DATA_ROOT = Path(os.environ.get("STYLOTRACE_API_DATA", ROOT / "api-data"))
 IO_SCRIPTS = ROOT / "agent" / "scripts" / "io"
 STATIC = Path(__file__).parent / "static"
 
-ACCESS_TOKEN = os.environ.get("SCULPTOR_ACCESS_TOKEN", "").strip()
-DEFAULT_MODEL = os.environ.get("SCULPTOR_DEFAULT_MODEL", "deepseek-v4-flash").strip()
-DEFAULT_BASE_URL = os.environ.get("SCULPTOR_DEFAULT_BASE_URL", "https://api.deepseek.com/v1").strip().rstrip("/")
-MOCK = os.environ.get("SCULPTOR_MOCK_LLM", "") == "1"
+ACCESS_TOKEN = os.environ.get("STYLOTRACE_ACCESS_TOKEN", "").strip()
+DEFAULT_MODEL = os.environ.get("STYLOTRACE_DEFAULT_MODEL", "deepseek-v4-flash").strip()
+DEFAULT_BASE_URL = os.environ.get("STYLOTRACE_DEFAULT_BASE_URL", "https://api.deepseek.com/v1").strip().rstrip("/")
+MOCK = os.environ.get("STYLOTRACE_MOCK_LLM", "") == "1"
 
 app = FastAPI(title="Stylotrace API", version="1.0.0", description="从修改中学习个人文风的写作系统（BYOK）")
 app.add_middleware(
@@ -86,11 +86,11 @@ def session_dir(ns: str, session_id: str) -> Path:
 
 def run_engine(api_key: str, model: str, base_url: str, workspace: Path, message: str) -> dict:
     env = os.environ.copy()
-    env["SCULPTOR_LLM_API_KEY"] = api_key
-    env["SCULPTOR_LLM_MODEL"] = model
-    env["SCULPTOR_LLM_BASE_URL"] = base_url
+    env["STYLOTRACE_LLM_API_KEY"] = api_key
+    env["STYLOTRACE_LLM_MODEL"] = model
+    env["STYLOTRACE_LLM_BASE_URL"] = base_url
     if MOCK:
-        env["SCULPTOR_MOCK_LLM"] = "1"
+        env["STYLOTRACE_MOCK_LLM"] = "1"
     req = json.dumps({"message": message, "workspace": str(workspace)}, ensure_ascii=False)
     try:
         proc = subprocess.run(

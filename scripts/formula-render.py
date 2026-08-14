@@ -6,7 +6,7 @@
 """
 from PIL import Image, ImageDraw, ImageFont
 
-OUT = '/Users/wallace/Documents/Codex/2026-08-04/bang/sculptor-agent/docs/competition'
+OUT = '/Users/wallace/Documents/Codex/2026-08-04/bang/stylotrace/docs/competition'
 FONT = '/System/Library/Fonts/Supplemental/Arial Unicode.ttf'
 
 FORMULAS = [

@@ -41,9 +41,9 @@
 ### CLI
 
 ```bash
-sculptor doc translate 论文.docx --lang en --out 论文.en
-sculptor doc restyle  老文章.md --style "克制、短句、具体细节" --out 老文章.sculptor
-sculptor doc restyle  老文章.md --style 我的旧稿.md --out 老文章.sculptor   # 风格来自旧稿文件
+stylotrace doc translate 论文.docx --lang en --out 论文.en
+stylotrace doc restyle  老文章.md --style "克制、短句、具体细节" --out 老文章.stylotrace
+stylotrace doc restyle  老文章.md --style 我的旧稿.md --out 老文章.stylotrace   # 风格来自旧稿文件
 ```
 
 产物：`.docx` 输入 → `<out>.docx`（**原格式回填**，run 级保留）+ `<out>.md`；`md/txt` 输入 → `<out>.md` + `<out>.docx` + `<out>.html`；翻译另附回译校验（保留/丢失/漂移）。
@@ -69,15 +69,15 @@ sculptor doc restyle  老文章.md --style 我的旧稿.md --out 老文章.sculp
 1. **Word/WPS**：直接打开导出的 `.docx`；需要完全复刻原版式时：
    ```bash
    pandoc input.docx -t markdown -o input.md        # 高保真提取
-   sculptor doc translate input.md --lang en --out out
+   stylotrace doc translate input.md --lang en --out out
    pandoc out.md --reference-doc=input.docx -o out.docx   # 复用原样式
    ```
-2. **其他 Agent（Codex/Claude Code/Cursor）**：通过 MCP 调用 `doc_translate` / `doc_restyle`，或在提示词里引用 `sculptor doc ...` 命令。
+2. **其他 Agent（Codex/Claude Code/Cursor）**：通过 MCP 调用 `doc_translate` / `doc_restyle`，或在提示词里引用 `stylotrace doc ...` 命令。
 3. **批量目录**：
    ```bash
-   for f in docs/*.docx; do sculptor doc translate "$f" --lang en --out "out/${f%.docx}"; done
+   for f in docs/*.docx; do stylotrace doc translate "$f" --lang en --out "out/${f%.docx}"; done
    ```
-4. **风格档案共享**：`sculptor profile export --to style.json` 把个人风格带走，`doc restyle --style style.json` 让其他环境复用同一风格（v0.56 支持旧稿/方向；档案文件路径接入后续版本）。
+4. **风格档案共享**：`stylotrace profile export --to style.json` 把个人风格带走，`doc restyle --style style.json` 让其他环境复用同一风格（v0.56 支持旧稿/方向；档案文件路径接入后续版本）。
 
 ## 后续（按价值排序）
 
@@ -98,9 +98,9 @@ cd agent && node test/doc-pipeline.test.mjs
 
 ```bash
 cd stylotrace/web
-SCULPTOR_LLM_API_KEY=sk-xxx \
-SCULPTOR_WEB_PASSWORD=your-password \   # 设置后启用登录保护（未设置则单机免登录）
-SCULPTOR_WEB_DATA=/path/to/web-data \   # 会话/作品库数据目录（建议挂持久盘）
+STYLOTRACE_LLM_API_KEY=sk-xxx \
+STYLOTRACE_WEB_PASSWORD=your-password \   # 设置后启用登录保护（未设置则单机免登录）
+STYLOTRACE_WEB_DATA=/path/to/web-data \   # 会话/作品库数据目录（建议挂持久盘）
 PORT=8080 node server.mjs
 ```
 
@@ -112,6 +112,6 @@ cd stylotrace/web && npm test
 
 生产注意：
 - **HTTPS**：由部署平台提供（Render/Vercel/反向代理终止 TLS）；自建服务器用 caddy/nginx 反代；
-- **数据备份**：`SCULPTOR_WEB_DATA` 目录即全部数据（会话/作品库/风格档案/知识库），定期打包即可；
-- **密钥安全**：`SCULPTOR_LLM_API_KEY` 仅存服务端环境变量，前端不接触；`SCULPTOR_WEB_PASSWORD` 用于访问保护；
-- **公开对外**：务必设置 `SCULPTOR_WEB_PASSWORD`；如需多用户隔离，当前版本为单用户设计，需再接入账号体系。
+- **数据备份**：`STYLOTRACE_WEB_DATA` 目录即全部数据（会话/作品库/风格档案/知识库），定期打包即可；
+- **密钥安全**：`STYLOTRACE_LLM_API_KEY` 仅存服务端环境变量，前端不接触；`STYLOTRACE_WEB_PASSWORD` 用于访问保护；
+- **公开对外**：务必设置 `STYLOTRACE_WEB_PASSWORD`；如需多用户隔离，当前版本为单用户设计，需再接入账号体系。

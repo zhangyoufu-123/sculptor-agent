@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """论文数据图（v1.0）：用清晰条形图替换抽象热力图，直接展示差异。
-图1 风格距离：SCULPTOR 到各真人作者 vs 通用模型（越小越接近作者）。
+图1 风格距离：Stylotrace 到各真人作者 vs 通用模型（越小越接近作者）。
 图2 作者识别：TF-IDF vs 词级文体计量 vs 字符 n-gram vs 8 维特征。
 图3 消融：学习权重 vs 默认权重。
 """
@@ -9,10 +9,10 @@ import re
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-BASE = '/Users/wallace/Documents/Codex/2026-08-04/bang/sculptor-agent/docs/competition'
+BASE = '/Users/wallace/Documents/Codex/2026-08-04/bang/stylotrace/docs/competition'
 
 SAMPLES = {
-    'SCULPTOR 作者': (
+    'Stylotrace 作者': (
         '那年秋天，我第二次走进北大红楼。石阶还是旧的，被一百年的脚步磨出了光泽。'
         '窗台上积着灰，我伸手一抹，指腹上留下一道深色的痕。红砖墙在暮色里发暗，'
         '我想起课本里那句"破晓的号角"，忽然明白历史不是摆在玻璃柜里的展品，'
@@ -114,7 +114,7 @@ norm = {d: {n: (rows[n][d] - min(r[d] for r in rows.values())) /
             (max(r[d] for r in rows.values()) - min(r[d] for r in rows.values()) or 1)
             for n in rows} for d in dims}
 vec = {n: np.array([norm[d][n] for d in dims]) for n in rows}
-dist = {n: float(np.linalg.norm(vec['SCULPTOR 作者'] - vec[n])) for n in rows if n != 'SCULPTOR 作者'}
+dist = {n: float(np.linalg.norm(vec['Stylotrace 作者'] - vec[n])) for n in rows if n != 'Stylotrace 作者'}
 
 FT = '/System/Library/Fonts/STHeiti Light.ttc'
 FS = '/System/Library/Fonts/Supplemental/Songti.ttc'
@@ -158,7 +158,7 @@ def bar_chart(title, subtitle, items, unit='', color_key=None, out='chart.png', 
     print(f'saved {out}')
 
 
-# 图1：风格距离（SCULPTOR 到各对象，越小越接近作者）
+# 图1：风格距离（Stylotrace 到各对象，越小越接近作者）
 def fig_distance():
     items = []
     for name in ['真人作者 A', '真人作者 B', '样本1', '样本2', '样本3']:
@@ -167,7 +167,7 @@ def fig_distance():
         items.append((name, dist[name], MODEL_COLOR))
     items.append(('模板公文基线', dist['模板公文基线'], OTHER_COLOR))
     bar_chart(
-        '图5　SCULPTOR 与各对象/模型的风格距离',
+        '图5　Stylotrace 与各对象/模型的风格距离',
         '数值越小 = 越接近该对象（真人作者应为绿色短条，通用模型应为红色长条）',
         items, unit='', out='style-distance-bars.png',
     )

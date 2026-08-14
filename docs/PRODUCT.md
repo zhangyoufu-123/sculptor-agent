@@ -4,9 +4,9 @@
 
 版本：v0.17.0 · 形态：可一键安装的 skill 包（内嵌完整 agent 引擎）+ 独立 CLI + MCP 服务器
 
-**开箱即用**：未配置 `SCULPTOR_LLM_API_KEY` 时自动读取宿主已配置的 API（Codex / Claude Code /
-OpenCode / 常见环境变量），只显示来源与末 4 位、绝不打印密钥；`sculptor credentials --ask`
-可交互选择或手动输入（保存到 `.sculptor/credentials.json`，0600）。
+**开箱即用**：未配置 `STYLOTRACE_LLM_API_KEY` 时自动读取宿主已配置的 API（Codex / Claude Code /
+OpenCode / 常见环境变量），只显示来源与末 4 位、绝不打印密钥；`stylotrace credentials --ask`
+可交互选择或手动输入（保存到 `.stylotrace/credentials.json`，0600）。
 
 ## 一、这是什么
 
@@ -56,7 +56,7 @@ Stylotrace 是一个**承上启下的写作 Agent**：它读你、问你、写�
 - 原创性检查（文内重复句/与个人库自我复用/模板句）；
 - **联网 RAG**：verify 项自动生成检索查询——直连端点或宿主代检，结果回灌缓存与素材；
 - 读者群像 + 交锋辩论（MAJ-EVAL 式）。
-- **深度审阅 Review**：`sculptor review [--fix]` 一次聚合红队+校对+事实+原创+风格保真+
+- **深度审阅 Review**：`stylotrace review [--fix]` 一次聚合红队+校对+事实+原创+风格保真+
   读者交锋，输出 P0/P1/P2/亮点，`--fix` 一键修复 P0 并复检（红队与读者反馈的核心闭环）。
 
 ### 写作能力
@@ -70,14 +70,14 @@ Stylotrace 是一个**承上启下的写作 Agent**：它读你、问你、写�
 ### 多模态输入输出
 - 输入：docx / xlsx / md / txt / 图片（视觉模型）/ **音频口述（whisper）**；
 - 输出：docx（普通/公文国标/学术排版）、html、pdf（内置中文字体）、srt（视频脚本转字幕）、md；
-- 语音口述：`sculptor dictate <音频> [--to-draft]`，转录成素材或口述草稿。
+- 语音口述：`stylotrace dictate <音频> [--to-draft]`，转录成素材或口述草稿。
 
 ### 工程形态
-- **Skill 包**：`skills/sculptor/` 内嵌完整引擎（`scripts/engine/`，CI 防漂移），装 skill 即装 agent；
-- **独立 CLI**：`agent/bin/sculptor.js`（或 `./install.sh --cli` 软链）；
+- **Skill 包**：`skills/stylotrace/` 内嵌完整引擎（`scripts/engine/`，CI 防漂移），装 skill 即装 agent；
+- **独立 CLI**：`agent/bin/stylotrace.js`（或 `./install.sh --cli` 软链）；
 - **MCP 服务器**：35 个工具，供 Codex / Claude Code / OpenCode 通过标准 MCP 调用；
-- **导演模式**：`sculptor agent` 自主决策主导全程；`agent --once` 单步接入宿主；
-- **生态位探测**：`sculptor probe` 判断任务是否值得介入，只提议一次、被拒即退让；
+- **导演模式**：`stylotrace agent` 自主决策主导全程；`agent --once` 单步接入宿主；
+- **生态位探测**：`stylotrace probe` 判断任务是否值得介入，只提议一次、被拒即退让；
 - **共存与退让**：只写自己的工作区，外部修改一律退让不覆盖（并发守卫）。
 
 ## 四、设计思路
@@ -103,7 +103,7 @@ Stylotrace 不抢"作者"身份：先问后写、素材不足不生成、大纲�
 - **感性层**：读者群像、交锋辩论、感性解剖（立场/局限/困惑/多视角/风格兑现度）——模拟"人第一次读的心理活动"，AI 的感性只能靠多视角模拟逼近。
 
 ### 6. 与宿主生态共生，不打架
-退让是底线：只写 `.sculptor/` 工作区，外部改动不覆盖；MCP 被动，宿主不调用就不执行；缺信息反向请宿主代问；联网检索默认走宿主代检（requests.jsonl），可选直连。
+退让是底线：只写 `.stylotrace/` 工作区，外部改动不覆盖；MCP 被动，宿主不调用就不执行；缺信息反向请宿主代问；联网检索默认走宿主代检（requests.jsonl），可选直连。
 
 ## 五、设计亮点（与行业对比）
 
@@ -124,7 +124,7 @@ Stylotrace 不抢"作者"身份：先问后写、素材不足不生成、大纲�
 stylotrace/
 ├── install.sh                 # 一键安装入口（curl | bash / git clone）
 ├── agent/                     # 完整 agent 引擎（单一事实源）
-│   ├── bin/sculptor.js        # CLI 入口
+│   ├── bin/stylotrace.js        # CLI 入口
 │   ├── src/                   # 35+ 模块：clarify/outline/write/redteam/
 │   │                          #   reader-gallery/style/style-pulse/style-adapter/
 │   │                          #   style-eval/style-memory/library/genre/rag/
@@ -132,7 +132,7 @@ stylotrace/
 │   │                          #   history/profile/citation/io/director/mcp/…
 │   ├── scripts/io/            # docx/xlsx/PDF 处理（python）
 │   └── test/                  # e2e 全链路（离线 mock LLM，180 项断言）
-├── skills/sculptor/           # 可安装 skill（内嵌 engine 快照 + SKILL.md + hooks + references）
+├── skills/stylotrace/           # 可安装 skill（内嵌 engine 快照 + SKILL.md + hooks + references）
 ├── scripts/                   # 安装/引擎同步/本地 LoRA 训练
 ├── docs/PRODUCT.md            # 本文档
 ├── examples/ extras/          # 示例与 macOS 引用服务
@@ -149,11 +149,11 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/stylotrace/main/inst
 git clone https://github.com/zhangyoufu-123/stylotrace && cd stylotrace && ./install.sh
 
 # 配置 LLM（默认 DeepSeek 端点）
-export SCULPTOR_LLM_API_KEY=sk-xxx
+export STYLOTRACE_LLM_API_KEY=sk-xxx
 
 # 在你的写作项目里直接开始（skill 内嵌完整引擎）
-node .codex/skills/sculptor/scripts/sculptor.mjs init
-node .codex/skills/sculptor/scripts/sculptor.mjs agent   # 导演模式，主导全程
+node .codex/skills/stylotrace/scripts/stylotrace.mjs init
+node .codex/skills/stylotrace/scripts/stylotrace.mjs agent   # 导演模式，主导全程
 ```
 
 常用命令速查：`clarify` 澄清 · `outline` 大纲 · `write` 写作 · `redteam` 审计 · `style --pulses` 脉搏 ·
@@ -171,5 +171,5 @@ node .codex/skills/sculptor/scripts/sculptor.mjs agent   # 导演模式，主导
 
 ## 九、路线图
 
-- **已落地（v0.8–v0.23）**：风格保真闭环、大纲评审、公文国标、读者交锋、持续微调管线、事实核查、语音口述、多格式导出、校对、联网 RAG、改写矩阵、版本快照、全局风格档案、引文管理、静默质量门、**个人知识库**（读过的书/去过的地方/自己的构想：归纳式一问 + 只问一次 + 轮换注入，`sculptor knowledge` 可管理）、**主导式协作**（写作生态位内 Stylotrace 自主决策，宿主/学术/数据分析 agent 作为数据供给方，`probe` 给出 academic/official/creative/point-edit 细分入口与启动建议）、**实时取数**（澄清/大纲/写作三处自动排队检索：clarify-data / outline-gap / write-gap，`rag needs` + `rag_ingest` 闭环，回灌进素材、去重不阻塞）、**数据回灌自动续写**（回灌晚于写作 → 交付前自动重写【素材不足】节并重新审计，最多补 2 轮）、**自动参考文献草稿**（学术论文交付自动生成 references.md，`sculptor citations --auto` 可手动触发）、**学术论证链**（known→gap→tension→insight→method→evidence→limitation，论证完备性扫描，不依赖外部学术 agent）、**荐书联想**（思想库匹配 + "理论是什么/为什么可用"，确认后收入知识库）、**角色预演**（小说/推理：持久角色档案 + 理想-现实张力驱动的第一人称行为预测，注入写作）、**统一素材体系**（知识库 + 检索来源 + 内置文法/诗词/论证资产联合注入，数据互通）、**人物风格肖像**（从知识库/旧作/修改记录侧写写作人格，`sculptor persona` 可查询，特征映射回风格向量）、**内置库 RAG 化**（思想/资产库联网优先、内置 JSON 离线兜底，回灌书目自动入知识库）、**文章圣经**（长文/系列文跨篇一致性，交付自动沉淀）、**复阅-修订循环**（初稿后全文复查，P0 自动修订一轮）、**知识库迁移**（export/import 随人走，隐私提示）、**风格过拟合护栏 + 提示词动态预算**、**情绪曲线量化**（`sculptor emotion`）、**投标书/申报书文体 + 古文风/脱敏改写预设**、**联网内容置信度分级**（待核实标注）。
+- **已落地（v0.8–v0.23）**：风格保真闭环、大纲评审、公文国标、读者交锋、持续微调管线、事实核查、语音口述、多格式导出、校对、联网 RAG、改写矩阵、版本快照、全局风格档案、引文管理、静默质量门、**个人知识库**（读过的书/去过的地方/自己的构想：归纳式一问 + 只问一次 + 轮换注入，`stylotrace knowledge` 可管理）、**主导式协作**（写作生态位内 Stylotrace 自主决策，宿主/学术/数据分析 agent 作为数据供给方，`probe` 给出 academic/official/creative/point-edit 细分入口与启动建议）、**实时取数**（澄清/大纲/写作三处自动排队检索：clarify-data / outline-gap / write-gap，`rag needs` + `rag_ingest` 闭环，回灌进素材、去重不阻塞）、**数据回灌自动续写**（回灌晚于写作 → 交付前自动重写【素材不足】节并重新审计，最多补 2 轮）、**自动参考文献草稿**（学术论文交付自动生成 references.md，`stylotrace citations --auto` 可手动触发）、**学术论证链**（known→gap→tension→insight→method→evidence→limitation，论证完备性扫描，不依赖外部学术 agent）、**荐书联想**（思想库匹配 + "理论是什么/为什么可用"，确认后收入知识库）、**角色预演**（小说/推理：持久角色档案 + 理想-现实张力驱动的第一人称行为预测，注入写作）、**统一素材体系**（知识库 + 检索来源 + 内置文法/诗词/论证资产联合注入，数据互通）、**人物风格肖像**（从知识库/旧作/修改记录侧写写作人格，`stylotrace persona` 可查询，特征映射回风格向量）、**内置库 RAG 化**（思想/资产库联网优先、内置 JSON 离线兜底，回灌书目自动入知识库）、**文章圣经**（长文/系列文跨篇一致性，交付自动沉淀）、**复阅-修订循环**（初稿后全文复查，P0 自动修订一轮）、**知识库迁移**（export/import 随人走，隐私提示）、**风格过拟合护栏 + 提示词动态预算**、**情绪曲线量化**（`stylotrace emotion`）、**投标书/申报书文体 + 古文风/脱敏改写预设**、**联网内容置信度分级**（待核实标注）。
 - **可选（P2）**：流式输出、TTS 听读、PPT 联动、模板市集、多语言翻译——按真实场景按需补，不碰写作主线。

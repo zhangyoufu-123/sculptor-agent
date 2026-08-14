@@ -15,7 +15,7 @@ const { roundtripCheck, renderRoundtrip } = await import(
 const { exportLatex } = await import(path.join(HERE, '..', 'src', 'io.js'));
 
 const cfg = { ...loadConfig(), apiKey: 'mock' };
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-roundtrip-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-roundtrip-'));
 const w = ws.ensureWorkspace(path.join(tmp, 'w1'), { create: true });
 const TEXT =
   '我站在北大红楼门口，石阶被磨亮了一百年。历史从不缺席，它只等一个人走进去。纪念牌上写着：百年征程波澜壮阔，百年初心历久弥坚。';

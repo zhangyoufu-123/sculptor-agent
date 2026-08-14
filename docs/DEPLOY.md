@@ -9,7 +9,7 @@
 cd web
 npm run mock    # 离线 mock 模式：不需要 API 密钥，流程全通，适合先看效果
 # 或
-SCULPTOR_LLM_API_KEY=sk-xxx npm start   # 真实模式：用你自己的 DeepSeek/OpenAI 密钥
+STYLOTRACE_LLM_API_KEY=sk-xxx npm start   # 真实模式：用你自己的 DeepSeek/OpenAI 密钥
 ```
 
 浏览器打开 http://localhost:5177 ，输入一个写作念头即可。
@@ -21,7 +21,7 @@ SCULPTOR_LLM_API_KEY=sk-xxx npm start   # 真实模式：用你自己的 DeepSee
 | **Railway** | 一次性试用额度（$5，约够演示几个月） | ✅ 最合适 | 完整 Node 进程 + 持久磁盘，Stylotrace 的工作区文件系统照常工作；自带域名 `*.up.railway.app` |
 | **Render** | 免费 Web Service（冷启动较慢） | ✅ 合适 | 完整 Node 进程 + 磁盘，免费实例空闲会休眠、被访问时唤醒 |
 | **Fly.io** | 免费额度有限 | ✅ 合适 | 完整 Node + 卷，稍复杂 |
-| **Vercel** | 免费 | ⚠ 不推荐 | Serverless 无持久文件系统，Stylotrace 依赖 `.sculptor/` 状态文件，需要大改 |
+| **Vercel** | 免费 | ⚠ 不推荐 | Serverless 无持久文件系统，Stylotrace 依赖 `.stylotrace/` 状态文件，需要大改 |
 | **本地 + Cloudflare Tunnel** | 免费 | ✅ 应急 | 电脑开着即可公网访问，演示前临时用 |
 
 ## 推荐：Railway 一键部署
@@ -29,7 +29,7 @@ SCULPTOR_LLM_API_KEY=sk-xxx npm start   # 真实模式：用你自己的 DeepSee
 1. 打开 https://railway.app → 用 GitHub 登录；
 2. New Project → **Deploy from GitHub repo** → 选 `zhangyoufu-123/stylotrace`；
 3. 部署设置里：**Root Directory** 填 `web`；**Start Command** 填 `npm start`；
-4. 添加环境变量：`SCULPTOR_LLM_API_KEY=sk-xxx`（必填，真实模式）；
+4. 添加环境变量：`STYLOTRACE_LLM_API_KEY=sk-xxx`（必填，真实模式）；
 5. 部署完成后，Railway 会给你一个 `https://<项目名>.up.railway.app` 域名，直接可访问；
 6. 可选：Settings → Networking → 绑定自定义域名。
 
@@ -39,7 +39,7 @@ SCULPTOR_LLM_API_KEY=sk-xxx npm start   # 真实模式：用你自己的 DeepSee
 
 1. https://render.com → New → **Web Service** → 连接 GitHub 仓库；
 2. Root Directory `web`，Build Command 留空，Start Command `npm start`；
-3. 环境变量加 `SCULPTOR_LLM_API_KEY`；
+3. 环境变量加 `STYLOTRACE_LLM_API_KEY`；
 4. 免费实例域名 `<名称>.onrender.com`。首次访问有 30–60 秒冷启动，属正常。
 
 ## 安全与限制

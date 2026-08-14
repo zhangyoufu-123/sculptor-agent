@@ -30,7 +30,7 @@ console.log(`PASS L0–L5 回答分级（${CASES.length} 例）`);
 
 // 确认清单：部分确认时 done 状态正确
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-guide-test-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-guide-test-'));
   const w = ws.ensureWorkspace(tmp, { create: true });
   const state = ws.readState(w);
   state.confirmed = { topic: '北大红楼', genre: '散文', targetWords: 800 };

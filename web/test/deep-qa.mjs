@@ -11,9 +11,9 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..');
-const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-deep-'));
-process.env.SCULPTOR_MOCK_LLM = '1';
-process.env.SCULPTOR_WEB_DATA = path.join(TMP, 'web');
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-deep-'));
+process.env.STYLOTRACE_MOCK_LLM = '1';
+process.env.STYLOTRACE_WEB_DATA = path.join(TMP, 'web');
 
 let failures = 0;
 const check = (name, cond, extra = '') => {
@@ -158,7 +158,7 @@ console.log('\n═══ C. CLI（agent 端）：论文全流程 + 导出全格�
   // 用与 Web 相同的 mock fetch（server.mjs 已注入）
   const { runCli } = await import(pathToFileURL(path.join(REPO, 'agent', 'src', 'cli.js')).href);
   const wsDir = path.join(TMP, 'cli-ws');
-  process.env.SCULPTOR_WORKSPACE = wsDir;
+  process.env.STYLOTRACE_WORKSPACE = wsDir;
   const run = async (args, { input = '' } = {}) => {
     process.exitCode = 0;
     const logs = [];

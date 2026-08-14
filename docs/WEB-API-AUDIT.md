@@ -13,7 +13,7 @@
 - **发现 1 处死元素**：`modePill`（"离线演示"静态标签）HTML 有、JS 零引用，
   版本角标过期（v0.29）→ 已清理并更新为 v0.48。
 - `/api/rag/needs` 未在前端直连——这是**供给协议端点**（宿主/学术/数据分析 agent
-  用 `sculptor rag needs` 或 MCP `data_needs` 查看待办）；Web 端通过
+  用 `stylotrace rag needs` 或 MCP `data_needs` 查看待办）；Web 端通过
   `/api/context` 的 `rag.pendingRequests` 展示待办数，检索闭环走
   `/api/rag/search` + `/api/rag/ingest`，无功能缺口。
 

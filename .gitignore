@@ -1,6 +1,6 @@
 .DS_Store
 node_modules/
-.sculptor/
+.stylotrace/
 .codex/
 web-data/
 api-data/
@@ -18,7 +18,7 @@ draft.pdf
 draft.srt
 draft.html
 draft-*.docx
-sculptor-profile.json
+stylotrace-profile.json
 *.log
 
 __pycache__/

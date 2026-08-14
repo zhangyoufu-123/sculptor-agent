@@ -64,7 +64,7 @@ const cfg = { ...loadConfig(), apiKey: 'mock' };
 
 // 3) 澄清全链路：用户抛理论 → 下一问"向下挖一层"（思想层追问），思想入 state
 {
-  const w = ws.ensureWorkspace(fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-thinking-')), {
+  const w = ws.ensureWorkspace(fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-thinking-')), {
     create: true,
   });
   const r = await clarifyStep(cfg, w, {

@@ -24,7 +24,7 @@ const { generateOutline, normalizeParts } = await import(
 );
 
 const cfg = { ...loadConfig(), apiKey: 'mock' };
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-live-outline-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-live-outline-'));
 
 function seedCore(state) {
   state.phase = 'clarify';

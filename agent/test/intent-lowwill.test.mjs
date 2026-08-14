@@ -14,7 +14,7 @@ const { detectGenre } = await import(path.join(HERE, '..', 'src', 'genre.js'));
 
 const cfg = { ...loadConfig(), apiKey: '' };
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-intent-test-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-intent-test-'));
 
 // 0) 对话回复护栏：口语"你决定"不是公文文种"决定"，"写一份…决定"才是。
 assert(detectGenre('你决定，继续吧') === null, '口语"你决定"不触发公文文种');

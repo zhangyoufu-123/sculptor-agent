@@ -11,15 +11,15 @@ services:
     envVars:
       - key: PORT
         value: 10000
-      - key: SCULPTOR_WEB_DATA
+      - key: STYLOTRACE_WEB_DATA
         value: /var/data
-      - key: SCULPTOR_LLM_API_KEY
+      - key: STYLOTRACE_LLM_API_KEY
         sync: false
-      - key: SCULPTOR_WEB_PASSWORD
+      - key: STYLOTRACE_WEB_PASSWORD
         sync: false
-      - key: SCULPTOR_LLM_BASE_URL
+      - key: STYLOTRACE_LLM_BASE_URL
         sync: false
-      - key: SCULPTOR_LLM_MODEL
+      - key: STYLOTRACE_LLM_MODEL
         sync: false
     disk:
       name: stylotrace-data

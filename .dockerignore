@@ -6,7 +6,7 @@
 !.env.example
 web-data
 node_modules
-.sculptor
+.stylotrace
 .codex
 .codex-plugin
 .claude-plugin

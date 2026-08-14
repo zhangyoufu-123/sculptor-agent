@@ -88,7 +88,7 @@
 
 - 真实多作者语料（脱敏）+ 强基线（TF-IDF、char TF-IDF、无调制基线）。
 - 交叉验证 + 置换检验 + 逐维消融 + 学习权重 vs 默认权重对照。
-- 盲评落地：`sculptor experiment blind-stats` 已有，补齐一键收集 + 报告。
+- 盲评落地：`stylotrace experiment blind-stats` 已有，补齐一键收集 + 报告。
 
 ### 2.6 文档级风格：起承转合 + 整篇构成（新增，补齐多层盲区）
 
@@ -113,7 +113,7 @@ Activation Addition（Turner 2023）。
 
 | 项 | 现状 | 动作 |
 | --- | --- | --- |
-| 模型优先级 | 引擎继承宿主 Codex 活跃模型，.env.local 的 DEEPSEEK_MODEL 被压过 | 固定"显式 SCULPTOR_LLM_* > .env.local > 宿主" |
+| 模型优先级 | 引擎继承宿主 Codex 活跃模型，.env.local 的 DEEPSEEK_MODEL 被压过 | 固定"显式 STYLOTRACE_LLM_* > .env.local > 宿主" |
 | 端到端 | 只有契约测试，无真人全流程走查 | 补"装→澄清→大纲→写作→审计→导出"冒烟脚本 + 真实走查 |
 | 错误/降级 | 多处静默降级 | 审计降级路径，关键降级要有 doctor 可见的提示 |
 | 安装 | install.sh 存在 | 走查三个安装点 + 脱机安装验证 |
@@ -144,7 +144,7 @@ Activation Addition（Turner 2023）。
 1. 零依赖、skill 内嵌、可解释可追溯（不引入重 ML 运行时）。
 2. 软性加权，作者保留否决权，无拒绝式硬约束。
 3. 数据纯净性：知识库/检索内容不进风格语料。
-4. 改 agent/src 后必须同步 `skills/sculptor/scripts/engine/`。
+4. 改 agent/src 后必须同步 `skills/stylotrace/scripts/engine/`。
 
 ## 6. 论文素材（过程性思考，持续追加）
 

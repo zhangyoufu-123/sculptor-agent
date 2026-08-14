@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-把 docs/competition/科技论文-SCULPTOR.md 渲染为带 Word 原生公式（OMML）的 docx。
+把 docs/competition/科技论文-Stylotrace.md 渲染为带 Word 原生公式（OMML）的 docx。
 用法：python3 scripts/gen-paper-docx.py
 依赖：python-docx（公式为内嵌 OMML，无需 LaTeX 环境）
 """
@@ -13,8 +13,8 @@ from docx.oxml import parse_xml
 from docx.oxml.ns import qn
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(BASE, 'docs/competition/科技论文-SCULPTOR.md')
-OUT = os.path.join(BASE, 'docs/competition/科技论文-SCULPTOR.docx')
+SRC = os.path.join(BASE, 'docs/competition/科技论文-Stylotrace.md')
+OUT = os.path.join(BASE, 'docs/competition/科技论文-Stylotrace.docx')
 
 W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 M_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'

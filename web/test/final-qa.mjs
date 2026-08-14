@@ -11,9 +11,9 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..');
-const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-final-'));
-process.env.SCULPTOR_MOCK_LLM = '1';
-process.env.SCULPTOR_WEB_DATA = path.join(TMP, 'web');
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-final-'));
+process.env.STYLOTRACE_MOCK_LLM = '1';
+process.env.STYLOTRACE_WEB_DATA = path.join(TMP, 'web');
 
 let failures = 0;
 const check = (name, cond, extra = '') => {
@@ -191,7 +191,7 @@ console.log('\n═══ C. 商业化检查 ═══');
 // C3 安装 dry-run
 {
   const inst = spawnSync('bash', [path.join(REPO, 'install.sh'), '--dry-run', '--project', path.join(TMP, 'proj')], { encoding: 'utf8' });
-  check('[C3] 安装脚本 dry-run 正常', inst.status === 0 && inst.stdout.includes('sculptor'), (inst.stdout || '').slice(0, 60));
+  check('[C3] 安装脚本 dry-run 正常', inst.status === 0 && inst.stdout.includes('stylotrace'), (inst.stdout || '').slice(0, 60));
 }
 // C4 版本一致 + README/CHANGELOG 存在
 {

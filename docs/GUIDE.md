@@ -5,7 +5,7 @@
 ## 安装
 
 ```bash
-# 方式一：一行命令，一次装好三个安装点（全局 skill + 当前项目 skill + 开发镜像 ~/sculptor）
+# 方式一：一行命令，一次装好三个安装点（全局 skill + 当前项目 skill + 开发镜像 ~/stylotrace）
 curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/stylotrace/main/install.sh | bash -s -- --all
 
 # 方式二：git clone
@@ -13,13 +13,13 @@ git clone https://github.com/zhangyoufu-123/stylotrace
 cd stylotrace && ./install.sh --all --project ~/我的写作项目
 ```
 
-三个安装点各有用途：`~/.codex/skills/sculptor`（全局：所有 Codex 对话可用）、
-`<项目>/.codex/skills/sculptor`（项目级：只在当前项目生效）、`~/sculptor`（开发镜像：
+三个安装点各有用途：`~/.codex/skills/stylotrace`（全局：所有 Codex 对话可用）、
+`<项目>/.codex/skills/stylotrace`（项目级：只在当前项目生效）、`~/stylotrace`（开发镜像：
 选择性同步 agent/skills/scripts 等，保留你自己的 `.git`、`node_modules`、`.env.local`）。
 任一安装点更新后，随处一键刷新：
 
 ```bash
-bash ~/.codex/skills/sculptor/scripts/update.sh [项目目录]   # skill 自带更新器
+bash ~/.codex/skills/stylotrace/scripts/update.sh [项目目录]   # skill 自带更新器
 ./install.sh --all --update                                   # 仓库内更新（先 git pull）
 ```
 
@@ -31,8 +31,8 @@ bash ~/.codex/skills/sculptor/scripts/update.sh [项目目录]   # skill 自带�
 skill 内嵌完整 agent 引擎，装完即用，无需单独安装 CLI：
 
 ```bash
-export SCULPTOR_LLM_API_KEY=sk-xxx    # 必配：默认 DeepSeek 端点
-STYLOTRACE=.codex/skills/sculptor/scripts/sculptor.mjs
+export STYLOTRACE_LLM_API_KEY=sk-xxx    # 必配：默认 DeepSeek 端点
+STYLOTRACE=.codex/skills/stylotrace/scripts/stylotrace.mjs
 node $STYLOTRACE init && node $STYLOTRACE agent   # 导演模式：主导全程，自动推进到交付
 ```
 
@@ -84,24 +84,24 @@ node $STYLOTRACE init && node $STYLOTRACE agent   # 导演模式：主导全程�
 
 ## 双形态
 
-- **Skill 形态（默认，完整引擎内嵌）**（`skills/sculptor/`）：`scripts/engine/` 是 agent 的
+- **Skill 形态（默认，完整引擎内嵌）**（`skills/stylotrace/`）：`scripts/engine/` 是 agent 的
   完整快照（由 `scripts/sync-skill-engine.sh` 同步、CI 校验防漂移），装 skill 即装完整 agent。
-- **独立 CLI 形态（可选）**（`agent/`）：`./install.sh --cli` 软链 `sculptor` 到 `~/.local/bin`；
-  另提供 MCP stdio 服务器（`node scripts/sculptor.mjs mcp`）——Codex / Claude Code / OpenCode
+- **独立 CLI 形态（可选）**（`agent/`）：`./install.sh --cli` 软链 `stylotrace` 到 `~/.local/bin`；
+  另提供 MCP stdio 服务器（`node scripts/stylotrace.mjs mcp`）——Codex / Claude Code / OpenCode
   通过标准 MCP 调用，对话由宿主主导，Stylotrace 只负责写作与风格。只写自己的工作区，绝不碰宿主配置。
 
 ## 共存与退让（不与其他 Agent 打架）
 
 - **主权顺序**：用户指令 > 宿主当前动作 > Stylotrace。
 - **写前校验**：改用户文件前重读；目标原文已被外部改动 → 中止退让，绝不覆盖。
-- **地盘隔离**：只用 `.sculptor/` 与用户明确指定的文件。
+- **地盘隔离**：只用 `.stylotrace/` 与用户明确指定的文件。
 - **MCP 被动**：宿主不调用就不执行。
 - **生态位主动**：任务落到写作生态位时主动提议（`probe`），提议一次、可拒绝；合作不接管。
 
 ## 凭据与安全
 
-未配置 `SCULPTOR_LLM_API_KEY` 时自动读取宿主已配置的 API（Codex / Claude Code / OpenCode /
-常见 `*_API_KEY`），只显示来源与末 4 位、绝不打印；`sculptor credentials --ask` 交互选择。
+未配置 `STYLOTRACE_LLM_API_KEY` 时自动读取宿主已配置的 API（Codex / Claude Code / OpenCode /
+常见 `*_API_KEY`），只显示来源与末 4 位、绝不打印；`stylotrace credentials --ask` 交互选择。
 密钥只放本地 `.env.local`（已被 `.gitignore` 忽略，权限 0600）；提交前跑
 `bash scripts/scan-secrets.sh --all-refs`（CI 已内置）；一旦泄露，立即到 GitHub Settings → Tokens 吊销重建。
 
@@ -110,12 +110,12 @@ node $STYLOTRACE init && node $STYLOTRACE agent   # 导演模式：主导全程�
 `agent/` 是唯一事实源；skill 内嵌引擎由同步脚本生成：
 
 ```bash
-scripts/sync-skill-engine.sh           # agent → skills/sculptor/scripts/engine
+scripts/sync-skill-engine.sh           # agent → skills/stylotrace/scripts/engine
 scripts/sync-skill-engine.sh --check   # 校验是否漂移（CI 在跑）
 cd agent && npm test                   # 全链路离线测试（mock LLM，337 项断言）
 ```
 
-观察者 hooks 自动把会话事件写入 `.sculptor/protocol/context.jsonl`，压缩恢复时凭
+观察者 hooks 自动把会话事件写入 `.stylotrace/protocol/context.jsonl`，压缩恢复时凭
 context + state + 风格指纹续写，记忆会丢、风格不丢。
 
 ## 分发渠道

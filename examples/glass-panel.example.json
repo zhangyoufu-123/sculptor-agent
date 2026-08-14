@@ -17,8 +17,8 @@
   "pending": [],
   "nextStep": "写完第三段 → 红队审计 → 交付",
   "vault": {
-    "writeStyle": ".sculptor/vault/write-style.json",
-    "readStyle": ".sculptor/vault/read-style.json",
-    "fingerprint": ".sculptor/vault/style-fingerprint.json"
+    "writeStyle": ".stylotrace/vault/write-style.json",
+    "readStyle": ".stylotrace/vault/read-style.json",
+    "fingerprint": ".stylotrace/vault/style-fingerprint.json"
   }
 }

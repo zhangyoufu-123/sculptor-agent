@@ -52,7 +52,7 @@
 
 ### P1（下一批）
 - ~~**改写结果卡片**~~ → **v0.46 已完成**：选区 AI 返回 3 个方向不同的候选
-  （`sculptor rewrite` / `/api/rewrite`），可接受/换一个/取消；应用走 point-edit
+  （`stylotrace rewrite` / `/api/rewrite`），可接受/换一个/取消；应用走 point-edit
   （定位校验 + 写回 + 风格吸收 + 版本快照）。
 - ~~**历史回滚入口**~~ → **v0.46 已完成**：草稿区"版本"按钮 → 快照列表 → 一键回滚
   （`/api/history` + `/api/rollback`；point-edit 前自动快照）。

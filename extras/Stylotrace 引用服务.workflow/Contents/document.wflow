@@ -35,11 +35,11 @@
 					<key>COMMAND_STRING</key>
 					<string>#!/bin/bash
 SEL="$(cat)"
-SCULPTOR_BIN="${SCULPTOR_BIN:-$HOME/.local/bin/sculptor}"
-PROJECT="${SCULPTOR_PROJECT:-$HOME/Documents}"
+STYLOTRACE_BIN="${STYLOTRACE_BIN:-$HOME/.local/bin/stylotrace}"
+PROJECT="${STYLOTRACE_PROJECT:-$HOME/Documents}"
 INSTRUCTION="$(osascript -e 'set T to text returned of (display dialog "修改指令（例如：这句太文艺，收一点）" default answer "帮我改一下" with title "Stylotrace")' 2>/dev/null)"
-if [ -x "$SCULPTOR_BIN" ]; then
-  "$SCULPTOR_BIN" point-edit "$SEL" "$INSTRUCTION" --dir "$PROJECT"
+if [ -x "$STYLOTRACE_BIN" ]; then
+  "$STYLOTRACE_BIN" point-edit "$SEL" "$INSTRUCTION" --dir "$PROJECT"
 else
   printf '〔Stylotrace 引用〕《%s》\n修改指令：%s' "$SEL" "$INSTRUCTION" | pbcopy
   osascript -e 'display notification "引用已复制到剪贴板" with title "Stylotrace"'
@@ -53,11 +53,11 @@ fi</string>
 					<key>source</key>
 					<string>#!/bin/bash
 SEL="$(cat)"
-SCULPTOR_BIN="${SCULPTOR_BIN:-$HOME/.local/bin/sculptor}"
-PROJECT="${SCULPTOR_PROJECT:-$HOME/Documents}"
+STYLOTRACE_BIN="${STYLOTRACE_BIN:-$HOME/.local/bin/stylotrace}"
+PROJECT="${STYLOTRACE_PROJECT:-$HOME/Documents}"
 INSTRUCTION="$(osascript -e 'set T to text returned of (display dialog "修改指令（例如：这句太文艺，收一点）" default answer "帮我改一下" with title "Stylotrace")' 2>/dev/null)"
-if [ -x "$SCULPTOR_BIN" ]; then
-  "$SCULPTOR_BIN" point-edit "$SEL" "$INSTRUCTION" --dir "$PROJECT"
+if [ -x "$STYLOTRACE_BIN" ]; then
+  "$STYLOTRACE_BIN" point-edit "$SEL" "$INSTRUCTION" --dir "$PROJECT"
 else
   printf '〔Stylotrace 引用〕《%s》\n修改指令：%s' "$SEL" "$INSTRUCTION" | pbcopy
   osascript -e 'display notification "引用已复制到剪贴板" with title "Stylotrace"'

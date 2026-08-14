@@ -13,7 +13,7 @@ const mod = await import(path.join(HERE, '..', 'src', 'modulator.js'));
 const kb = await import(path.join(HERE, '..', 'src', 'knowledge.js'));
 const { contrastiveScore } = await import(path.join(HERE, '..', 'src', 'token-decode.js'));
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-emb-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-emb-'));
 const w = ws.ensureWorkspace(path.join(tmp, 'w'), { create: true });
 
 const authorA = [

@@ -6,7 +6,7 @@
 ## 0. 前置：把仓库推到 GitHub
 
 ```bash
-cd /Users/wallace/Documents/Codex/2026-08-04/bang/sculptor-agent && git push
+cd /Users/wallace/Documents/Codex/2026-08-04/bang/stylotrace && git push
 ```
 
 ## 1. 安装并登录 Render CLI（推荐，Blueprint 校验/启动）
@@ -41,12 +41,12 @@ API Key 页面：`https://dashboard.render.com/u/*/settings#api-keys`
 
 | 变量 | 必填 | 说明 |
 | --- | --- | --- |
-| `SCULPTOR_LLM_API_KEY` | 是 | LLM 密钥（服务端，不出现在前端） |
-| `SCULPTOR_WEB_PASSWORD` | 建议 | 访问密码（设置后启用登录保护） |
-| `SCULPTOR_LLM_BASE_URL` | 否 | 自定义 OpenAI 兼容端点 |
-| `SCULPTOR_LLM_MODEL` | 否 | 默认模型名 |
+| `STYLOTRACE_LLM_API_KEY` | 是 | LLM 密钥（服务端，不出现在前端） |
+| `STYLOTRACE_WEB_PASSWORD` | 建议 | 访问密码（设置后启用登录保护） |
+| `STYLOTRACE_LLM_BASE_URL` | 否 | 自定义 OpenAI 兼容端点 |
+| `STYLOTRACE_LLM_MODEL` | 否 | 默认模型名 |
 
-数据目录 `SCULPTOR_WEB_DATA=/var/data` 已挂 1GB 持久盘（会话/作品库/风格档案/知识库都在里面，
+数据目录 `STYLOTRACE_WEB_DATA=/var/data` 已挂 1GB 持久盘（会话/作品库/风格档案/知识库都在里面，
 重启不丢，可随时打包备份）。
 
 ## 4. 验证
@@ -58,5 +58,5 @@ API Key 页面：`https://dashboard.render.com/u/*/settings#api-keys`
 ## 已知注意
 
 - Free 计划休眠后首次请求会慢（Render 冷启动），属正常；
-- `SCULPTOR_LLM_API_KEY` 为服务端共享密钥：适合自用/小团队/演示；公开大流量需接账号体系；
+- `STYLOTRACE_LLM_API_KEY` 为服务端共享密钥：适合自用/小团队/演示；公开大流量需接账号体系；
 - 镜像内置 python3-docx（Debian 官方包），docx 读取/导出/块级回填开箱可用。

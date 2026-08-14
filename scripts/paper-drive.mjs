@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// 论文写作驱动（真实 LLM）：以项目真实素材回答导演澄清，让 Sculptor 亲自写
-// 《SCULPTOR：以"作者建模"为中心的深度协作写作 Agent》参赛论文。
-// 用法: node scripts/paper-drive.mjs [工作区]   （需网络 + 已配置 SCULPTOR_LLM_* 或宿主凭据）
-process.env.SCULPTOR_QUICK = process.env.SCULPTOR_QUICK || '1'; // 快速模式：读者 3 人、跳过交锋与适配卡重蒸馏
-process.env.SCULPTOR_LLM_TIMEOUT_MS = process.env.SCULPTOR_LLM_TIMEOUT_MS || '150000';
+// 论文写作驱动（真实 LLM）：以项目真实素材回答导演澄清，让 Stylotrace 亲自写
+// 《Stylotrace：以"作者建模"为中心的深度协作写作 Agent》参赛论文。
+// 用法: node scripts/paper-drive.mjs [工作区]   （需网络 + 已配置 STYLOTRACE_LLM_* 或宿主凭据）
+process.env.STYLOTRACE_QUICK = process.env.STYLOTRACE_QUICK || '1'; // 快速模式：读者 3 人、跳过交锋与适配卡重蒸馏
+process.env.STYLOTRACE_LLM_TIMEOUT_MS = process.env.STYLOTRACE_LLM_TIMEOUT_MS || '150000';
 import path from 'node:path';
 import fs from 'node:fs';
 import { loadConfig } from '../agent/src/config.js';
 import { agentStep } from '../agent/src/director.js';
 import * as ws from '../agent/src/workspace.js';
 
-const workspace = process.argv[2] || '/tmp/sculptor-paper-ws';
+const workspace = process.argv[2] || '/tmp/stylotrace-paper-ws';
 const cfg = loadConfig();
 
 // ── 预置作者输入（真实项目资料；作者本人提供的素材，非模型生成）──
@@ -48,13 +48,13 @@ const SEED_MATERIALS = [
   st.phase = 'clarify';
   st.confirmed = st.confirmed || {};
   Object.assign(st.confirmed, {
-    topic: 'SCULPTOR：以"作者建模"为中心的深度协作写作 Agent',
+    topic: 'Stylotrace：以"作者建模"为中心的深度协作写作 Agent',
     audience: '中学科技类竞赛评委：懂中文、懂一点 AI 概念但不要求编程——理论与落地并重，指标、案例、交互都要有',
     targetWords: 7500,
     stance:
       '论证写作系统应以"作者建模"为中心：通用写作的下限由模型能力决定，上限由系统对作者的理解决定；让评委看到这是可落地、可复现、有人机深协作的工程系统，而不是概念包装',
     theme:
-      '作者建模是写作 AI 的分水岭：通用工具管"作品"，Sculptor 管"作者"——把作者读过的书、写过的文、亲手改过的字、说过的理论都变成可检索、可注入、可演进的第一手资料',
+      '作者建模是写作 AI 的分水岭：通用工具管"作品"，Stylotrace 管"作者"——把作者读过的书、写过的文、亲手改过的字、说过的理论都变成可检索、可注入、可演进的第一手资料',
     arguments: [
       '风格是可表征的结构化偏离，不是提示词能装下的：四层风格向量 + 每轮隐式采集 + 修改即风格教学，才能让"AI 写的像你"从口号变成指标',
       '澄清协议要挖思想而不是搭结构：思想脉络追踪用户的"主张-前提-推理-理论来源"，提问主次由 LLM 结合对话自主判断（代码只兜底），配合 RAG 知识背景',
@@ -81,7 +81,7 @@ const ARGUMENTS = [
   '人机深协作需要工程可复现：导演状态机主导全流程，Web 工作台把能力贴到作者手边（选区/候选/回滚/可视化），双端 QA 与红队保证不崩、不打架、不 AI 腔',
 ];
 const STYLE_SAMPLE =
-  '大语言模型已具备通用文本生成能力，但用于个人写作时普遍存在"千人一面、一眼 AI 腔"的问题。本文提出核心论断：通用写作的下限由模型能力决定，而上限由系统对"作者"的理解决定。据此设计并实现了 SCULPTOR——一个嵌入 Agent 环境的深度协作写作系统，以持续维护的作者风格模型、知识模型与意图模型为中心运转。';
+  '大语言模型已具备通用文本生成能力，但用于个人写作时普遍存在"千人一面、一眼 AI 腔"的问题。本文提出核心论断：通用写作的下限由模型能力决定，而上限由系统对"作者"的理解决定。据此设计并实现了 Stylotrace——一个嵌入 Agent 环境的深度协作写作系统，以持续维护的作者风格模型、知识模型与意图模型为中心运转。';
 let styleAsked = 0; // 风格底稿只贴一次，重复问即低意愿放行
 
 function answerFor(question) {
@@ -97,7 +97,7 @@ function answerFor(question) {
   if (/素材|经历|画面|数据|引文|案例/.test(q))
     return MATERIALS.shift() || '还有一条：作品库按文体分类并蒸馏"个人写作 skill"，同一作者跨篇保持风格一致，多作品指标可对比';
   if (/立意|核心意思|中心/.test(q))
-    return '作者建模是写作 AI 的分水岭：通用工具管"作品"，Sculptor 管"作者"——把作者读过的书、写过的文、亲手改过的字、说过的理论都变成可检索、可注入、可演进的第一手资料';
+    return '作者建模是写作 AI 的分水岭：通用工具管"作品"，Stylotrace 管"作者"——把作者读过的书、写过的文、亲手改过的字、说过的理论都变成可检索、可注入、可演进的第一手资料';
   if (/论点|支撑|理由|论证/.test(q))
     return ARGUMENTS.shift() || '第四个支撑：跨文体的完整性——公文/合同/学术/小说各有蓝图与导出规范，但共享同一套作者模型与反 AI 审计，证明"个人化"不牺牲"规范性"';
   if (/情感|曲线|情绪/.test(q))
@@ -113,7 +113,7 @@ function answerFor(question) {
   return '继续，你来判断——把最该问的问了';
 }
 
-const OPEN = '写一篇参赛学术论文《SCULPTOR：以"作者建模"为中心的深度协作写作 Agent》，约七千字，中文，学术论文文体。资料和实验数据我都在对话里给你，请你先理解我的核心思想，再设计大纲，最后逐节写成一篇有论点、有证据、有诚意的论文。';
+const OPEN = '写一篇参赛学术论文《Stylotrace：以"作者建模"为中心的深度协作写作 Agent》，约七千字，中文，学术论文文体。资料和实验数据我都在对话里给你，请你先理解我的核心思想，再设计大纲，最后逐节写成一篇有论点、有证据、有诚意的论文。';
 
 let r = await agentStep(cfg, workspace, { lastInput: OPEN });
 let step = 0;

@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 PORT="${PORT:-8000}"
-MOCK="${SCULPTOR_MOCK_LLM:-0}"
+MOCK="${STYLOTRACE_MOCK_LLM:-0}"
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "缺少 python3（>=3.9）" >&2
@@ -29,7 +29,7 @@ echo '       -H "Content-Type: application/json" \'
 echo '       -d '\''{"message":"我想写一篇关于故乡的散文"}'\'''
 
 if [ "$MOCK" = "1" ]; then
-  SCULPTOR_MOCK_LLM=1 python3 -m uvicorn api.main:app --host 0.0.0.0 --port "$PORT"
+  STYLOTRACE_MOCK_LLM=1 python3 -m uvicorn api.main:app --host 0.0.0.0 --port "$PORT"
 else
   python3 -m uvicorn api.main:app --host 0.0.0.0 --port "$PORT"
 fi

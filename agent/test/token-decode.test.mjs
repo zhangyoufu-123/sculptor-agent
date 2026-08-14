@@ -20,7 +20,7 @@ const {
   decodeSection,
 } = await import(path.join(HERE, '..', 'src', 'token-decode.js'));
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sculptor-decode-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stylotrace-decode-'));
 const w = ws.ensureWorkspace(path.join(tmp, 'w'), { create: true });
 
 // 风格样本：短句、口语、具体物象（"作者 A"语料）
