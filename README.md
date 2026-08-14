@@ -5,9 +5,12 @@
 **一个会先读懂你、再陪你写好的深度协作写作 Agent（v1.0）。**
 
 装上它之后，你不需要会写提示词——说出一个念头，剩下的澄清、大纲、成稿、修改、审计，它陪你走完。
-装进 Codex / Claude Code / OpenCode，它是你的写作合伙人；打开 Web 工作台，它是你的伴随式写作台。
+装进 Codex / Claude Code / OpenCode 是写作合伙人；接进 Cursor / Windsurf / Claude Desktop / Hermes 等
+任意 MCP 宿主是写作子 agent；在终端用 `stylotrace agent` 是独立导演。三种形态，同一个决策内核。
 
 > **通用写作的下限由模型能力决定，上限由系统对"作者"的理解决定。**
+
+> 跨宿主接入方式（skill / MCP / CLI 的配置片段与规则适配）见 [adapters/README.md](adapters/README.md)。
 
 ## 为什么会有它
 

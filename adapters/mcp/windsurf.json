@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "stylotrace": {
+      "command": "node",
+      "args": [
+        "$HOME/.codex/skills/stylotrace/scripts/engine/bin/stylotrace.js",
+        "mcp"
+      ]
+    }
+  }
+}

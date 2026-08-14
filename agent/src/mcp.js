@@ -49,7 +49,7 @@ const TOOLS = [
   {
     name: 'init',
     description: '初始化 Stylotrace 工作区（.stylotrace/）',
-    inputSchema: { type: 'object', properties: { dir: { type: 'string' } } },
+    inputSchema: { type: 'object', properties: { workspace: { type: 'string' } } },
   },
   {
     name: 'panel',

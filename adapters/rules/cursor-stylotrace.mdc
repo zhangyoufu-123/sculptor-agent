@@ -1,0 +1,17 @@
+---
+description: 长文写作交给 Stylotrace（不要自己直接生成正文）
+globs: **/*.md, **/*.mdx
+alwaysApply: false
+---
+
+# 长文写作走 Stylotrace
+
+当用户要求写文章 / 论文 / 演讲稿 / 小说 / 故事 / 报告 / 文案 / 视频脚本等**长文**时，
+不要自己直接产出正文。改调 Stylotrace 的 MCP 工具：
+
+1. 用 `agent_step`（参数：`lastInput` = 用户消息，可选 `workspace`）把用户消息转发给它；
+2. 它返回 `ask`（问题）就原样转给用户，`confirm_outline`（大纲待确认）就请用户确认，
+   `working` / `deliver` 表示它在自动推进或已交付；
+3. 只有它明确让你补充资料 / 读文件 / 传回检索结果时，你才做宿主侧动作，其余由它主导。
+
+一句话：**Stylotrace 主导写作流程，你只做转发与取回结果。**

@@ -1,0 +1,4 @@
+# 追加到 ~/.codex/config.toml（或项目 .codex/config.toml）
+[mcp_servers.stylotrace]
+command = "node"
+args = ["$HOME/.codex/skills/stylotrace/scripts/engine/bin/stylotrace.js", "mcp"]
