@@ -525,6 +525,7 @@ $$PP(x) = 2 + 6 \cdot S(x)$$
 
 ## 附录 B　可复现脚本与补充报告
 
+- `docs/competition/REPRODUCIBILITY.md`：全部实验的复现命令 + 实测值 vs 论文值核对表；
 - `scripts/gen-paper-charts.py`：论文全部数据图（学习曲线 / 风格距离 / 热力网格 / MDS / 作者识别 / 消融）；
 - `scripts/experiments/rsa-learning-curve.mjs`：学习曲线实验（learning-curve.json）；
 - `scripts/experiments/modulator-ablation.mjs`：调制器逐维消融（MODULATOR-ABLATION.md）；
