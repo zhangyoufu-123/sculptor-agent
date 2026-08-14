@@ -3,13 +3,13 @@
   "version": "0.16.0",
   "description": "深度协作写作 Agent：多轮澄清、大纲评审、逐节写作、静默质量门、读者群像、联网 RAG、多格式导出。",
   "author": {
-    "name": "Sculptor Team"
+    "name": "Stylotrace Team"
   },
   "license": "MIT",
   "keywords": ["writing", "style", "agent", "chinese-writing"],
   "skills": "./skills/",
   "interface": {
-    "displayName": "Sculptor 写作助手",
+    "displayName": "Stylotrace 写作助手",
     "shortDescription": "深度协作写作 Agent：双风格、读者群像、反 AI 痕迹、联网 RAG",
     "longDescription": "多轮澄清（一次一问）→ 大纲评审 → 双风格逐节写作 → 红队审计 → 静默质量门（风格保真/原创性/校对/事实核查）→ 读者群像 + 交锋 → 交付。风格脉搏从每句话与每次修改中在线学习；支持语音口述、25 种文体、docx/html/pdf/srt 导出、一键改写矩阵、版本快照与 LoRA 持续微调。"
   }

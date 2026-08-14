@@ -1,4 +1,4 @@
-# Sculptor 公开 API（FastAPI + BYOK）镜像：Node（无头引擎）+ Python（API 服务）
+# Stylotrace 公开 API（FastAPI + BYOK）镜像：Node（无头引擎）+ Python（API 服务）
 FROM node:20-slim
 
 RUN apt-get update \

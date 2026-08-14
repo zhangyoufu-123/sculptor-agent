@@ -1,4 +1,4 @@
-// Sculptor Studio API 冒烟测试：不监听端口，直接捕获请求处理器逐路由验证。
+// Stylotrace Studio API 冒烟测试：不监听端口，直接捕获请求处理器逐路由验证。
 // 用法: SCULPTOR_WEB_DATA=$(mktemp -d) node web/test/api-smoke.mjs
 import http from 'node:http';
 import { Writable } from 'node:stream';
@@ -73,13 +73,13 @@ async function step(name, fn) {
   }
 }
 
-console.log('Sculptor Studio API 冒烟测试（mock LLM，无端口）');
+console.log('Stylotrace Studio API 冒烟测试（mock LLM，无端口）');
 
 let sid = '';
 
 await step('静态资源', async () => {
   const home = await call('/');
-  assert(home.statusCode === 200 && home._body().includes('Sculptor Studio'), '首页可访问');
+  assert(home.statusCode === 200 && home._body().includes('Stylotrace Studio'), '首页可访问');
   const css = await call('/assets/app.css');
   assert(css.statusCode === 200 && css._body().includes('sidebar'), 'CSS 可访问');
   const js = await call('/assets/app.js');

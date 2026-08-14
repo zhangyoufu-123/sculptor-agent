@@ -130,7 +130,7 @@ function reviewPromptArgs(ctx) {
   const budget = ctx.budget
     ? `【篇幅预算】${ctx.budget.label}\n（素材下限 ${ctx.budget.materialsMin} 条；每节必须分配用户素材，缺素材的节要标"需补充"。）`
     : '';
-  return `你是 Sculptor 的大纲评审师（CogWriter 式规划-评审-重规划）。用户已确认主题、立意、论点与素材，下面是你评审对象——一份待确认的大纲。
+  return `你是 Stylotrace 的大纲评审师（CogWriter 式规划-评审-重规划）。用户已确认主题、立意、论点与素材，下面是你评审对象——一份待确认的大纲。
 
 【主题】${ctx.topic}
 【核心立意】${ctx.theme || '未明确'}
@@ -256,7 +256,7 @@ export async function reviewOutline(cfg, wsDir, { outline = null } = {}) {
 export function renderOutlineReview(report, { revised = false } = {}) {
   const out = [];
   const line = '─'.repeat(46);
-  out.push(`\n${line}`, 'Sculptor 大纲评审', line);
+  out.push(`\n${line}`, 'Stylotrace 大纲评审', line);
   out.push(
     `评分: ${(report.score * 100).toFixed(0)} 分（${report.mode === 'llm' ? 'LLM 评审' : '确定性兜底'}）`,
   );

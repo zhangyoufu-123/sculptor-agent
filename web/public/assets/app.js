@@ -1,4 +1,4 @@
-/* Sculptor Studio · 视图路由与写作工作台（v0.27 大改）
+/* Stylotrace Studio · 视图路由与写作工作台（v0.27 大改）
    三栏工作台：左侧导航 / 主区视图 / 右侧 Agent 上下文面板（实时理解、清单、素材、风格进度）。
    设计标准：所有视图切换统一走 showView()（同一条 viewIn 动画）；阶段条状态规范不变。 */
 const $ = (id) => document.getElementById(id);
@@ -53,7 +53,7 @@ function showView(name, { keepStage = false } = {}) {
     const el = document.querySelector(`.nav-item[data-nav="${n}"]`);
     if (el) el.classList.toggle('is-active', n === name);
   });
-  $('crumb').textContent = CRUMB[name] || 'Sculptor';
+  $('crumb').textContent = CRUMB[name] || 'Stylotrace';
   if (!keepStage && ['home', 'sessions', 'works', 'persona', 'knowledge', 'tools'].includes(name)) setStage('home');
   updateContextVisibility();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -374,7 +374,7 @@ function renderOutlinePane(c) {
   }
   const writingNow = c.stage === 'write' && !c.hasDraft;
   parts.push(ctxSection(
-    '给 Sculptor 的建议',
+    '给 Stylotrace 的建议',
     `<textarea class="suggest" id="outlineSuggest" rows="2" placeholder="${writingNow ? '写作进行中，写完再提修改意见…' : '直接说：哪一节要改、往哪个方向改…'}"></textarea>
      <button class="btn btn-gold btn-sm" id="suggestSend" ${writingNow ? 'disabled' : ''}>发送建议</button>`,
   ));
@@ -823,7 +823,7 @@ function renderPaneContext(c) {
     parts.push(ctxSection('回答层次（L0–L5）', `<div class="vector-chips">${stats}</div>${recent}`));
   }
   if (!parts.length) {
-    parts.push('<div class="empty">还没有上下文——开始对话后，这里会实时显示 Sculptor 的理解、素材与风格进度。</div>');
+    parts.push('<div class="empty">还没有上下文——开始对话后，这里会实时显示 Stylotrace 的理解、素材与风格进度。</div>');
   }
   pane.innerHTML = parts.join('');
   $('ctxUploadBtn')?.addEventListener('click', () => $('ctxUploadInput')?.click());
@@ -1260,7 +1260,7 @@ async function submitChat(text) {
   if (!sessionId || !msg || busy) return;
   addMsg('user', esc(msg));
   busy = true; $('send').disabled = true;
-  const w = addWorking('Sculptor 正在思考…');
+  const w = addWorking('Stylotrace 正在思考…');
   const spin = spinWorking(w);
   try {
     const r = await apiPost('/api/step', { sessionId, message: msg });

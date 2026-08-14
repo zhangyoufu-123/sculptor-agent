@@ -1,5 +1,5 @@
 // 凭据发现层：自动读取宿主（Codex / Claude Code / OpenCode）与常见环境变量里
-// 已配置的 LLM API，让 Sculptor 开箱即用，无需用户重复填 key。
+// 已配置的 LLM API，让 Stylotrace 开箱即用，无需用户重复填 key。
 // 原则：
 //   1) 显式 SCULPTOR_LLM_* 环境变量永远优先；
 //   2) 绝不打印完整密钥——只显示来源与末 4 位；

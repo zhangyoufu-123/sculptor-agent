@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Sculptor Agent CLI 入口。
+// Stylotrace Agent CLI 入口。
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
@@ -129,7 +129,7 @@ import {
 } from './credentials.js';
 import { runReview, renderReview } from './review.js';
 
-const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四层复合风格向量 · 个人知识库 · 多 Agent 协作 · 多模态）
+const HELP = `Stylotrace Agent v0.23 — 完整写作 Agent（导演模式 · 四层复合风格向量 · 个人知识库 · 多 Agent 协作 · 多模态）
 
 用法:
   sculptor init [目录]                初始化工作区（默认 ./.sculptor）
@@ -167,7 +167,7 @@ const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四�
                                      文档翻译：docx/md/txt → 原意解读 + 结构保留翻译 → md/docx/html 导出（附回译校验）
   sculptor doc restyle <文件> [--style 旧稿|方向] [--out out] [工作区]
                                      文档风格重写：把成品文档按作者风格重写 → md/docx/html 导出
-  sculptor quote "<原句>"             生成可粘贴的「Sculptor 引用」块
+  sculptor quote "<原句>"             生成可粘贴的「Stylotrace 引用」块
   sculptor hook <工作区> [payload]    宿主生命周期钩子 → 观察日志 + 压缩守卫
   sculptor checklist <工作区>         渲染需求访谈确认清单（不消耗 LLM）
   sculptor style [--memory 查询] [--export] [--backfill] [--extract] [工作区]
@@ -247,7 +247,7 @@ const HELP = `Sculptor Agent v0.23 — 完整写作 Agent（导演模式 · 四�
                                      选定后用 point-edit --replacement 应用
   sculptor roundtrip [<文本|文件>] [--file x.md] [工作区]
                                      翻译/回译校验：中译英→回译，信息点核对 + 风格对比
-  sculptor probe "<任务描述>"         生态位探测：该不该让 Sculptor 主动介入
+  sculptor probe "<任务描述>"         生态位探测：该不该让 Stylotrace 主动介入
 
 环境变量（可选，默认指向 DeepSeek）:
   SCULPTOR_LLM_BASE_URL  SCULPTOR_LLM_API_KEY  SCULPTOR_LLM_MODEL
@@ -348,7 +348,7 @@ export async function runCli(argv, io = {}) {
         const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, dir), {
           create: true,
         });
-        console.log(`Sculptor 工作区已初始化 → ${w}`);
+        console.log(`Stylotrace 工作区已初始化 → ${w}`);
         break;
       }
       case 'agent': {
@@ -507,7 +507,7 @@ export async function runCli(argv, io = {}) {
         } else if (sub === 'needs') {
           const needs = pendingDataNeeds(w);
           if (!needs.length) {
-            console.log('（当前没有待办检索——需要数据时 Sculptor 会自动排队并提示）');
+            console.log('（当前没有待办检索——需要数据时 Stylotrace 会自动排队并提示）');
             break;
           }
           console.log(`待办资料检索 ${needs.length} 组（供宿主/学术/数据分析 agent 供给）：`);
@@ -848,7 +848,7 @@ export async function runCli(argv, io = {}) {
         const q = parseQuoteArg(raw);
         if (!q) throw new Error('引用为空');
         console.log(
-          `〔Sculptor 引用〕《${q}》\n修改指令：<在这里写你要怎么改，例如：这句太文艺，收一点>`,
+          `〔Stylotrace 引用〕《${q}》\n修改指令：<在这里写你要怎么改，例如：这句太文艺，收一点>`,
         );
         break;
       }
@@ -1551,7 +1551,7 @@ export async function runCli(argv, io = {}) {
         const instruction = positional[1] || extractInstruction(positional[0] || '');
         if (!positional[0] || !instruction)
           throw new Error(
-            '用法: sculptor point-edit "<引用/原文>" "<修改指令>" [--dir 项目] [--file 文件]\n或: sculptor point-edit "〔Sculptor 引用〕《原句》\\n修改指令：…"',
+            '用法: sculptor point-edit "<引用/原文>" "<修改指令>" [--dir 项目] [--file 文件]\n或: sculptor point-edit "〔Stylotrace 引用〕《原句》\\n修改指令：…"',
           );
         const r = await pointEdit(cfg, ws.resolveWorkspace(cfg, flags.workspace || ''), {
           quote: positional[0],

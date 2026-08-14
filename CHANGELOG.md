@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-14（项目更名：Sculptor → Stylotrace）
+
+- GitHub 仓库 `sculptor-agent` → `stylotrace`；package 名、README、插件清单、Web/API/site 界面、SKILL 展示名统一为 Stylotrace；
+- 保留 `sculptor` 作为技能触发名、CLI 命令与安装路径（`~/.codex/skills/sculptor`、`~/.local/bin/sculptor`、`SCULPTOR_*` 环境变量、本地数据目录），避免破坏既有安装；
+- 论文与实验脚本（`docs/competition/`、`scripts/experiments/`、`scripts/finetune/` 等）保留 "SCULPTOR" 学术命名。
+
 ## 2026-08-13（v1.0 商业化收口：词级文体计量 + 改迹变换 + 拟改层 + 消融）
 
 从"候选级评分原型"升级为"可解释、可学习、可复现作者改法"的完整链路：

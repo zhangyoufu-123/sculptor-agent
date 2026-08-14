@@ -1,4 +1,4 @@
-# SCULPTOR 全面升级方案（Phase 1 已完成 · 待推进 Phase 2/3）
+# STYLOTRACE 全面升级方案（Phase 1 已完成 · 待推进 Phase 2/3）
 
 > **状态更新（v0.68）**：Phase 1 已全部落地并合入（命名校准 A1、RSA 形式化 A2、学习曲线 A3、
 > 论文重排 A5、个人回避库 B1、上下文窗口编辑对 B2、可解释层 B7、embedding 合并 C1、doctor C4、

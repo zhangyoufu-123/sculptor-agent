@@ -1,4 +1,4 @@
-# Render 部署指南（Sculptor Studio）
+# Render 部署指南（Stylotrace Studio）
 
 仓库已包含 `render.yaml`（Blueprint）与 `Dockerfile`，按 Render 官方 Codex 插件
 （render-blueprints / render-docker / render-deploy 技能）的规范编写。
@@ -26,7 +26,7 @@ render blueprints validate --file render.yaml
 启动（会给出 Dashboard 链接）：
 
 ```bash
-render blueprint launch --file render.yaml --name sculptor-studio
+render blueprint launch --file render.yaml --name stylotrace-studio
 ```
 
 ## 2. 或使用 Render MCP / API（需要 API Key）

@@ -246,7 +246,7 @@ export function renderPanel(stateFile) {
   const line = '─'.repeat(46);
   const phase = PHASE_LABELS[s.phase] || s.phase || '未知';
   const out = [];
-  out.push(`\n${line}`, 'Sculptor 玻璃面板', line);
+  out.push(`\n${line}`, 'Stylotrace 玻璃面板', line);
   out.push(`阶段: ${phase}${s.projectId ? `    项目: ${s.projectId}` : ''}`);
   if (s.updatedAt) out.push(`更新: ${s.updatedAt}`);
   if (s.summary) out.push(`现在在做什么: ${s.summary}`);
@@ -293,7 +293,7 @@ export function statusReport(ws) {
     phase = PHASE_LABELS[readState(ws).phase] || '未知';
   } catch {}
   return [
-    `Sculptor 工作区: ${ws}`,
+    `Stylotrace 工作区: ${ws}`,
     `  阶段: ${phase}`,
     `  风格: write ${styleDimSummary(path.join(ws, 'vault', 'write-style.json'))} · read ${styleDimSummary(path.join(ws, 'vault', 'read-style.json'))}`,
     `  观察日志: ${countLines(path.join(ws, 'protocol', 'context.jsonl'))} 条`,

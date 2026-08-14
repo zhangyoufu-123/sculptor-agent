@@ -1,7 +1,7 @@
 {
-  "name": "sculptor-agent",
+  "name": "stylotrace",
   "version": "1.0.0",
-  "description": "Sculptor complete agent: standalone writing workflow CLI + point-edit + MCP server for host agents (Codex/Claude Code/OpenCode)",
+  "description": "Stylotrace complete agent: standalone writing workflow CLI + point-edit + MCP server for host agents (Codex/Claude Code/OpenCode)",
   "type": "module",
   "bin": {
     "sculptor": "bin/sculptor.js"
@@ -15,9 +15,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/zhangyoufu-123/sculptor-agent"
+    "url": "https://github.com/zhangyoufu-123/stylotrace"
   },
-  "author": "Sculptor Team",
+  "author": "Stylotrace Team",
   "engines": {
     "node": ">=18"
   },

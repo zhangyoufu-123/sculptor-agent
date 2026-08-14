@@ -165,7 +165,7 @@ export function proofScan(text) {
   };
 }
 
-const PROOF_PROMPT = (ctx) => `你是 Sculptor 的校对员。校对下面这段中文，只报确定的问题：
+const PROOF_PROMPT = (ctx) => `你是 Stylotrace 的校对员。校对下面这段中文，只报确定的问题：
 
 【文本】
 ${ctx.text}
@@ -271,7 +271,7 @@ export async function proofread(cfg, wsDir, { file = null } = {}) {
 export function renderProofread(report) {
   const out = [];
   const line = '─'.repeat(46);
-  out.push(`\n${line}`, 'Sculptor 校对 · 交付前检查', line);
+  out.push(`\n${line}`, 'Stylotrace 校对 · 交付前检查', line);
   out.push(
     `结果（${report.mode === 'llm' ? '确定性 + LLM' : '确定性扫描'}）: 错别字 ${report.byType.typo} · 语病 ${report.byType.grammar} · 标点 ${report.byType.punctuation} · 风格 ${report.byType.style}`,
   );

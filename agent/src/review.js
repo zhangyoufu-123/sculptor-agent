@@ -162,7 +162,7 @@ export async function runReview(cfg, wsDir, { file = null, fix = false, quick = 
 export function renderReview(report) {
   const out = [];
   const line = '─'.repeat(46);
-  out.push(`\n${line}`, 'Sculptor 深度审阅 · 红队 + 读者 + 风格 + 事实', line);
+  out.push(`\n${line}`, 'Stylotrace 深度审阅 · 红队 + 读者 + 风格 + 事实', line);
   out.push(
     `结论: ${report.passed ? '✓ 通过（无 P0 硬伤）' : `✗ ${report.p0.length} 项 P0 硬伤`}${report.fixed ? '（已自动修复）' : ''}`,
   );

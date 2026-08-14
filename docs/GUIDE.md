@@ -1,4 +1,4 @@
-# Sculptor 使用手册
+# Stylotrace 使用手册
 
 安装、命令、双形态、协作协议、开发维护。想快速了解产品本身，回 [README](../README.md)。
 
@@ -6,11 +6,11 @@
 
 ```bash
 # 方式一：一行命令，一次装好三个安装点（全局 skill + 当前项目 skill + 开发镜像 ~/sculptor）
-curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/sculptor-agent/main/install.sh | bash -s -- --all
+curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/stylotrace/main/install.sh | bash -s -- --all
 
 # 方式二：git clone
-git clone https://github.com/zhangyoufu-123/sculptor-agent
-cd sculptor-agent && ./install.sh --all --project ~/我的写作项目
+git clone https://github.com/zhangyoufu-123/stylotrace
+cd stylotrace && ./install.sh --all --project ~/我的写作项目
 ```
 
 三个安装点各有用途：`~/.codex/skills/sculptor`（全局：所有 Codex 对话可用）、
@@ -32,16 +32,16 @@ skill 内嵌完整 agent 引擎，装完即用，无需单独安装 CLI：
 
 ```bash
 export SCULPTOR_LLM_API_KEY=sk-xxx    # 必配：默认 DeepSeek 端点
-SCULPTOR=.codex/skills/sculptor/scripts/sculptor.mjs
-node $SCULPTOR init && node $SCULPTOR agent   # 导演模式：主导全程，自动推进到交付
+STYLOTRACE=.codex/skills/sculptor/scripts/sculptor.mjs
+node $STYLOTRACE init && node $STYLOTRACE agent   # 导演模式：主导全程，自动推进到交付
 ```
 
-导演模式（自主决策 · 主导对话）：每次收到你的消息，Sculptor 自己决定下一步并执行——
+导演模式（自主决策 · 主导对话）：每次收到你的消息，Stylotrace 自己决定下一步并执行——
 澄清问完就生成大纲、大纲确认就逐节写作、写完就反 AI 审计、审完就请 8 位"第一读者"群像反馈、
 最后交付。你不需要催"继续"，只在真正的决策点（主题/立场/素材/立意/论点/大纲确认）回答。
 交付后说"整篇更克制一点"这类风格方向 → 全文自动按新方向重写并再走一轮审计与群像。
 
-深度定点修改：选中一句话 → `node $SCULPTOR point-edit "原句" "指令" --dir 项目`
+深度定点修改：选中一句话 → `node $STYLOTRACE point-edit "原句" "指令" --dir 项目`
 （macOS 可装右键服务，见 `extras/`）。宿主 agent 安装后按 `SKILL.md` 自动调用全部流程。
 
 ## 常用命令
@@ -88,11 +88,11 @@ node $SCULPTOR init && node $SCULPTOR agent   # 导演模式：主导全程，�
   完整快照（由 `scripts/sync-skill-engine.sh` 同步、CI 校验防漂移），装 skill 即装完整 agent。
 - **独立 CLI 形态（可选）**（`agent/`）：`./install.sh --cli` 软链 `sculptor` 到 `~/.local/bin`；
   另提供 MCP stdio 服务器（`node scripts/sculptor.mjs mcp`）——Codex / Claude Code / OpenCode
-  通过标准 MCP 调用，对话由宿主主导，Sculptor 只负责写作与风格。只写自己的工作区，绝不碰宿主配置。
+  通过标准 MCP 调用，对话由宿主主导，Stylotrace 只负责写作与风格。只写自己的工作区，绝不碰宿主配置。
 
 ## 共存与退让（不与其他 Agent 打架）
 
-- **主权顺序**：用户指令 > 宿主当前动作 > Sculptor。
+- **主权顺序**：用户指令 > 宿主当前动作 > Stylotrace。
 - **写前校验**：改用户文件前重读；目标原文已被外部改动 → 中止退让，绝不覆盖。
 - **地盘隔离**：只用 `.sculptor/` 与用户明确指定的文件。
 - **MCP 被动**：宿主不调用就不执行。

@@ -45,7 +45,7 @@ L4 提供"用户真正要什么"。生成时**分层注入、按层加权**：
 小语料下，深层风格**不能靠统计读取，必须靠交互确认**。借鉴
 "Whose story is it? Personalizing story generation by inferring author styles"
 （arXiv:2502.13028，2025）——用结构化"作者写作清单"从旧作推断风格，达到 78% 的捕捉胜率。
-SCULPTOR 已有雏形（外溢优先、思想脉络），本轮把它系统化为 L3 读取协议：
+STYLOTRACE 已有雏形（外溢优先、思想脉络），本轮把它系统化为 L3 读取协议：
 
 1. **主张与立场**：这篇你要让它"相信/感觉到"什么？（已有 stance/theme）
 2. **论证与推理**：你心里有没有一条现成推理线/一本书可顺着想？（已有 thinking/borrow）
@@ -66,7 +66,7 @@ $$\log P_{\mathrm{final}}(w \mid c, t) = \log P_{\mathrm{base}}(w \mid c) + \sum
 
 各方法锚点与落地：
 
-| 方法 | 文献 | 形态 | SCULPTOR 对应 |
+| 方法 | 文献 | 形态 | STYLOTRACE 对应 |
 | --- | --- | --- | --- |
 | 专家/反专家对比 | DExperts（Liu et al., ACL 2021, 2105.03023） | 专家小模型 logits − 反专家 logits | V3：个人 LoRA 为专家、通用为反专家 |
 | 对比解码 | Contrastive Decoding（Li et al., ICLR 2023, 2210.15097） | 强模型 vs 弱模型对比 + 合理性约束 | V2：logprobs 下 p_base vs 退化前缀 |

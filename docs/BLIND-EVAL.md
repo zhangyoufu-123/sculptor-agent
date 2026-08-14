@@ -15,7 +15,7 @@ node bin/sculptor.js experiment run \
   /path/to/workspace
 ```
 
-生成 `blind.json`（随机顺序的 A/B 盲评对：一篇是 Sculptor 按你风格写的，一篇是你本人的真文）。
+生成 `blind.json`（随机顺序的 A/B 盲评对：一篇是 Stylotrace 按你风格写的，一篇是你本人的真文）。
 
 ## 第 2 步：导出问卷（一次）
 

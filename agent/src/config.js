@@ -1,4 +1,4 @@
-// Sculptor Agent 配置：全部来自环境变量，绝不读宿主配置，天然无冲突。
+// Stylotrace Agent 配置：全部来自环境变量，绝不读宿主配置，天然无冲突。
 // 例外（凭据发现）：未显式配置 SCULPTOR_LLM_API_KEY 时，可自动复用宿主
 // （Codex/Claude/OpenCode/env）已配置的 API —— 只读本机、绝不外发、绝不打印密钥。
 import path from 'node:path';

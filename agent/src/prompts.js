@@ -1,8 +1,8 @@
-// Sculptor Agent 内嵌提示词：与 skill 参考文档同源，保证两种形态行为一致。
+// Stylotrace Agent 内嵌提示词：与 skill 参考文档同源，保证两种形态行为一致。
 
 export const QUESTIONER_PROMPT = (
   ctx,
-) => `你是 Sculptor 的追问设计师。你的工作不是收集填空题，而是像一位有判断力的朋友那样，让用户说出真实想法。
+) => `你是 Stylotrace 的追问设计师。你的工作不是收集填空题，而是像一位有判断力的朋友那样，让用户说出真实想法。
 
 【完整上下文】
 ${ctx.context}
@@ -146,7 +146,7 @@ skeleton 是"这篇文章按什么顺序走"的简写，例如 ["从门口写起
 
 export const OUTLINE_PROMPT = (
   ctx,
-) => `你是 Sculptor 的提纲设计师。基于用户已确认的信息，设计一篇${ctx.genre || '文章'}的大纲。
+) => `你是 Stylotrace 的提纲设计师。基于用户已确认的信息，设计一篇${ctx.genre || '文章'}的大纲。
 
 【主题】${ctx.topic}
 【核心立意】${ctx.theme || '未明确（先澄清立意再生成大纲）'}
@@ -198,7 +198,7 @@ parts 可选（长文才输出）；sections 必填且完整平铺。`;
 
 export const WRITE_PROMPT = (
   ctx,
-) => `你是 Sculptor 的写作者。写出"这个人类作者会写"的文字，而不是 AI 的文字。
+) => `你是 Stylotrace 的写作者。写出"这个人类作者会写"的文字，而不是 AI 的文字。
 
 【文章】《${ctx.title}》
 【核心立意】${ctx.theme || ''}
@@ -259,7 +259,7 @@ ${ctx.recentPulse ? `【上一节风格脉搏】${ctx.recentPulse}——写本�
 
 只输出正文（不要标题、不要 JSON、不要解释）。`;
 
-export const EXPAND_PROMPT = (ctx) => `你是 Sculptor 的写作者。本节字数不足，需要扩写。
+export const EXPAND_PROMPT = (ctx) => `你是 Stylotrace 的写作者。本节字数不足，需要扩写。
 
 【本节】${ctx.heading}（功能：${ctx.function}）
 【目标字数】${ctx.target} 字（中文字符）
@@ -310,7 +310,7 @@ ${ctx.knowledgeBrief ? `【作者知识库·辅助参考】\n${ctx.knowledgeBrie
 
 export const RESTYLE_PROMPT = (
   ctx,
-) => `你是 Sculptor 的改写者。把下面这一节按【新风格方向】整体重写：
+) => `你是 Stylotrace 的改写者。把下面这一节按【新风格方向】整体重写：
 保留原文的论点、素材与结构功能，只换表达方式、节奏与口吻。整篇文章都要按新方向统一，不许只有这一节变。
 
 【本节】${ctx.heading}（功能：${ctx.function}${ctx.thesis ? `；论点：${ctx.thesis}` : ''}）
@@ -336,7 +336,7 @@ ${ctx.text}
 
 export const REDTEAM_FIX_PROMPT = (
   ctx,
-) => `你是 Sculptor 的修订者。以下片段被反 AI 审计标记为有 AI 痕迹，请用该用户的风格改写，消除问题。
+) => `你是 Stylotrace 的修订者。以下片段被反 AI 审计标记为有 AI 痕迹，请用该用户的风格改写，消除问题。
 
 【问题】${ctx.issues}
 【写作风格】${ctx.writeStyle || '（具体、克制、有个人痕迹）'}
@@ -351,7 +351,7 @@ ${ctx.text}
 
 export const DISSECT_PROMPT = (
   ctx,
-) => `你是 Sculptor 的感性解剖师。AI 没有主体性，但你的任务是像显影液一样，照出人类作者的主体结构。
+) => `你是 Stylotrace 的感性解剖师。AI 没有主体性，但你的任务是像显影液一样，照出人类作者的主体结构。
 
 【文本/项目】
 ${ctx.text}
@@ -396,7 +396,7 @@ ${text}
 
 export const CONVERSATION_STYLE_PROMPT = (
   utterances,
-) => `你是 Sculptor 的风格提炼师。下面是这位作者在一段写作对话里的全部发言（素材、感受、修改意见、确认）。请从这些"活的发言"里提炼他的整体写作风格——不是从成稿，而是从他怎么想、怎么选、怎么改。
+) => `你是 Stylotrace 的风格提炼师。下面是这位作者在一段写作对话里的全部发言（素材、感受、修改意见、确认）。请从这些"活的发言"里提炼他的整体写作风格——不是从成稿，而是从他怎么想、怎么选、怎么改。
 
 【对话发言】
 ${utterances.map((u, i) => `${i + 1}. ${u}`).join('\n')}

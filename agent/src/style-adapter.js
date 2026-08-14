@@ -134,7 +134,7 @@ function deterministicAdapter(corpus) {
 
 function adapterPromptArgs(ctx) {
   const corpus = renderCorpusForAdapter(ctx.corpus);
-  return `你是 Sculptor 的风格适配师。把下面这位作者的素材压缩成一张"风格适配卡"——让任何写手只看这张卡，就能写出像这位作者的文字。卡要具体到可执行，不要泛泛而谈。
+  return `你是 Stylotrace 的风格适配师。把下面这位作者的素材压缩成一张"风格适配卡"——让任何写手只看这张卡，就能写出像这位作者的文字。卡要具体到可执行，不要泛泛而谈。
 
 【作者素材】
 ${corpus}

@@ -81,7 +81,7 @@ function presetCtx(cfg) {
   };
 }
 
-const TRANSFORM_PROMPT = (ctx) => `你是 Sculptor 的预设改写者。把下面的文稿按【预设】改写。
+const TRANSFORM_PROMPT = (ctx) => `你是 Stylotrace 的预设改写者。把下面的文稿按【预设】改写。
 
 【预设】${ctx.preset.hint}
 ${ctx.tone ? `【目标语气】${ctx.tone}` : ''}
@@ -121,7 +121,7 @@ export async function transform(
   const existing = fs.readFileSync(draftFile, 'utf8');
   if (state.lastDraftHash && fileHash(existing) !== state.lastDraftHash && !force) {
     throw new Error(
-      'draft.md 在最后一次写作后被外部修改过，Sculptor 已退让、不覆盖。确认要改写请运行: sculptor transform --force',
+      'draft.md 在最后一次写作后被外部修改过，Stylotrace 已退让、不覆盖。确认要改写请运行: sculptor transform --force',
     );
   }
   const [presetName, tonePart] = String(preset).split(':');

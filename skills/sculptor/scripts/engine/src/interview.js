@@ -62,7 +62,7 @@ export function renderChecklist(state) {
   const rows = checklistOf(state);
   const done = rows.filter((r) => r.done).length;
   const line = '─'.repeat(46);
-  const out = [line, 'Sculptor 需求访谈 · 确认清单', line];
+  const out = [line, 'Stylotrace 需求访谈 · 确认清单', line];
   for (const r of rows) {
     const mark = r.done ? '✓' : '…';
     const extra = r.note ? `（${r.note}）` : '';
@@ -176,7 +176,7 @@ export async function interviewInteractive(cfg, wsDir) {
   let lowWill = 0;
   let lastInput = '';
   console.log(
-    'Sculptor 需求访谈（每轮一个问题；回答完会更新确认清单；随时说"你决定"跳过可选维度）\n',
+    'Stylotrace 需求访谈（每轮一个问题；回答完会更新确认清单；随时说"你决定"跳过可选维度）\n',
   );
   try {
     while (true) {

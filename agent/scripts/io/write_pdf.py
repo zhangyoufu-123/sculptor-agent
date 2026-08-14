@@ -48,7 +48,7 @@ def main():
         rightMargin=25 * mm,
         topMargin=25 * mm,
         bottomMargin=25 * mm,
-        title="Sculptor 文稿",
+        title="Stylotrace 文稿",
     )
     flow = []
     in_list = []

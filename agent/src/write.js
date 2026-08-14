@@ -104,7 +104,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
   // 退让协议：draft.md 若被用户/其他 agent 外部修改过，不静默覆盖；除非显式 --force。
   if (existing && state.lastDraftHash && fileHash(existing) !== state.lastDraftHash && !force) {
     throw new Error(
-      'draft.md 在最后一次写作后被外部修改过，Sculptor 已退让、不覆盖。确认要重写请运行: sculptor write --force',
+      'draft.md 在最后一次写作后被外部修改过，Stylotrace 已退让、不覆盖。确认要重写请运行: sculptor write --force',
     );
   }
   snapshot(workspace, 'write');

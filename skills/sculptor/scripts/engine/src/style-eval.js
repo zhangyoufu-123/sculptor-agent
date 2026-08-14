@@ -144,7 +144,7 @@ function deterministicEval(text, corpus) {
   };
 }
 
-const EVAL_PROMPT = (ctx) => `你是 Sculptor 的风格保真评估师。你的任务只有一件：判断这篇文字**像不像这个作者本人**——不是好不好，不是对不对，是像不像。
+const EVAL_PROMPT = (ctx) => `你是 Stylotrace 的风格保真评估师。你的任务只有一件：判断这篇文字**像不像这个作者本人**——不是好不好，不是对不对，是像不像。
 
 【作者参照系（全部来自作者本人的旧稿/亲手修改/风格档案）】
 ${ctx.reference}
@@ -299,7 +299,7 @@ export function applyEvalFeedback(workspace, report) {
 export function renderStyleEval(report) {
   const out = [];
   const line = '─'.repeat(46);
-  out.push(`\n${line}`, 'Sculptor 风格保真评估 · 这篇像不像你', line);
+  out.push(`\n${line}`, 'Stylotrace 风格保真评估 · 这篇像不像你', line);
   if (!report.hasReference) {
     out.push('（工作区还没有作者参照语料——旧稿样本或亲手修改记录）');
     out.push(report.advice[0] || '先贴一段同文体旧稿，或做几次 point-edit 建立参照系。');

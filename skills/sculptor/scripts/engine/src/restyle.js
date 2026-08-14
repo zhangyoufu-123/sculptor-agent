@@ -40,7 +40,7 @@ export async function restyle(cfg, wsDir, { direction = '', section = null, forc
   // 退让协议：draft 被用户/其他 agent 外部修改过 → 不覆盖，除非显式 --force。
   if (state.lastDraftHash && fileHash(existing) !== state.lastDraftHash && !force) {
     throw new Error(
-      'draft.md 在最后一次写作后被外部修改过，Sculptor 已退让、不覆盖。确认要重写请运行: sculptor restyle --force',
+      'draft.md 在最后一次写作后被外部修改过，Stylotrace 已退让、不覆盖。确认要重写请运行: sculptor restyle --force',
     );
   }
   snapshot(workspace, 'restyle');

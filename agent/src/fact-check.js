@@ -57,7 +57,7 @@ export function factScan(text, materials = []) {
   return { items: uniqueItems(items).slice(0, 60) };
 }
 
-const FACT_PROMPT = (ctx) => `你是 Sculptor 的事实核查员。下面是这篇文章里被机器标出的"事实候选"（数字/年代/引文/人名/机构）。请逐一判断可信度：
+const FACT_PROMPT = (ctx) => `你是 Stylotrace 的事实核查员。下面是这篇文章里被机器标出的"事实候选"（数字/年代/引文/人名/机构）。请逐一判断可信度：
 
 【用户素材（作者自己提供的，可信）】
 ${ctx.materials || '（无）'}
@@ -191,7 +191,7 @@ export async function factCheck(cfg, wsDir, { file = null } = {}) {
 export function renderFactCheck(report) {
   const out = [];
   const line = '─'.repeat(46);
-  out.push(`\n${line}`, 'Sculptor 事实核查 · 交付前必看', line);
+  out.push(`\n${line}`, 'Stylotrace 事实核查 · 交付前必看', line);
   out.push(
     `核查结果（${report.mode === 'llm' ? 'LLM 复核' : report.mode === 'fallback' ? '确定性扫描' : '未发现候选'}）: ` +
       `material ${report.byType.material} · common ${report.byType.common} · verify ${report.byType.verify}`,

@@ -1,4 +1,4 @@
-// 自主导演（Director）：让 Sculptor 主导写作对话，而不是被动等"继续"。
+// 自主导演（Director）：让 Stylotrace 主导写作对话，而不是被动等"继续"。
 // 每次收到用户消息后，导演自己决定下一步：该问就问、该生成大纲就生成、
 // 该写就逐节写、该审计就审计、该请读者群像就群像——只有真正的用户决策点
 // （主题/立场/素材/立意/论点/大纲确认/风格方向）才停下等用户。
@@ -814,7 +814,7 @@ export async function agentInteractive(cfg, wsDir) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
   let lastInput = '';
-  console.log('Sculptor 导演模式：我主导流程，你只回答该你决定的问题（随时可打断）。\n');
+  console.log('Stylotrace 导演模式：我主导流程，你只回答该你决定的问题（随时可打断）。\n');
   try {
     for (let i = 0; i < 200; i++) {
       const r = await agentStep(cfg, workspace, { lastInput });

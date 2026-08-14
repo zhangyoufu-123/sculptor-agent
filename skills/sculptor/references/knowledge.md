@@ -76,13 +76,13 @@ sculptor knowledge remove 《X》     # 移除（可恢复：从 git/备份恢�
 ## 竞品/方法参考
 
 - **MemGPT（Letta）**：分层记忆 + 自我编辑——知识按主题检索注入，核心记忆不随上下文漂移；
-  Sculptor 对应：`knowledgeBrief` 每次按主题检索，条目独立于对话历史。
+  Stylotrace 对应：`knowledgeBrief` 每次按主题检索，条目独立于对话历史。
 - **Alexandria**：来源可引、人可读——知识条目带 `source` 与 `createdAt`，且是 Markdown，
-  用户可以像读笔记一样审阅；Sculptor 的 `<id>.md` 即此思路。
-- **memories-off**：像管代码一样管知识——显式 CRUD + 测试；Sculptor 的
+  用户可以像读笔记一样审阅；Stylotrace 的 `<id>.md` 即此思路。
+- **memories-off**：像管代码一样管知识——显式 CRUD + 测试；Stylotrace 的
   `list/add/remove/search/view` 子命令与单元测试（`agent/test/knowledge.test.mjs`）对应。
 - **read-aware（研究）**：Agent 引导的简短访谈比一次性问卷更能捕捉阅读背景；
-  Sculptor 的归纳式一问（书名捕捉 + 主题泛问）即此类引导，且用 `asked.jsonl` 防重复。
+  Stylotrace 的归纳式一问（书名捕捉 + 主题泛问）即此类引导，且用 `asked.jsonl` 防重复。
 
 ## 与个人写作库的分工
 

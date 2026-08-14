@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sculptor Agent 安装器：安装独立 CLI + 可选的宿主 MCP 注册（默认只打印配置，绝不擅自改宿主文件）
+# Stylotrace Agent 安装器：安装独立 CLI + 可选的宿主 MCP 注册（默认只打印配置，绝不擅自改宿主文件）
 set -euo pipefail
 
 PKG_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,7 +11,7 @@ WRITE_CODEX=0
 
 usage() {
   cat <<'EOF'
-Sculptor Agent 安装器
+Stylotrace Agent 安装器
 
 用法:
   ./scripts/install-agent.sh [--prefix <dir>] [--dry-run] [--mcp-codex [--write-codex]]

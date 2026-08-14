@@ -1,6 +1,6 @@
 # 风格金库（Style Vault）
 
-这是 Sculptor 最核心的持久化资产，双风格分离存储：
+这是 Stylotrace 最核心的持久化资产，双风格分离存储：
 
 - `write-style.json` — 人想写的：语言习惯、联想链、句式、不完美痕迹。
 - `read-style.json` — 人想听的：结构、节奏、信息密度、情感曲线。

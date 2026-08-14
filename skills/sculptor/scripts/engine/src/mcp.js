@@ -1,5 +1,5 @@
-// MCP stdio server：让 Codex / Claude Code / OpenCode 等宿主通过标准 MCP 调用 Sculptor。
-// 协议：换行分隔的 JSON-RPC 2.0。宿主自己决定何时调用，Sculptor 不监听宿主任何事件。
+// MCP stdio server：让 Codex / Claude Code / OpenCode 等宿主通过标准 MCP 调用 Stylotrace。
+// 协议：换行分隔的 JSON-RPC 2.0。宿主自己决定何时调用，Stylotrace 不监听宿主任何事件。
 import readline from 'node:readline';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -48,7 +48,7 @@ import { runReview, renderReview } from './review.js';
 const TOOLS = [
   {
     name: 'init',
-    description: '初始化 Sculptor 工作区（.sculptor/）',
+    description: '初始化 Stylotrace 工作区（.sculptor/）',
     inputSchema: { type: 'object', properties: { dir: { type: 'string' } } },
   },
   {
@@ -82,7 +82,7 @@ const TOOLS = [
   {
     name: 'agent_step',
     description:
-      '导演单步（自主决策）：传入用户最新消息（可为空），Sculptor 自己决定下一步并执行——返回 ask（提问）/ confirm_outline（大纲待确认）/ working（自动推进进度）/ deliver（交付）。宿主只负责转发用户消息，写作流程由 Sculptor 主导。',
+      '导演单步（自主决策）：传入用户最新消息（可为空），Stylotrace 自己决定下一步并执行——返回 ask（提问）/ confirm_outline（大纲待确认）/ working（自动推进进度）/ deliver（交付）。宿主只负责转发用户消息，写作流程由 Stylotrace 主导。',
     inputSchema: {
       type: 'object',
       properties: { workspace: { type: 'string' }, lastInput: { type: 'string' } },
@@ -236,7 +236,7 @@ const TOOLS = [
   {
     name: 'data_needs',
     description:
-      '查看当前工作区待办的资料检索请求与素材缺口（Sculptor 主导写作、请求数据；宿主/学术/数据分析 agent 据此供给并回灌）。返回 [{requestId,purpose,queries}]。',
+      '查看当前工作区待办的资料检索请求与素材缺口（Stylotrace 主导写作、请求数据；宿主/学术/数据分析 agent 据此供给并回灌）。返回 [{requestId,purpose,queries}]。',
     inputSchema: {
       type: 'object',
       properties: { workspace: { type: 'string' } },
@@ -281,7 +281,7 @@ const TOOLS = [
   },
   {
     name: 'quote',
-    description: '生成可粘贴的〔Sculptor 引用〕块（选中原句 → 右键/粘贴 → 定点修改）',
+    description: '生成可粘贴的〔Stylotrace 引用〕块（选中原句 → 右键/粘贴 → 定点修改）',
     inputSchema: {
       type: 'object',
       properties: { text: { type: 'string' } },
@@ -453,7 +453,7 @@ const TOOLS = [
   },
   {
     name: 'probe',
-    description: '生态位探测：判断任务是否值得 Sculptor 主动介入（长文写作/风格/结构/定点修改）',
+    description: '生态位探测：判断任务是否值得 Stylotrace 主动介入（长文写作/风格/结构/定点修改）',
     inputSchema: {
       type: 'object',
       properties: { text: { type: 'string' } },
@@ -720,7 +720,7 @@ async function callTool(name, args, cfg) {
     }
     case 'quote': {
       return {
-        text: `〔Sculptor 引用〕《${String(args.text || '').trim()}》\n修改指令：<在这里写你要怎么改>`,
+        text: `〔Stylotrace 引用〕《${String(args.text || '').trim()}》\n修改指令：<在这里写你要怎么改>`,
       };
     }
     case 'style_status': {

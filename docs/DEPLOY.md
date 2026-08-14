@@ -1,6 +1,6 @@
-# Sculptor Web 演示版部署指南
+# Stylotrace Web 演示版部署指南
 
-把 "Codex + Sculptor 组合"的写作流程搬进浏览器：`web/` 是一个零依赖 Node 服务 +
+把 "Codex + Stylotrace 组合"的写作流程搬进浏览器：`web/` 是一个零依赖 Node 服务 +
 聊天式前端，评委打开网址就能体验 澄清 → 大纲 → 逐节写作 → 反 AI 审计 → 交付。
 
 ## 先本地跑起来（30 秒）
@@ -18,16 +18,16 @@ SCULPTOR_LLM_API_KEY=sk-xxx npm start   # 真实模式：用你自己的 DeepSee
 
 | 平台 | 免费额度 | 适不适合本服务 | 说明 |
 | --- | --- | --- | --- |
-| **Railway** | 一次性试用额度（$5，约够演示几个月） | ✅ 最合适 | 完整 Node 进程 + 持久磁盘，Sculptor 的工作区文件系统照常工作；自带域名 `*.up.railway.app` |
+| **Railway** | 一次性试用额度（$5，约够演示几个月） | ✅ 最合适 | 完整 Node 进程 + 持久磁盘，Stylotrace 的工作区文件系统照常工作；自带域名 `*.up.railway.app` |
 | **Render** | 免费 Web Service（冷启动较慢） | ✅ 合适 | 完整 Node 进程 + 磁盘，免费实例空闲会休眠、被访问时唤醒 |
 | **Fly.io** | 免费额度有限 | ✅ 合适 | 完整 Node + 卷，稍复杂 |
-| **Vercel** | 免费 | ⚠ 不推荐 | Serverless 无持久文件系统，Sculptor 依赖 `.sculptor/` 状态文件，需要大改 |
+| **Vercel** | 免费 | ⚠ 不推荐 | Serverless 无持久文件系统，Stylotrace 依赖 `.sculptor/` 状态文件，需要大改 |
 | **本地 + Cloudflare Tunnel** | 免费 | ✅ 应急 | 电脑开着即可公网访问，演示前临时用 |
 
 ## 推荐：Railway 一键部署
 
 1. 打开 https://railway.app → 用 GitHub 登录；
-2. New Project → **Deploy from GitHub repo** → 选 `zhangyoufu-123/sculptor-agent`；
+2. New Project → **Deploy from GitHub repo** → 选 `zhangyoufu-123/stylotrace`；
 3. 部署设置里：**Root Directory** 填 `web`；**Start Command** 填 `npm start`；
 4. 添加环境变量：`SCULPTOR_LLM_API_KEY=sk-xxx`（必填，真实模式）；
 5. 部署完成后，Railway 会给你一个 `https://<项目名>.up.railway.app` 域名，直接可访问；
@@ -52,5 +52,5 @@ SCULPTOR_LLM_API_KEY=sk-xxx npm start   # 真实模式：用你自己的 DeepSee
 
 ## 架构一句话
 
-浏览器 → `web/server.mjs`（Node HTTP）→ Sculptor 导演状态机（`agent/src/director.js`）→ LLM API。
-前端负责美，后端负责流程，Sculptor 负责写作。
+浏览器 → `web/server.mjs`（Node HTTP）→ Stylotrace 导演状态机（`agent/src/director.js`）→ LLM API。
+前端负责美，后端负责流程，Stylotrace 负责写作。

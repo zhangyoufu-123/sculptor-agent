@@ -1,4 +1,4 @@
-# Sculptor Studio Web —— Render 部署镜像
+# Stylotrace Studio Web —— Render 部署镜像
 # node（web 零依赖 Node 服务）+ python3 + python-docx（docx 读取/导出/docx_blocks 回填）
 FROM node:20-slim
 

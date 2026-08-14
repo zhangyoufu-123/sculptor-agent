@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Sculptor 公开 API（FastAPI + BYOK）。
+"""Stylotrace 公开 API（FastAPI + BYOK）。
 
 核心设计：Bring Your Own Key。每个请求用 `Authorization: Bearer <你自己的 LLM API Key>`
 携带用户自己的密钥——服务端不存任何中心账号、不出任何 LLM 费用；密钥同时用于：
@@ -10,7 +10,7 @@
 可选访问门：设置环境变量 SCULPTOR_ACCESS_TOKEN 后，只有 Bearer 等于该值的请求能进
 （用于只把服务开给特定人）；不设置则任何自带 key 的人都能用（BYOK 语义下天然安全）。
 
-会话数据落盘在 api-data/users/<key 哈希>/<session_id>/（复用 Sculptor 工作区协议）。
+会话数据落盘在 api-data/users/<key 哈希>/<session_id>/（复用 Stylotrace 工作区协议）。
 引擎为 Node 子进程（agent/bin/headless.mjs），每轮一次调用，JSON 进 JSON 出。
 
 启动：
@@ -43,7 +43,7 @@ DEFAULT_MODEL = os.environ.get("SCULPTOR_DEFAULT_MODEL", "deepseek-v4-flash").st
 DEFAULT_BASE_URL = os.environ.get("SCULPTOR_DEFAULT_BASE_URL", "https://api.deepseek.com/v1").strip().rstrip("/")
 MOCK = os.environ.get("SCULPTOR_MOCK_LLM", "") == "1"
 
-app = FastAPI(title="Sculptor API", version="1.0.0", description="从修改中学习个人文风的写作系统（BYOK）")
+app = FastAPI(title="Stylotrace API", version="1.0.0", description="从修改中学习个人文风的写作系统（BYOK）")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -152,7 +152,7 @@ def chat(body: ChatIn, authorization: Optional[str] = Header(default=None)):
         sid = hashlib.sha256(os.urandom(16)).hexdigest()[:16]
         d = session_dir(ns, sid)
         d.mkdir(parents=True, exist_ok=True)
-        # 首个 message 兼作主题，写入转录（复用 Sculptor 工作区由 agentStep 建 state）
+        # 首个 message 兼作主题，写入转录（复用 Stylotrace 工作区由 agentStep 建 state）
         if body.topic:
             (d / "transcript.jsonl").write_text(
                 json.dumps({"role": "user", "text": body.topic}, ensure_ascii=False) + "\n",

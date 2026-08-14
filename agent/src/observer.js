@@ -1,6 +1,6 @@
-// 生态位感知（Observer）：检测任务是否落在 Sculptor 的写作生态位，
+// 生态位感知（Observer）：检测任务是否落在 Stylotrace 的写作生态位，
 // 并生成"轻量提议"。主动，但可拒绝；被拒即完全退让。
-// 这是"主动触发"的确定性依据：宿主 AI 用 probe 判断该不该让 Sculptor 介入。
+// 这是"主动触发"的确定性依据：宿主 AI 用 probe 判断该不该让 Stylotrace 介入。
 import { chatWithRetry } from './llm.js';
 
 const POSITIVE = [
@@ -81,7 +81,7 @@ export function probeTask(text) {
       : 'agent'
     : '';
   const offer = triggered
-    ? `这是${reasons.join('、')}任务，Sculptor 可以承接（从 ${entry} 起步：${
+    ? `这是${reasons.join('、')}任务，Stylotrace 可以承接（从 ${entry} 起步：${
         entry === 'academic'
           ? '按学术规范澄清研究问题/论点/文献数据，写带引用与参考文献的论文'
           : entry === 'official'
@@ -139,7 +139,7 @@ export async function probeTaskLLM(cfg, text) {
     const negatives = isWriting ? [] : [String(j.reason || '非写作任务').slice(0, 50)];
     const entry = isWriting ? type : 'none';
     const offer = isWriting
-      ? `这是写作任务，Sculptor 可以承接（从 ${entry} 起步：${ENTRY_OFFER[entry] || ENTRY_OFFER.clarify}）。要我接手吗？一句话即可，不接也没关系。`
+      ? `这是写作任务，Stylotrace 可以承接（从 ${entry} 起步：${ENTRY_OFFER[entry] || ENTRY_OFFER.clarify}）。要我接手吗？一句话即可，不接也没关系。`
       : '';
     return {
       triggered: isWriting,

@@ -1,8 +1,8 @@
-# Render Blueprint：Sculptor Studio（web 服务，Docker 运行时，含 python3+python-docx）
+# Render Blueprint：Stylotrace Studio（web 服务，Docker 运行时，含 python3+python-docx）
 # 由 Render Codex 插件（render-blueprints / render-docker 技能）规范编写。
 services:
   - type: web
-    name: sculptor-studio
+    name: stylotrace-studio
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
@@ -22,6 +22,6 @@ services:
       - key: SCULPTOR_LLM_MODEL
         sync: false
     disk:
-      name: sculptor-data
+      name: stylotrace-data
       mountPath: /var/data
       sizeGB: 1

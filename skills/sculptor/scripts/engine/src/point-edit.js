@@ -8,10 +8,10 @@ import { styleSummary } from './outline.js';
 import { refreshStyleVector } from './style-vector.js';
 import { snapshot } from './history.js';
 
-/** 解析"引用"粘贴格式：〔Sculptor 引用〕《原文》 或 直接原文 */
+/** 解析"引用"粘贴格式：〔Stylotrace 引用〕《原文》 或 直接原文 */
 export function parseQuoteArg(raw) {
   let s = String(raw || '').trim();
-  // 两行引用块：〔Sculptor 引用〕《原文》\n修改指令：…
+  // 两行引用块：〔Stylotrace 引用〕《原文》\n修改指令：…
   const block = s.match(/〔[^〕]*引用[^〕]*〕\s*[《<«「](.+?)[》>»」]/s);
   if (block) return block[1].trim();
   const m = s.match(/〔[^〕]*引用[^〕]*〕\s*[《<«「]?(.+?)[》>»」]?$/s);
@@ -104,7 +104,7 @@ export function applyChangeIfUnchanged(file, hit, replacement) {
   const current = fs.readFileSync(file, 'utf8');
   if (current.slice(hit.start, hit.end) !== hit.matched) {
     throw new Error(
-      '该文件在修改期间被外部改动（目标原文已变化），Sculptor 已退让中止、未写盘。请重新选择引用后再改。',
+      '该文件在修改期间被外部改动（目标原文已变化），Stylotrace 已退让中止、未写盘。请重新选择引用后再改。',
     );
   }
   const before = current.slice(0, hit.start);

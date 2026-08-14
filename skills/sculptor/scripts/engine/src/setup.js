@@ -203,7 +203,7 @@ export async function runSetup(flags = {}) {
     : ['codex', 'claude', 'opencode'];
   const report = [];
 
-  log(`Sculptor 自动接入（${dry ? 'dry-run' : '执行'}）`);
+  log(`Stylotrace 自动接入（${dry ? 'dry-run' : '执行'}）`);
   log(`项目: ${projectDir}（项目级接入，只有本项目对话可用）`);
   log('');
 

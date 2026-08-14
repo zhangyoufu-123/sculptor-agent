@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sculptor self-updater: refresh ALL three install points from GitHub in one command.
+# Stylotrace self-updater: refresh ALL three install points from GitHub in one command.
 #
 # Works from anywhere once the skill is installed (project-scoped or global):
 #   bash ~/.codex/skills/sculptor/scripts/update.sh [项目目录]
@@ -11,7 +11,7 @@
 #   [3/3] dev mirror     ~/sculptor  (SCULPTOR_MIRROR_DIR 可改；选择性同步，保留你的 .git/node_modules/.env)
 #
 # Env overrides:
-#   SCULPTOR_REPO_URL      仓库地址（默认 zhangyoufu-123/sculptor-agent）
+#   SCULPTOR_REPO_URL      仓库地址（默认 zhangyoufu-123/stylotrace）
 #   SCULPTOR_INSTALL_DIR   本地克隆目录（默认 ~/.local/share/sculptor-agent）
 #   SCULPTOR_MIRROR_DIR    镜像目录（默认 ~/sculptor）
 set -euo pipefail
@@ -19,10 +19,10 @@ set -euo pipefail
 PROJECT_DIR="${1:-${PWD}}"
 MIRROR_DIR="${SCULPTOR_MIRROR_DIR:-${HOME}/sculptor}"
 STORE_DIR="${SCULPTOR_INSTALL_DIR:-${HOME}/.local/share/sculptor-agent}"
-REPO_URL="${SCULPTOR_REPO_URL:-https://github.com/zhangyoufu-123/sculptor-agent}"
+REPO_URL="${SCULPTOR_REPO_URL:-https://github.com/zhangyoufu-123/stylotrace}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 
-echo "=== Sculptor 更新：三处安装点一次刷新 ==="
+echo "=== Stylotrace 更新：三处安装点一次刷新 ==="
 echo "  当前 skill: $SKILL_DIR"
 echo "  项目目录:   $PROJECT_DIR"
 echo "  镜像目录:   $MIRROR_DIR"

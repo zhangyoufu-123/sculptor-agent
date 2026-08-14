@@ -1,4 +1,4 @@
-# Sculptor Studio —— Zeabur 免费部署指南（无需银行卡）
+# Stylotrace Studio —— Zeabur 免费部署指南（无需银行卡）
 
 > 若 Render 因"必须绑定支付方式"不可用，Zeabur 是免费替代：无需信用卡、可用 GitHub 账号登录、
 > 支持从 GitHub 仓库自动构建 Docker 镜像，并提供持久化存储卷。免费档服务闲置时自动休眠，
@@ -6,7 +6,7 @@
 
 ## 一、准备
 
-- 一个 GitHub 账号（已有：zhangyoufu-123），仓库 `sculptor-agent` 需已推送（main 分支）。
+- 一个 GitHub 账号（已有：zhangyoufu-123），仓库 `stylotrace` 需已推送（main 分支）。
 - 一个 LLM API Key（`SCULPTOR_LLM_API_KEY`），例如 DeepSeek 的 key。
 - 仓库已内置 `Dockerfile`（node + python3 + python-docx）与 `.dockerignore`
   （排除 `.env*`、`web-data` 等敏感/运行数据，不被打进镜像）。
@@ -16,7 +16,7 @@
 1. 打开 https://zeabur.com ，点击 **Sign in**，选择 **GitHub** 登录（免费，无需银行卡）。
 2. 登录后进入控制台，点击 **新建项目**，区域任选（建议选离你近的免费区域）。
 3. 在项目内点击 **创建服务 → 从 GitHub 导入**，授权 Zeabur 访问 GitHub，
-   选择仓库 `zhangyoufu-123/sculptor-agent`，分支 `main`。
+   选择仓库 `zhangyoufu-123/stylotrace`，分支 `main`。
 4. 构建方式选择 **Dockerfile**（Zeabur 会自动识别仓库根目录的 `Dockerfile`）。
 5. 在服务的 **Variables（环境变量）** 中添加：
 

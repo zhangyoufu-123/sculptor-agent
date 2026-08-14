@@ -1495,7 +1495,7 @@ export async function clarifyInteractive(cfg, wsDir) {
   let lowWill = 0;
   let lastInput = '';
   let state = ws.readState(workspace);
-  console.log('Sculptor 澄清阶段（一次一问，随时说"你决定"结束）\n');
+  console.log('Stylotrace 澄清阶段（一次一问，随时说"你决定"结束）\n');
   try {
     while (true) {
       const next = await clarifyStep(cfg, wsDir, { lastInput });

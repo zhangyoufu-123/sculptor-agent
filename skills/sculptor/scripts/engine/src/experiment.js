@@ -1,5 +1,5 @@
 // 实验与数据采集引擎（v0.24）：支撑研究论文第 5.3 节的三类实证研究。
-//   实验一 风格保真度对照：通用 LLM（baseline）vs SCULPTOR 风格注入（variant），
+//   实验一 风格保真度对照：通用 LLM（baseline）vs STYLOTRACE 风格注入（variant），
 //          客观人类化指标 + 随机顺序 A/B 盲评对；
 //   实验二 消融：依次关闭 styleShot/persona/knowledge/styleAdapter，量化边际贡献；
 //   实验三 用户体验：问卷模板 + 结构化记录。
@@ -313,7 +313,7 @@ export async function runAblation(cfg, opts = {}) {
 // ── 问卷模板（实验三：用户体验 + 盲评）──────────────────
 export function userSurveyTemplate() {
   return {
-    title: 'Sculptor 写作体验实验问卷',
+    title: 'Stylotrace 写作体验实验问卷',
     sections: [
       {
         name: '盲评（实验一）',
@@ -345,7 +345,7 @@ export function userSurveyTemplate() {
  * 把 blind.json 渲染成一页盲评问卷（Markdown）：每对 A/B 文本 + 单选 + 理由框。
  * 问卷头部标注"请勿查看来源"，尾部留姓名/日期栏。
  */
-export function renderBlindSurvey(blind, { title = 'Sculptor 风格保真度盲评' } = {}) {
+export function renderBlindSurvey(blind, { title = 'Stylotrace 风格保真度盲评' } = {}) {
   const pairs = Array.isArray(blind) ? blind : [];
   if (!pairs.length) return '（没有盲评对）';
   const lines = [

@@ -1,4 +1,4 @@
-# Sculptor Agent（完整 Agent 形态）
+# Stylotrace Agent（完整 Agent 形态）
 
 零依赖 Node CLI：独立运行完整写作工作流，也提供 **MCP stdio 服务器** 供 Codex / Claude Code / OpenCode 等宿主调用。
 核心承诺：**只写自己的工作区（.sculptor/），不碰任何宿主配置**——与常见 agent 无冲突。
@@ -6,7 +6,7 @@
 ## 安装（真实安装，默认零侵入）
 
 ```bash
-cd sculptor-agent
+cd stylotrace
 ./scripts/install-agent.sh                 # CLI → ~/.local/bin/sculptor
 ./scripts/install-agent.sh --mcp-codex     # 打印 Codex 的 MCP 配置（不写文件）
 ./scripts/install-agent.sh --mcp-codex --write-codex   # 显式写入（先备份）
@@ -32,7 +32,7 @@ sculptor write                # 逐节写作 → draft.md（双风格注入 + �
 sculptor redteam --fix        # 反 AI 审计 + LLM 修订
 sculptor audience             # 读者群像：8 个"第一读者"的感性反馈（交付前强制）
 sculptor dissect              # 感性解剖 5 维度
-sculptor quote "选中的原句"    # 生成可粘贴的「Sculptor 引用」块
+sculptor quote "选中的原句"    # 生成可粘贴的「Stylotrace 引用」块
 sculptor style                # 查看风格档案进度（证明风格被读到了）
 sculptor panel / status       # 玻璃面板 / 工作区摘要
 sculptor doctor --ping        # 自检 + LLM 连通
@@ -45,7 +45,7 @@ sculptor point-edit "原句" "修改指令" --dir 项目   # 深度定点修改�
 每轮只问一个问题（带建议与选项），回答后立刻更新一张确认清单：
 
 ```text
-Sculptor 需求访谈 · 确认清单
+Stylotrace 需求访谈 · 确认清单
 ✓ 主题（已确认）
 ✓ 立场/目的（已确认）
 … 读者与场合 — 待确认
@@ -60,15 +60,15 @@ Sculptor 需求访谈 · 确认清单
 
 ### 定点引用（Quote）——选中即改
 
-在 md 文档里选中一句话 → 右键 → 复制 → 粘贴到 Sculptor 对话：
+在 md 文档里选中一句话 → 右键 → 复制 → 粘贴到 Stylotrace 对话：
 
 ```text
-〔Sculptor 引用〕《选中的原句》
+〔Stylotrace 引用〕《选中的原句》
 修改指令：这句太文艺，收一点
 ```
 
 `sculptor quote "原句"` 可一键生成这个块；macOS 用户可装
-`extras/Sculptor 引用服务.workflow`（右键菜单服务），选中文字 → 右键 → 在 Sculptor 中修改。
+`extras/Stylotrace 引用服务.workflow`（右键菜单服务），选中文字 → 右键 → 在 Stylotrace 中修改。
 point-edit 会精确定位原文、只改那一处、并把修改吸收进风格档案。
 
 ### 读者群像（Audience）——交付前的感性把关
@@ -115,10 +115,10 @@ Claude Code 项目 `.mcp.json`：
 { "mcpServers": { "sculptor": { "command": "/path/to/sculptor", "args": ["mcp"] } } }
 ```
 
-宿主 agent 通过 17 个 MCP 工具调用 Sculptor：`init / panel / status / clarify_step /
+宿主 agent 通过 17 个 MCP 工具调用 Stylotrace：`init / panel / status / clarify_step /
 interview_step / outline / write_section / write_all / redteam / audience / dissect /
 absorb / fingerprint / point_edit / quote / style_status / probe`。对话仍由宿主主导，
-Sculptor 只负责写作工作流与风格——这就是"承上启下"的协作模型。
+Stylotrace 只负责写作工作流与风格——这就是"承上启下"的协作模型。
 
 ### 风格可见性（Style）
 

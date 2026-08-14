@@ -8,7 +8,7 @@
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>在 Sculptor 中修改</string>
+				<string>在 Stylotrace 中修改</string>
 			</dict>
 			<key>NSRequiredContext</key>
 			<dict/>

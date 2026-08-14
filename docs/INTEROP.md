@@ -1,8 +1,8 @@
-# Sculptor 文档互通管线（Document Interop Pipeline）v0.56
+# Stylotrace 文档互通管线（Document Interop Pipeline）v0.56
 
 ## 目标
 
-让 Sculptor 的每一个环节都支持"文件进、文件出"，并能与其他产品（Word/WPS、其他 Agent、MCP 客户端）衔接：
+让 Stylotrace 的每一个环节都支持"文件进、文件出"，并能与其他产品（Word/WPS、其他 Agent、MCP 客户端）衔接：
 
 | 环节 | 文件进 | 文件出 |
 | --- | --- | --- |
@@ -97,7 +97,7 @@ cd agent && node test/doc-pipeline.test.mjs
 零依赖 Node 服务 + 纯静态前端，任何 Node 主机可直接运行（无构建步骤）：
 
 ```bash
-cd sculptor-agent/web
+cd stylotrace/web
 SCULPTOR_LLM_API_KEY=sk-xxx \
 SCULPTOR_WEB_PASSWORD=your-password \   # 设置后启用登录保护（未设置则单机免登录）
 SCULPTOR_WEB_DATA=/path/to/web-data \   # 会话/作品库数据目录（建议挂持久盘）
@@ -107,7 +107,7 @@ PORT=8080 node server.mjs
 验证（web 8 套 QA 共 303 项断言）：
 
 ```bash
-cd sculptor-agent/web && npm test
+cd stylotrace/web && npm test
 ```
 
 生产注意：

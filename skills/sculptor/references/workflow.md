@@ -1,4 +1,4 @@
-# Sculptor 全工作流
+# Stylotrace 全工作流
 
 ## 状态机
 
@@ -65,7 +65,7 @@ node scripts/sculptor.mjs panel .sculptor/protocol/state.json
 ## 观察者日志（Observer Log）
 
 宿主 hooks 会把会话事件自动写入 `.sculptor/protocol/context.jsonl`（会话开始、用户消息、AI 消息、会话结束）。
-Sculptor 在 Phase 0 和压缩恢复时优先读这份日志 + state.json，而不是只依赖当前上下文——对话被压缩后，
+Stylotrace 在 Phase 0 和压缩恢复时优先读这份日志 + state.json，而不是只依赖当前上下文——对话被压缩后，
 用户说过的话和风格信号依然有据可查。
 
 宿主没接 hooks 时，Phase 0 就把已有对话摘要手动追加一条：
@@ -99,7 +99,7 @@ Sculptor 在 Phase 0 和压缩恢复时优先读这份日志 + state.json，而�
 
 ## 多模态委托（Requester 协议）
 
-Sculptor 不直接读图/听音频。需要时向主体 Agent 追加 `protocol/requests.jsonl`：
+Stylotrace 不直接读图/听音频。需要时向主体 Agent 追加 `protocol/requests.jsonl`：
 
 ```json
 {"id":"req-001","type":"ask_user","question":"有没有相关的照片或手稿？请把路径发给我（如 /image ~/Desktop/手稿.png）","options":["有，稍后发","没有"],"recommendation":"有的话最有帮助","status":"pending"}

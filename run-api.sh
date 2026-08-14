@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sculptor 公开 API 一键启动（BYOK）：本地需要 Node 18+ 与 Python 3.9+。
+# Stylotrace 公开 API 一键启动（BYOK）：本地需要 Node 18+ 与 Python 3.9+。
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -20,7 +20,7 @@ if ! python3 -c 'import fastapi, uvicorn' >/dev/null 2>&1; then
   python3 -m pip install -r api/requirements.txt
 fi
 
-echo "Sculptor API 启动：http://localhost:${PORT}"
+echo "Stylotrace API 启动：http://localhost:${PORT}"
 echo "模式：$([ "$MOCK" = "1" ] && echo mock 离线冒烟 || echo live，BYOK)"
 echo '调用示例：'
 echo '  curl -X POST http://localhost:'"$PORT"'/v1/chat \'

@@ -235,7 +235,7 @@ export async function runAudience(cfg, wsDir, { file = null, quick = false } = {
 export function renderAudience(report) {
   const out = [];
   const line = '─'.repeat(46);
-  out.push(`\n${line}`, 'Sculptor 读者群像 · 第一次阅读反馈', line);
+  out.push(`\n${line}`, 'Stylotrace 读者群像 · 第一次阅读反馈', line);
   for (const p of report.personas) {
     out.push(`\n【${p.persona}】${p.role ? `（${p.role}）` : ''}`);
     if (p.impression) out.push(`读完后: ${p.impression}`);
@@ -327,7 +327,7 @@ function deterministicDebate(debaters) {
   };
 }
 
-const DEBATE_PROMPT = (ctx) => `你是 Sculptor 的读者辩论主持人（MAJ-EVAL 式多智能体交锋）。三位"第一读者"第一次读同一篇文章，各执一词。请组织一轮交锋并收敛，让作者拿到可直接执行的结论。
+const DEBATE_PROMPT = (ctx) => `你是 Stylotrace 的读者辩论主持人（MAJ-EVAL 式多智能体交锋）。三位"第一读者"第一次读同一篇文章，各执一词。请组织一轮交锋并收敛，让作者拿到可直接执行的结论。
 
 【文章】（节选）
 ${ctx.excerpt}
@@ -442,7 +442,7 @@ export async function runDebate(
 export function renderDebate(report) {
   const out = [];
   const line = '─'.repeat(46);
-  out.push(`\n${line}`, 'Sculptor 读者交锋 · 共识 / 争议 / 优先级', line);
+  out.push(`\n${line}`, 'Stylotrace 读者交锋 · 共识 / 争议 / 优先级', line);
   if (report.mode === 'none') {
     out.push(report.reason || '（无交锋）');
     out.push(line);

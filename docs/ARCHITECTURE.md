@@ -1,4 +1,4 @@
-# Sculptor 工作流与 Agent 合作体系（架构总览）
+# Stylotrace 工作流与 Agent 合作体系（架构总览）
 
 > 版本：v0.41 · 2026-08-11
 > 读法：先看状态机，再看协作协议，最后看"LLM 优先 / 代码安全网"边界——这条边界是
@@ -15,7 +15,7 @@
 └──────────────────────────┬─────────────────────────────────┘
                            │ MCP（被动）/ HTTP（REST）
 ┌──────────────────────────▼─────────────────────────────────┐
-│ Sculptor 核心（agent/src）                                    │
+│ Stylotrace 核心（agent/src）                                    │
 │ 导演状态机 director.js 主导全程；各 agent 模块按阶段被调用     │
 │ clarify / outline / write / revise / redteam / quality /      │
 │ audience / deliver / restyle + 供给与评估模块（rag、style、   │
@@ -73,7 +73,7 @@ flowchart LR
 
 ### 3.2 MCP 被动协议
 
-- Sculptor 不监听对话、不自动运行；宿主不调用工具就不执行任何动作。
+- Stylotrace 不监听对话、不自动运行；宿主不调用工具就不执行任何动作。
 - 全部能力以工具暴露：`agent_step`（导演单步）/ `clarify_step` / `interview_step` /
   `outline` / `write` / `redteam` / `audience` / `rag_*` / `point_edit` / `consistency` /
   `curve` / `style_*` 等。宿主只转发用户消息并执行检索供给。
@@ -81,7 +81,7 @@ flowchart LR
 ### 3.3 供给方协议（写论文/报告时的数据闭环）
 
 ```
-Sculptor 判定"需要资料" ──► 写 requests.jsonl（purpose: clarify-data/outline-gap/
+Stylotrace 判定"需要资料" ──► 写 requests.jsonl（purpose: clarify-data/outline-gap/
                                     write-gap/fact-check/asset-search，去重、不阻塞）
         ▲                                        │
         └── rag ingest 回灌 ◄── 宿主/学术/数据分析 agent 查看 needs 并检索
@@ -92,7 +92,7 @@ Sculptor 判定"需要资料" ──► 写 requests.jsonl（purpose: clarify-da
 
 ### 3.4 主权与退让协议
 
-1. **主权顺序：用户指令 > 宿主当前动作 > Sculptor。** 宿主正在做事时绝不插入。
+1. **主权顺序：用户指令 > 宿主当前动作 > Stylotrace。** 宿主正在做事时绝不插入。
 2. **写文件前重读校验**：改任何非 `.sculptor/` 文件（如 point-edit 改用户 md）前必须确认原文还在原位置；被改过 → 中止退让。
 3. **draft.md 外部修改检测**：写后 hash 变了 → 报错要求 `--force`，不静默覆盖。
 4. **不碰别人的地盘**：只读写自己的工作区与用户明确指定的文件。

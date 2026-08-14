@@ -1,4 +1,4 @@
-# SCULPTOR Agent 工程计划（v1.6 → 行业顶级）
+# STYLOTRACE Agent 工程计划（v1.6 → 行业顶级）
 
 > 目标：把"改迹调制（revision-trace modulation）"这条创新主线，从"可解释、可学习的
 > 候选级原型"推到"行业顶级的小样本风格注入"，并保证真实可用。
@@ -153,7 +153,7 @@ Activation Addition（Turner 2023）。
 - 2026-08-13：小样本定位与 `decodeN` 的 200 字符阈值矛盾——修复后"几十次修改学出方向"才能名副其实地
   覆盖"几段话就能起步"的场景。
 - 2026-08-13：文献复盘确认两条主线——(1) 风格是分层的（文档/话语/句子/词四级），当前只覆盖后两级；
-  (2) 无微调的控制走"解码期专家-反专家对比"（DExperts/对比解码/StyleVector/ActAdd），SCULPTOR 的
+  (2) 无微调的控制走"解码期专家-反专家对比"（DExperts/对比解码/StyleVector/ActAdd），STYLOTRACE 的
   personal/avoidance 恰好是 expert/anti-expert 的雏形，缺的是把"打分"升级为"对比影响"。
 - 2026-08-13（Phase B 实测）：作者识别 v2 显示 char n-gram 个人模型仅 46.3%（显著低于 TF-IDF 90.3%），
   因为它抓的是"内容字符"而非"风格"；升级为词级文体计量（功能词+标点节奏，Burrows Delta 思想）后

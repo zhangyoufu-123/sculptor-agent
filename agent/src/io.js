@@ -339,7 +339,7 @@ export function exportLatex(mdText, outFile) {
     '\\usepackage[UTF8]{ctex}',
     '\\usepackage{amsmath,amssymb}',
     '\\usepackage{graphicx}',
-    '\\title{SCULPTOR 论文}',
+    '\\title{STYLOTRACE 论文}',
     '\\begin{document}',
     '\\maketitle',
   ];
@@ -418,7 +418,7 @@ export function exportHtml(mdText, outFile) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escHtml(mdText.split('\n').find((l) => l.startsWith('# '))?.slice(2) || 'Sculptor 文稿')}</title>
+<title>${escHtml(mdText.split('\n').find((l) => l.startsWith('# '))?.slice(2) || 'Stylotrace 文稿')}</title>
 <style>
 body{max-width:760px;margin:2.4rem auto;padding:0 1.2rem;font-family:"Songti SC","STSong","SimSun",serif;line-height:1.9;color:#222}
 h1,h2,h3{font-family:"Heiti SC","STHeiti","SimHei",sans-serif;line-height:1.4}

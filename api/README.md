@@ -1,6 +1,6 @@
-# Sculptor 公开 API（FastAPI + BYOK）
+# Stylotrace 公开 API（FastAPI + BYOK）
 
-把 Sculptor 写作引擎包装成可自部署、可对外调用的 HTTP API。核心是 **BYOK（Bring Your Own Key）**：用户带自己的 LLM API Key 来调用，**服务端不存任何中心账号、不出任何 LLM 费用**；同一个 key 既是身份（用来区分会话），也是计费凭证（调用 LLM 时走这个 key）。
+把 Stylotrace 写作引擎包装成可自部署、可对外调用的 HTTP API。核心是 **BYOK（Bring Your Own Key）**：用户带自己的 LLM API Key 来调用，**服务端不存任何中心账号、不出任何 LLM 费用**；同一个 key 既是身份（用来区分会话），也是计费凭证（调用 LLM 时走这个 key）。
 
 ## 一键启动
 
@@ -14,8 +14,8 @@ SCULPTOR_MOCK_LLM=1 ./run-api.sh   # 离线冒烟（不调真实 LLM，用于验
 或 Docker：
 
 ```bash
-docker build -f api/Dockerfile -t sculptor-api .
-docker run --rm -p 8000:8000 sculptor-api
+docker build -f api/Dockerfile -t stylotrace-api .
+docker run --rm -p 8000:8000 stylotrace-api
 ```
 
 ## 调用

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sculptor Agent 跨平台安装器：装入 Codex / Claude Code / OpenCode
+# Stylotrace Agent 跨平台安装器：装入 Codex / Claude Code / OpenCode
 # 位于 skill 内部（skills/sculptor/scripts/install.sh），skill 自包含。
 set -euo pipefail
 
@@ -10,7 +10,7 @@ TARGETS=()
 
 usage() {
   cat <<'EOF'
-Sculptor Agent installer
+Stylotrace Agent installer
 
 用法:
   ./scripts/install.sh [--codex|--claude|--opencode|--all] [--dry-run]
@@ -88,7 +88,7 @@ wire_codex_hooks() {
     printf '已备份原配置 → %s\n' "$backup"
   fi
   {
-    printf '\n# Sculptor observer hooks（scripts/install.sh hooks 写入）\n'
+    printf '\n# Stylotrace observer hooks（scripts/install.sh hooks 写入）\n'
     if [ "$hermes" -eq 1 ]; then
       printf '# 启用版（Hermes CLI 字符串格式）\n[hooks]\n'
       for event in SessionStart UserPromptSubmit AssistantMessage Stop PreCompact; do

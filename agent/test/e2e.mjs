@@ -111,7 +111,7 @@ try {
     [new URL('../bin/sculptor.js', import.meta.url).pathname, '--help'],
     { encoding: 'utf8' },
   );
-  check('bin 启动器 --help', smoke.status === 0 && smoke.stdout.includes('Sculptor Agent'));
+  check('bin 启动器 --help', smoke.status === 0 && smoke.stdout.includes('Stylotrace Agent'));
 
   // 1. init
   let r = await run(['init'], {});
@@ -620,7 +620,7 @@ try {
   r = await run(['quote', '那扇窗沉默地注视着一切。']);
   check(
     'quote 生成可粘贴引用块',
-    r.out.includes('〔Sculptor 引用〕《那扇窗沉默地注视着一切。》') && r.out.includes('修改指令'),
+    r.out.includes('〔Stylotrace 引用〕《那扇窗沉默地注视着一切。》') && r.out.includes('修改指令'),
   );
 
   // 2.7 style 档案进度可见
@@ -1267,7 +1267,7 @@ try {
     !describeCandidate(codexCand[0]).includes('sk-xyz7890'),
   );
   const cfgExplicit = loadConfig({ SCULPTOR_LLM_API_KEY: 'sk-explicit', OPENAI_API_KEY: 'sk-env' });
-  check('显式 SCULPTOR 配置优先于宿主发现', cfgExplicit.apiKey === 'sk-explicit');
+  check('显式 STYLOTRACE 配置优先于宿主发现', cfgExplicit.apiKey === 'sk-explicit');
   const cf = saveCredentials(ws6, {
     baseUrl: 'https://example.com/v1',
     apiKey: 'sk-saved',
@@ -1334,7 +1334,7 @@ try {
   r = await run(['panel', path.join(workspace, 'protocol', 'state.json')]);
   check('玻璃面板渲染', r.out.includes('玻璃面板'));
   r = await run(['status']);
-  check('状态摘要', r.out.includes('Sculptor 工作区'));
+  check('状态摘要', r.out.includes('Stylotrace 工作区'));
   r = await run(['doctor', '--ping']);
   check('doctor + LLM 连通', r.code === 0 && r.out.includes('LLM 连通: ✓'), r.out.slice(0, 120));
 
@@ -1362,7 +1362,7 @@ try {
 
   r = await run([
     'point-edit',
-    '〔Sculptor 引用〕《它只等一个人走进去。》',
+    '〔Stylotrace 引用〕《它只等一个人走进去。》',
     '短一点',
     '--dir',
     work,
@@ -1370,7 +1370,7 @@ try {
   check('引用格式可解析', r.code === 0, r.out.slice(0, 120));
   r = await run([
     'point-edit',
-    '〔Sculptor 引用〕《历史从不缺席。》\n修改指令：更口语一点',
+    '〔Stylotrace 引用〕《历史从不缺席。》\n修改指令：更口语一点',
     '--dir',
     work,
   ]);
@@ -1432,7 +1432,7 @@ try {
   );
   check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'sculptor');
   check('MCP tools/list 39 个工具', byId[2]?.result?.tools?.length === 39);
-  check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Sculptor 工作区'));
+  check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Stylotrace 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
   const mcpInput2 = Readable.from([
     `${JSON.stringify({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'interview_step', arguments: { workspace, lastInput: '我在想结尾要不要留白' } } })}\n`,
@@ -1456,7 +1456,7 @@ try {
   check('MCP interview_step 返回清单', byId2[5]?.result?.content?.[0]?.text?.includes('checklist'));
   check(
     'MCP quote 生成引用块',
-    byId2[6]?.result?.content?.[0]?.text?.includes('〔Sculptor 引用〕'),
+    byId2[6]?.result?.content?.[0]?.text?.includes('〔Stylotrace 引用〕'),
   );
   const mcpInput3 = Readable.from([
     `${JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'style_memory', arguments: { workspace, topic: '北大红楼 历史' } } })}\n`,

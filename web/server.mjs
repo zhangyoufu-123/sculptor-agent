@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Sculptor Studio Web（v1.0）：零依赖 Node HTTP 服务。
-// 把 Sculptor 导演状态机（agentStep）包成 REST，前端提供完整写作工作台：
+// Stylotrace Studio Web（v1.0）：零依赖 Node HTTP 服务。
+// 把 Stylotrace 导演状态机（agentStep）包成 REST，前端提供完整写作工作台：
 //   多会话持久化（web-data/sessions/，可列表/改名/删除/续写）
 //   作品库（vault/library 跨会话聚合，按文体分类展示）
 //   风格肖像（write/read 14+7 维 + 复合风格向量 + 人物侧写）
@@ -254,7 +254,7 @@ function readJsonSafe(file) {
   }
 }
 
-// ── 会话持久化（web-data/sessions/<id>/：meta.json + transcript.jsonl + Sculptor 工作区）──
+// ── 会话持久化（web-data/sessions/<id>/：meta.json + transcript.jsonl + Stylotrace 工作区）──
 function sessionDir(id) {
   const root = sessionsRoot(currentMachine());
   const safe = String(id || '').replace(/[^a-z0-9-]/gi, '');
@@ -1456,7 +1456,7 @@ if (typeof server.on === 'function') {
 
 server.listen(PORT, () => {
   console.log(
-    `Sculptor Studio → http://localhost:${PORT}（${process.env.SCULPTOR_MOCK_LLM === '1' ? '离线 mock 模式' : '真实 LLM 模式'}）`,
+    `Stylotrace Studio → http://localhost:${PORT}（${process.env.SCULPTOR_MOCK_LLM === '1' ? '离线 mock 模式' : '真实 LLM 模式'}）`,
   );
   console.log(`  会话数据: ${DATA_ROOT}`);
   console.log(`  模型: ${currentCfg().model} · 密钥: ${currentCfg().apiKey ? '已配置' : '未配置（可在 .env.local 或环境变量里设）'}`);

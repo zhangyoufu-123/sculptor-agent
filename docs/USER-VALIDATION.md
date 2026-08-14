@@ -5,7 +5,7 @@
 
 ## A. 安装与启动（3 项）
 
-- [ ] 一条命令启动成功，终端打印 `Sculptor Studio → http://localhost:5177`，且显示 `密钥: 已配置`
+- [ ] 一条命令启动成功，终端打印 `Stylotrace Studio → http://localhost:5177`，且显示 `密钥: 已配置`
 - [ ] 打开首页无白屏、无 500，标题、侧栏、输入框正常渲染
 - [ ] `/health` 返回 `{ok:true, model:..., key:configured}`
 
