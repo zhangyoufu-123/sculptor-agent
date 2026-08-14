@@ -23,6 +23,19 @@
   - `docs/HANDOVER-v0.68.md`：本交接文档（未跟踪）
 - 建议：交接前把上述改动作为 v0.68 的收尾提交（如 `chore(v0.68): 版本号与 DeepSeek 凭据覆盖修复`），提交后重跑 agent/web 测试并重同步三个技能安装点。
 
+## GitHub 迁移与网络状态（2026-08-13 更新）
+
+- **两个 Git 仓库（迁移范围候选）**：
+  1. 开发工作区：`/Users/wallace/Documents/Codex/2026-08-04/bang/sculptor-agent`，remote = `zhangyoufu-123/sculptor-agent`，当前 HEAD `88acd1d`（DeepSeek V4 logprobs 探测，已推送），工作区干净
+  2. 发布/镜像仓库：`/Users/wallace/sculptor`，remote = `zhangyoufu-123/sculptor-harness`，本地 **13 个提交未推送**（含 v0.68 打包布局、logprobs 结果同步），工作区干净
+- **gh 凭据**：`gh auth status` 显示 token 已失效（zhangyoufu-123），`gh api` 连不上 api.github.com
+- **网络**：git 全局配置仍指向代理 `http://127.0.0.1:7897`，但代理进程已关；绕过代理直连 github.com 超时。**当前本机到 GitHub 完全不通**，推送与 gh 操作均不可用；DeepSeek API 直连正常
+- **迁移待办**（用户确认范围后执行）：
+  - 确认是否两个仓库都迁到 org（建议：dev → `org/sculptor-agent` 为主，harness → `org/sculptor-harness`）
+  - 恢复本机到 GitHub 的网络（重开代理/VPN，或改用可直连的路由并 `git config --unset http.proxy https.proxy`）
+  - org/空仓库建好后：`git remote set-url origin https://github.com/<org>/<repo>.git` + `git push -u origin main`
+  - 同步更新 README.md、install.sh、agent/package.json 里的 `zhangyoufu-123/sculptor-agent` 旧 URL
+
 ## 论文状态（科创大赛参赛论文）
 
 - **源文件**：`docs/competition/科技论文-SCULPTOR.md`（68,561 字节，约 545 行，8 章 + 附录 A/B + 致谢 + 参考文献）

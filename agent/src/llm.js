@@ -50,7 +50,15 @@ export async function chat(cfg, messages, opts = {}) {
   }
 
   const data = await res.json();
-  const content = data.choices?.[0]?.message?.content;
+  const msg = data.choices?.[0]?.message || {};
+  let content = msg.content;
+  // 推理模型（如 deepseek-v4-flash）在思考 token 耗尽预算时可能只返回 reasoning_content，
+  // 此时把推理尾部作为兜底内容，避免把有效回答误判为"空响应"。
+  if (typeof content !== 'string' || !content.trim()) {
+    if (typeof msg.reasoning_content === 'string' && msg.reasoning_content.trim()) {
+      content = msg.reasoning_content.trim();
+    }
+  }
   if (typeof content !== 'string' || !content.trim()) {
     throw new LlmEmptyError();
   }

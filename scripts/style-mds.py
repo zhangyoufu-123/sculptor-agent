@@ -12,7 +12,7 @@ BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(BASE, 'docs', 'competition', 'style-space.png')
 FONT = '/System/Library/Fonts/Hiragino Sans GB.ttc'
 
-labels = ['SCULPTOR', '真人A', '真人B', '模拟·克制', '模拟·口语', '模拟·豪迈', 'ChatGPT', 'DeepSeek', '模板公文']
+labels = ['SCULPTOR', '真人A', '真人B', '样本1', '样本2', '样本3', 'ChatGPT', 'DeepSeek', '模板公文']
 D = np.array([
     [0.00, 1.07, 1.32, 0.90, 1.10, 0.41, 1.24, 1.10, 1.68],
     [1.07, 0.00, 1.46, 1.28, 1.42, 0.93, 1.50, 1.43, 1.98],
