@@ -778,6 +778,9 @@ function renderPaneContext(c) {
       .join('');
     parts.push(ctxSection('思想脉络', lines || '<div class="ctx-line">（AI 正在从你的发言里归纳）</div>'));
   }
+  if (c.decision?.reason) {
+    parts.push(ctxSection('导演决策', `<div class="ctx-line">🎬 ${esc(c.decision.reason)}（→ ${esc(c.decision.action)}）</div>`));
+  }
   // 多模态输入：上传 md/txt/docx/xlsx/图片 → 提取成素材
   parts.push(ctxSection(
     '素材上传',
@@ -1214,6 +1217,9 @@ function applyMeta(meta) {
 
 async function handleStep(r) {
   if (r.meta) applyMeta(r.meta);
+  if (r.decision?.reason) {
+    addMsg('bot', `<div class="hint decide">🎬 导演判断：${esc(r.decision.reason)}（→ ${r.decision.action}）</div>`);
+  }
   if (r.kind === 'ask') {
     setStage('clarify');
     renderAsk(r);

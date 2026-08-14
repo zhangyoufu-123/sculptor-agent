@@ -71,14 +71,33 @@ const ACTION_STAGE = {
 export async function decideNextAction(cfg, wsDir, { lastInput = '' } = {}) {
   const workspace = ws.ensureWorkspace(wsDir);
   const state = ws.readState(workspace);
+  const draftPath = path.join(workspace, 'draft.md');
+  let draftExcerpt = '';
+  if (fs.existsSync(draftPath)) {
+    try {
+      draftExcerpt = fs.readFileSync(draftPath, 'utf8').replace(/\s+/g, ' ').trim().slice(0, 600);
+    } catch {}
+  }
+  const outlineHeads = (state.outline?.sections || [])
+    .slice(0, 12)
+    .map((s) => s.heading || '')
+    .filter(Boolean)
+    .join('、');
+  const recentDecisions = (state.decisionHistory || [])
+    .slice(-4)
+    .map((d) => `${d.action}:${d.reason}`)
+    .join(' | ');
   const brief = {
     phase: state.phase || 'clarify',
     stage: state.director?.stage || '',
     hasOutline: Boolean(state.outline?.sections?.length),
     outlineConfirmed: Boolean(state.confirmed?.outlineConfirmed),
-    hasDraft: fs.existsSync(path.join(workspace, 'draft.md')),
+    hasDraft: Boolean(draftExcerpt),
     genre: state.confirmed?.genre || '',
     topic: state.confirmed?.topic || state.outline?.title || '',
+    outlineHeads: outlineHeads || '',
+    draftExcerpt: draftExcerpt || '',
+    recentDecisions: recentDecisions || '',
     lastInput,
   };
   try {
@@ -88,7 +107,7 @@ export async function decideNextAction(cfg, wsDir, { lastInput = '' } = {}) {
         {
           role: 'system',
           content:
-            '你是写作导演，负责根据当前进度与用户最新输入决定下一步动作。可选动作：ask（继续澄清/追问，仅当信息不足）、outline（生成或调整大纲）、write（逐节写作）、revise（复阅-修订已有初稿）、audit（反AI审计，找并修AI痕迹）、review（多身份评述/读者群像，让不同身份读者读稿给反馈）、restyle（按新方向重写全文）、deliver（交付）。判断原则：用户要"优化/改/润色一篇已有的文章"→优先 audit/review/restyle，不要从头 ask；没有大纲不要 write/deliver。只输出严格 JSON：{"action":"...","phase":"...","reason":"一句话"}',
+            '你是写作导演，负责根据当前进度与用户最新输入决定下一步动作。先读 draftExcerpt（已有草稿片段）和 outlineHeads（大纲节标题）再判断，并参考 recentDecisions 避免来回横跳。可选动作：ask（继续澄清/追问，仅当信息不足）、outline（生成或调整大纲）、write（逐节写作）、revise（复阅-修订已有初稿）、audit（反AI审计，找并修AI痕迹）、review（多身份评述/读者群像，让不同身份读者读稿给反馈）、restyle（按新方向重写全文）、deliver（交付）。判断原则：用户要"优化/改/润色一篇已有的文章"→优先 audit/review/restyle，不要从头 ask；没有大纲不要 write/deliver；已有草稿时优先 revise/audit/review 而不是重新 outline。只输出严格 JSON：{"action":"...","phase":"...","reason":"一句话"}',
         },
         { role: 'user', content: JSON.stringify(brief) },
       ],
@@ -232,6 +251,9 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
         phase: decision.phase || state.phase,
         ts: ws.nowIso(),
       };
+      state.decisionHistory = state.decisionHistory || [];
+      state.decisionHistory.push({ action: decision.action, reason: decision.reason, ts: ws.nowIso() });
+      if (state.decisionHistory.length > 12) state.decisionHistory = state.decisionHistory.slice(-12);
       ws.writeState(workspace, state);
       ({ state, d } = load());
     }
