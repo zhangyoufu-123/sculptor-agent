@@ -297,12 +297,10 @@ def fig_ability():
 
 
 fig_heatmap()
-fig_distance()
-comp = fig_ability()
 
 # ═══ 数学报告（markdown）═══
 lines = [
-    '# 风格向量与写作能力：严格的数学推导与真实数值',
+    '# 风格向量与风格距离：数学推导与真实数值',
     '',
     '> v0.61 · 由 `scripts/style-vectors.py` 可复现生成（匿名真人/真人模拟/通用模型/模板样本，确定性算法）。',
     '',
@@ -349,40 +347,19 @@ lines += [
     f'{len(humans)} 组真人样本彼此平均 {d_hh:.2f}；而两个通用模型之间仅 {d_ai:.2f}——AI 腔互相趋同。',
     '这说明：SCULPTOR 学到的风格落在"人类"一侧，而不是模型的平均脸。',
     '',
-    '## 5. 写作能力综合评分',
-    '',
-    '定义 5 个能力维度 $s_k \\in [0,100]$：离 AI 腔距离、人类化指标、反 AI 味、全流程协作、多文体覆盖，'
-    '综合评分：',
-    '',
-    '$$C = 0.25\\,s_1 + 0.20\\,s_2 + 0.20\\,s_3 + 0.20\\,s_4 + 0.15\\,s_5$$',
-    '',
-    '| 对象 | 离AI腔 | 人类化 | 反AI味 | 全流程 | 多文体 | 综合 C |',
-    '| --- | --- | --- | --- | --- | --- | --- |',
-]
-sc = ability_scores()
-objs = [n for n in names if n.startswith('SCULPTOR') or '通用' in n or '模板' in n]
-for n in objs:
-    row = [n] + [f'{sc[n][a]:.0f}' for a in ABILITIES] + [f'{comp[n]:.1f}']
-    lines.append('| ' + ' | '.join(row) + ' |')
-lines += [
-    '',
-    '注：SCULPTOR 的"人类化/反AI味/全流程"来自实测（24+11 套 QA、反 AI 审计真实修复案例、'
-    '人类化指标四量纲达标）；通用模型与模板的相应维度为代表性基线估计（它们没有公开的全链路写作证据）。',
-    '',
-    '## 6. 可复现性',
+    '## 5. 可复现性',
     '',
     '```bash',
     'python3 scripts/style-vectors.py',
     '```',
     '',
-    '三张图（热力网格 / 距离矩阵 / 能力对比）与本文档全部由同一脚本、同一特征函数、同一随机种子（无随机）生成。',
+    '热力网格与本文档由同一脚本、同一特征函数、同一随机种子（无随机）生成；其余数据图（距离条形 / MDS / 学习曲线 / 作者识别 / 消融）见 `scripts/gen-paper-charts.py`。',
 ]
 with open(f'{BASE}/STYLE-MATH.md', 'w', encoding='utf-8') as f:
     f.write('\n'.join(lines) + '\n')
 
-print('三图 + STYLE-MATH.md 已生成')
+print('热力网格 + STYLE-MATH.md 已生成')
 for a in names:
     for b in names:
         if a < b:
             print(f'{a} ↔ {b}: {dist[(a,b)]:.2f}')
-print('综合评分:', comp)
