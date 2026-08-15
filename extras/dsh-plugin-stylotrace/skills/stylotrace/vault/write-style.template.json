@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "0.1",
+  "style": "write",
+  "dimensions": {
+    "temperature": { "value": null, "confidence": 0, "evidence": [] },
+    "sentencePreference": { "value": null, "confidence": 0, "evidence": [] },
+    "modifierDensity": { "value": null, "confidence": 0, "evidence": [] },
+    "languageRegister": { "value": null, "confidence": 0, "evidence": [] },
+    "emotionalSpectrum": { "value": null, "confidence": 0, "evidence": [] },
+    "narrativePerspective": { "value": null, "confidence": 0, "evidence": [] },
+    "imageryTendency": { "value": null, "confidence": 0, "evidence": [] },
+    "rhythm": { "value": null, "confidence": 0, "evidence": [] },
+    "rhetoricalDevices": { "value": null, "confidence": 0, "evidence": [] },
+    "dialogueRatio": { "value": null, "confidence": 0, "evidence": [] },
+    "timeHandling": { "value": null, "confidence": 0, "evidence": [] },
+    "endingPattern": { "value": null, "confidence": 0, "evidence": [] },
+    "criticalStance": { "value": null, "confidence": 0, "evidence": [] },
+    "vocabularyCharacter": { "value": null, "confidence": 0, "evidence": [] }
+  },
+  "vector": {
+    "personalDataset": { "topAssociations": [], "topTechniques": [], "topVocabulary": [] },
+    "writingDeviation": { "notableDirections": [] },
+    "attentionFocus": {}
+  },
+  "learnedFrom": { "samples": 0, "edits": 0, "choices": 0 },
+  "lastUpdated": null,
+  "notes": ""
+}

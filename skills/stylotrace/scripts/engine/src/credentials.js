@@ -164,6 +164,64 @@ export function discoverFromOpenCode(env = process.env, home = os.homedir()) {
   return out;
 }
 
+/**
+ * 极简扁平 YAML 解析：只取顶层 `KEY: value` 映射（跳过注释、空行与缩进块）。
+ * 零依赖，仅供 DSH 凭据文件（严格 CredentialRef→string 映射）使用。
+ */
+export function parseFlatYaml(text) {
+  const map = {};
+  for (const rawLine of String(text || '').split('\n')) {
+    const line = rawLine.replace(/\s*#.*$/, '').trim();
+    if (!line || /^\s/.test(rawLine)) continue; // 空行 / 注释 / 缩进块(非顶层)
+    const m = line.match(/^([A-Za-z0-9_.-]+)\s*:\s*(.*)$/);
+    if (!m) continue;
+    let value = m[2].trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (value) map[m[1]] = value;
+  }
+  return map;
+}
+
+/**
+ * 从 DSH（DeepSeek Harness）凭据文件发现：$DSH_HOME/.credentials.yaml。
+ * 该文件是严格的 CredentialRef→string 扁平映射（如 `DEEPSEEK_API_KEY: sk-xxx`），
+ * 由 DSH 的 Models 页面/凭据层管理，权限 0600。让 Stylotrace 装在 DSH 里时
+ * 开箱即用，无需用户重复填 key。
+ */
+export function discoverFromDsh(env = process.env, home = os.homedir()) {
+  const dshHome = env.DSH_HOME || path.join(home, '.dsh');
+  let text = '';
+  try {
+    text = fs.readFileSync(path.join(dshHome, '.credentials.yaml'), 'utf8');
+  } catch {
+    return [];
+  }
+  const mapping = parseFlatYaml(text);
+  const out = [];
+  for (const c of ENV_CANDIDATES) {
+    const key = mapping[c.key];
+    if (!key) continue;
+    const baseUrl = c.key === 'DEEPSEEK_API_KEY' ? mapping.DEEPSEEK_BASE_URL || c.baseUrl : c.baseUrl;
+    const model = c.key === 'DEEPSEEK_API_KEY' ? mapping.DEEPSEEK_MODEL || c.model : c.model;
+    out.push(
+      toCandidate({
+        source: `dsh-credentials:${c.key}`,
+        provider: c.key.replace(/_API_KEY$/, '').toLowerCase(),
+        baseUrl,
+        apiKey: key,
+        model,
+        protocol: c.protocol,
+      }),
+    );
+  }
+  return out;
+}
+
 /** 汇总全部候选，OpenAI 兼容的排前，返回排序列表。 */
 export function discoverCredentials(env = process.env, { home = os.homedir() } = {}) {
   const all = [
@@ -171,12 +229,14 @@ export function discoverCredentials(env = process.env, { home = os.homedir() } =
     ...discoverFromCodex(env, home),
     ...discoverFromClaude(env, home),
     ...discoverFromOpenCode(env, home),
+    ...discoverFromDsh(env, home),
   ];
   const score = (c) => {
     let s = c.protocol === 'openai' ? 100 : 0;
     if (c.active) s += 50;
     if (c.source.startsWith('env:')) s += 30;
     if (c.source.startsWith('codex-config:')) s += 20;
+    if (c.source.startsWith('dsh-credentials:')) s += 25;
     return s;
   };
   return all.sort((a, b) => score(b) - score(a));

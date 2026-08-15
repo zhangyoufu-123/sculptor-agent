@@ -1,0 +1,15 @@
+{
+  "projectId": "",
+  "updatedAt": null,
+  "phase": "observe",
+  "summary": "正在阅读已有对话与素材",
+  "confirmed": {},
+  "materials": [],
+  "pending": [],
+  "nextStep": "整理主题、目的、读者、素材与情绪",
+  "vault": {
+    "writeStyle": "vault/write-style.json",
+    "readStyle": "vault/read-style.json",
+    "fingerprint": "vault/style-fingerprint.json"
+  }
+}

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>dsh-plugin-stylotrace client 测试夹具</title>
+<style>
+  body { font-family: system-ui; padding: 20px; background: #1e1e20; color: #eee; }
+  textarea#composer { width: 90%; height: 60px; margin: 10px 0; padding: 8px; }
+  .msg { border: 1px solid #444; border-radius: 8px; padding: 10px; margin: 8px 0; background: #2a2a2c; }
+  .msg .author { font-size: 11px; color: #999; }
+  .user-bubble { background: #333; border-radius: 8px; padding: 6px 10px; }
+</style>
+</head>
+<body>
+  <h2>fixture: 模拟 DSH web DOM</h2>
+
+  <!-- 助手消息 1:包含 synthesized 产出路径 -->
+  <div class="msg" data-time-hover-root>
+    <div class="author">assistant</div>
+    <div>产品介绍已生成: <code>synthesized/product-demo.md</code>, 实验报告: <code>synthesized/report-exp-01.docx</code></div>
+  </div>
+
+  <!-- 用户消息(不应渲染作品 chip) -->
+  <div class="msg" data-time-hover-root>
+    <div class="author">user</div>
+    <div class="user-bubble">把这段改得更口语: 上述方案已初步完成整体性验证, 后续仍需持续性迭代优化。</div>
+  </div>
+
+  <!-- 助手消息 2:无产出路径(不应出现作品行) -->
+  <div class="msg" data-time-hover-root>
+    <div class="author">assistant</div>
+    <div>好的, 已按你的风格调整。</div>
+  </div>
+
+  <!-- 输入框 -->
+  <textarea id="composer" placeholder="输入消息…"></textarea>
+
+  <!-- 预置 ModuleLoader mock:load 后立即 materialize(等价 DSH 的 lazy 执行) -->
+  <script>
+    window.__ModuleLoader__ = {
+      load(entry) {
+        window.__stylotraceBundleLoaded = entry && entry.id
+        if (entry && entry.factory) {
+          try { entry.factory(function () { throw new Error('测试环境无其他模块') }) } catch (e) {
+            window.__stylotraceFactoryError = String(e && e.message || e)
+          }
+        }
+      }
+    }
+  </script>
+  <script src="../client.js"></script>
+</body>
+</html>

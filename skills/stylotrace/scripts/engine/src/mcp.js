@@ -44,6 +44,7 @@ import {
 } from './rag.js';
 import { originalityScan } from './originality.js';
 import { runReview, renderReview } from './review.js';
+import { synthesize, SYNTHESIZE_RENDER } from './synthesize.js';
 
 const TOOLS = [
   {
@@ -452,6 +453,29 @@ const TOOLS = [
     },
   },
   {
+    name: 'synthesize',
+    description:
+      '项目/上下文自动提炼写作：从项目目录（缺省=当前目录）与对话上下文自动提炼"作者想表达的内容"，生成实验报告/产品介绍/技术综述/README/技术博客/文章——无需用户逐项交代要求；有风格档案时按作者风格成稿，不确定事实标【待核实】，LLM 不可用时确定性兜底。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        project: { type: 'string', description: '项目目录；缺省=当前目录' },
+        target: {
+          type: 'string',
+          enum: ['report', 'product', 'review', 'readme', 'blog', 'article'],
+          description: '文体；缺省 report（实验报告）',
+        },
+        topic: { type: 'string', description: '主题/意图（可选；缺省自动提炼）' },
+        format: {
+          type: 'string',
+          enum: ['md', 'docx', 'html', 'both'],
+          description: '输出格式；缺省 md',
+        },
+      },
+    },
+  },
+  {
     name: 'probe',
     description: '生态位探测：判断任务是否值得 Stylotrace 主动介入（长文写作/风格/结构/定点修改）',
     inputSchema: {
@@ -842,6 +866,16 @@ async function callTool(name, args, cfg) {
       return {
         text: `已定点修改: ${r.file}\n- ${r.quote}\n+ ${r.replacement}\n风格吸收: write ${r.writeUpdated} + read ${r.readUpdated}`,
       };
+    }
+    case 'synthesize': {
+      const w = wsDir(args, cfg);
+      const r = await synthesize(cfg, w, {
+        project: args.project || '',
+        target: args.target || 'report',
+        topic: args.topic || '',
+        format: args.format || 'md',
+      });
+      return { text: SYNTHESIZE_RENDER(r) };
     }
     case 'probe': {
       return { text: JSON.stringify(probeTask(args.text || ''), null, 2) };

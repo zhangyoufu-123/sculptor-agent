@@ -1,0 +1,22 @@
+# dsh-plugin-stylotrace bundle patch — two rows.
+#
+# Row 1 (`dsh-plugin-stylotrace/mcp`): the stylotrace MCP bridge. Wraps
+# @deepseek-ai/dsh-mcp-client and connects to the vendored Stylotrace engine
+# over stdio MCP. 40 tools become available to the model as
+# mcp__stylotrace__<name> (clarify_step / outline / write_section / redteam /
+# audience / point_edit / synthesize / rag_search / citations / ...).
+# The wrapper (mcp.js) resolves the engine path from its own install location,
+# so the patch stays static across terminals / profiles / platforms.
+#
+# Row 2 (`dsh-plugin-stylotrace`): the Node half of the web client bundle
+# (no-op apply). The browser half (client.js, via exports["./client"]) is
+# loaded by the web shell through the dsh.client manifest: selection →
+# Stylotrace-quote improve bar, and synthesized-work recognition.
+#
+# Overridable row config (see mcp.js): env (e.g. STYLOTRACE_LLM_API_KEY),
+# toolCallTimeoutMs, failOnStartupError, reconnect.
+- insert:
+    - id: stylotrace
+      name: dsh-plugin-stylotrace/mcp
+    - id: stylotrace-client
+      name: dsh-plugin-stylotrace

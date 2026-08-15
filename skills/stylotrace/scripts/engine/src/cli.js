@@ -128,6 +128,7 @@ import {
   credentialsFile,
 } from './credentials.js';
 import { runReview, renderReview } from './review.js';
+import { synthesize, SYNTHESIZE_RENDER } from './synthesize.js';
 
 const HELP = `Stylotrace Agent v0.23 — 完整写作 Agent（导演模式 · 四层复合风格向量 · 个人知识库 · 多 Agent 协作 · 多模态）
 
@@ -168,6 +169,9 @@ const HELP = `Stylotrace Agent v0.23 — 完整写作 Agent（导演模式 · �
   stylotrace doc restyle <文件> [--style 旧稿|方向] [--out out] [工作区]
                                      文档风格重写：把成品文档按作者风格重写 → md/docx/html 导出
   stylotrace quote "<原句>"             生成可粘贴的「Stylotrace 引用」块
+  stylotrace synthesize [--project 目录] [--target report|product|review|readme|blog|article] [--topic 主题] [--format md|docx|html|both] [工作区]
+                                      项目/上下文自动提炼写作：从项目与对话上下文提炼作者想表达的内容，
+                                      生成实验报告/产品介绍/技术综述/README/技术博客——无需逐项交代要求
   stylotrace hook <工作区> [payload]    宿主生命周期钩子 → 观察日志 + 压缩守卫
   stylotrace checklist <工作区>         渲染需求访谈确认清单（不消耗 LLM）
   stylotrace style [--memory 查询] [--export] [--backfill] [--extract] [工作区]
@@ -261,6 +265,20 @@ const HELP = `Stylotrace Agent v0.23 — 完整写作 Agent（导演模式 · �
   STYLOTRACE_CREDENTIALS=auto|ask|off  凭据发现模式：auto 自动采用宿主最佳候选（默认）/ ask 交互 / off 只用显式配置
 `;
 
+// 取值 flag 白名单：只有这些 flag 才消费紧随的下一个参数。
+// 其余 flag（布尔开关）永不吞参数——否则 `style --signals /tmp/ws` 会把
+// `/tmp/ws` 误当成 --signals 的值吃掉，导致工作区静默丢失。
+// 可选值 flag（export/refresh/train：可布尔可带值）保留在取值侧，
+// 这类命令的工作区请用 --workspace 显式指定。
+const VALUE_FLAGS = new Set([
+  'answers', 'append', 'author', 'authors', 'background', 'category', 'dataset',
+  'dir', 'direction', 'docx', 'engine', 'export', 'fear', 'file', 'format',
+  'genre', 'hosts', 'html', 'lang', 'latex', 'md', 'memory', 'model', 'mood',
+  'note', 'out', 'pdf', 'project', 'refresh', 'scene', 'secret', 'section',
+  'session', 'speech', 'srt', 'style', 'target', 'text', 'title', 'to', 'tone',
+  'topic', 'train', 'type', 'use', 'want', 'words', 'workspace', 'world',
+]);
+
 function parseArgs(argv) {
   const flags = {};
   const positional = [];
@@ -268,9 +286,13 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a.startsWith('--')) {
       const key = a.slice(2);
-      const val = i + 1 < argv.length && !argv[i + 1].startsWith('--') ? argv[i + 1] : true;
-      if (val !== true) i += 1;
-      flags[key] = val;
+      const consumes = VALUE_FLAGS.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith('--');
+      if (consumes) {
+        flags[key] = argv[i + 1];
+        i += 1;
+      } else {
+        flags[key] = true;
+      }
     } else positional.push(a);
   }
   return { flags, positional };
@@ -1016,7 +1038,8 @@ export async function runCli(argv, io = {}) {
         break;
       }
       case 'transform': {
-        const w = ws.resolveWorkspace(cfg, flags.workspace || '');
+        // positional[0]=预设，工作区在 positional[1]
+        const w = ws.resolveWorkspace(cfg, flags.workspace || positional[1] || '');
         const preset = positional[0];
         if (!preset || !Object.keys(PRESETS).some((k) => preset === k || preset.startsWith(k + ':'))) {
           throw new Error(`用法: stylotrace transform <预设>，可用: ${Object.keys(PRESETS).join(' / ')}（tone 可用 tone:formal）`);
@@ -1036,7 +1059,7 @@ export async function runCli(argv, io = {}) {
         break;
       }
       case 'history': {
-        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || positional[0] || ''));
         const list = listHistory(w);
         if (!list.length) {
           console.log('（还没有版本快照：write/restyle/redteam --fix/transform 会自动生成）');
@@ -1051,7 +1074,8 @@ export async function runCli(argv, io = {}) {
         break;
       }
       case 'rollback': {
-        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        // positional[0]=快照序号，工作区在 positional[1]
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || positional[1] || ''));
         const r = rollback(w, { index: Number(positional[0] || 1) });
         console.log(`已回滚到第 ${positional[0] || 1} 份快照（[${r.reason}] ${r.ts}，${r.chars} 字）→ draft.md`);
         break;
@@ -1188,14 +1212,14 @@ export async function runCli(argv, io = {}) {
         break;
       }
       case 'recommend': {
-        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || positional[0] || ''));
         const state = ws.readState(w);
         const r = recommendReadings(state, w, { sessionAsked: false });
         console.log(r || '（暂时没匹配到与你主题相近的思想库条目——再多说一点你的主题/立意试试）');
         break;
       }
       case 'academic': {
-        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''));
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || positional[0] || ''));
         const state = ws.readState(w);
         console.log('【学术论证链】（行文思路骨架）');
         console.log(academicNarrative(state));
@@ -1469,6 +1493,17 @@ export async function runCli(argv, io = {}) {
       case 'doctor':
         await doctor(cfg, { ping: Boolean(flags.ping) });
         break;
+      case 'synthesize': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        const r = await synthesize(cfg, w, {
+          project: flags.project || '',
+          target: flags.target || 'report',
+          topic: flags.topic || '',
+          format: flags.format || 'md',
+        });
+        console.log(SYNTHESIZE_RENDER(r));
+        break;
+      }
       case 'mcp':
         await runMcpServer(io);
         break;
@@ -1553,12 +1588,16 @@ export async function runCli(argv, io = {}) {
           throw new Error(
             '用法: stylotrace point-edit "<引用/原文>" "<修改指令>" [--dir 项目] [--file 文件]\n或: stylotrace point-edit "〔Stylotrace 引用〕《原句》\\n修改指令：…"',
           );
-        const r = await pointEdit(cfg, ws.resolveWorkspace(cfg, flags.workspace || ''), {
-          quote: positional[0],
-          instruction,
-          dir: flags.dir,
-          file: flags.file,
-        });
+        const r = await pointEdit(
+          cfg,
+          ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''), { create: true }),
+          {
+            quote: positional[0],
+            instruction,
+            dir: flags.dir,
+            file: flags.file,
+          },
+        );
         console.log(`已定点修改: ${r.file}`);
         console.log(`- ${r.quote}`);
         console.log(`+ ${r.replacement}`);
@@ -1569,12 +1608,16 @@ export async function runCli(argv, io = {}) {
         const instruction = positional[1] || extractInstruction(positional[0] || '');
         if (!positional[0] || !instruction)
           throw new Error('用法: stylotrace rewrite "<引用/原文>" "<修改指令>" [--dir 项目] [--file 文件]');
-        const r = await rewriteVariants(cfg, ws.resolveWorkspace(cfg, flags.workspace || ''), {
-          quote: positional[0],
-          instruction,
-          dir: flags.dir,
-          file: flags.file,
-        });
+        const r = await rewriteVariants(
+          cfg,
+          ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || ''), { create: true }),
+          {
+            quote: positional[0],
+            instruction,
+            dir: flags.dir,
+            file: flags.file,
+          },
+        );
         console.log(`「${r.quote.slice(0, 30)}」的 ${r.candidates.length} 个改写候选（未落盘）:`);
         r.candidates.forEach((c, i) => console.log(`  ${i + 1}. ${c}`));
         console.log('选定后用: stylotrace point-edit "<原句>" "<指令>" （同指令会重新生成；直接应用候选见 Web）');

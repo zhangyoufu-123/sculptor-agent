@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "0.1",
+  "style": "read",
+  "structure": {
+    "pacing": { "value": null, "confidence": 0, "evidence": [] },
+    "infoDensity": { "value": null, "confidence": 0, "evidence": [] },
+    "emotionalCurve": { "value": null, "confidence": 0, "evidence": [] },
+    "openingTaste": { "value": null, "confidence": 0, "evidence": [] },
+    "endingTaste": { "value": null, "confidence": 0, "evidence": [] },
+    "frictionTolerance": { "value": null, "confidence": 0, "evidence": [] },
+    "formatPreference": { "value": null, "confidence": 0, "evidence": [] }
+  },
+  "readerProfiles": [],
+  "learnedFrom": { "samples": 0, "edits": 0 },
+  "lastUpdated": null,
+  "notes": ""
+}

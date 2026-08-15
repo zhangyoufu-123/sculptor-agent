@@ -59,6 +59,10 @@ Stylotrace 只负责"写作"这一件事，但在这件事里它主导：问什�
 
 ## 它能写什么
 
+- **为程序员而生：项目自动提炼**（`stylotrace synthesize`）：**"我做出了东西，但不想自己写。"**
+  给它一个项目目录（缺省当前目录），它自动收集 README / docs / package.json / 最近 git 提交 /
+  对话上下文 / 你的风格档案，提炼"你真正想表达什么"，按你的文风写成——
+  **实验报告、产品介绍、技术综述、README、技术博客**；不确定事实标【待核实】，LLM 不可用自动降级。
 - **议论文、散文、演讲稿**：澄清 → 大纲 → 双风格写作 → 审计 → 读者群像，全流程自动。
 - **学术论文**：自带论证链（已知→缺口→张力→洞见→方法→证据→局限），逐节检查"论点有没有证据、
   证据有没有推理桥"，自动生成参考文献草稿。
@@ -68,6 +72,10 @@ Stylotrace 只负责"写作"这一件事，但在这件事里它主导：问什�
 - **长文、系列文**：卷级大纲分卷展示，交付沉淀"文章圣经"，续写自动保持一致。
 - **翻译与回译校验**：原意优先翻译 + 回译校验闭环（信息不丢、风格可测）。
 - **任何文体**：扩写、缩写、润色、古文风、脱敏改写；版本可回滚；导出 docx / pdf / html / 字幕 / LaTeX。
+
+> 不只是程序员：小说家、学生、自媒体、任何"要认真写"的人，它都陪你——**同一套引擎，
+> 文体与自由度都交给它自己判断，硬编码最少、AI 主导最多**（导演状态机由 LLM 自主决策下一步，
+> 人只在真正的决策点拍板）。
 
 ## 最近的关键升级
 
@@ -151,6 +159,18 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/stylotrace/main/inst
 装完在新对话里直接说"写一篇关于××的散文，要有我的风格"即可。详细使用手册见
 [docs/GUIDE.md](docs/GUIDE.md)。一键安装三个安装点（全局 skill / 项目级 skill / 开发镜像），
 目录级生效、不碰其他项目。
+
+### 装进 DeepSeek Harness（DSH 插件）
+
+```bash
+dsh plugin --profile web add dsh-plugin-stylotrace   # 39 个 MCP 写作工具
+npx stylotrace-plugin install --all                  # 技能包 → DSH / Codex / Claude Code / OpenCode
+```
+
+插件包位于 `extras/dsh-plugin-stylotrace/`，安装后 DSH Agent 立即获得
+`mcp__stylotrace__*` 全流程写作工具（澄清/大纲/写作/红队/读者群像/定点修改/风格学习），
+并自动复用 DSH 的 `$DSH_HOME/.credentials.yaml` 凭据（`STYLOTRACE_LLM_API_KEY` 显式配置永远优先）。
+详细说明见 [extras/dsh-plugin-stylotrace/README.md](extras/dsh-plugin-stylotrace/README.md)。
 
 ## 文档
 

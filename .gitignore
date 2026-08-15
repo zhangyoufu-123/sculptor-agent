@@ -33,3 +33,6 @@ docs/competition/RESEARCH-PAPER.md
 docs/competition/查新报告.md
 docs/legacy/
 docs/experiments/
+
+# 插件构建产物(发布时由 npm pack 重新生成)
+extras/dsh-plugin-stylotrace/*.tgz

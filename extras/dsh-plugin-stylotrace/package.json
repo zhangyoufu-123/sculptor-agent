@@ -1,0 +1,65 @@
+{
+  "name": "dsh-plugin-stylotrace",
+  "version": "0.1.0",
+  "description": "Stylotrace 深度协作写作 Agent 的 DeepSeek Harness 插件：40 个 MCP 写作工具 + 完整技能包。风格学习（四层向量+外层调制器）、澄清→大纲→逐节写作→红队审计→读者群像，全流程可被 DSH Agent 调用。",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./mcp": "./mcp.js",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "stylotrace-plugin": "bin/stylotrace.mjs"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "mcp.js",
+    "cordis.patch.yml",
+    "bin/",
+    "skills/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "vendor": "bash scripts/vendor.sh",
+    "test": "node test/smoke.mjs && node test/mcp-bridge.mjs && node test/browser-check.mjs"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "@deepseek-ai/dsh-mcp-client": "^0.1.0-rc.6"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness-plugin",
+    "deepseek-harness",
+    "dsh",
+    "writing",
+    "style",
+    "agent",
+    "chinese-writing",
+    "mcp"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ],
+      "platform": "web"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zhangyoufu-123/stylotrace"
+  }
+}
