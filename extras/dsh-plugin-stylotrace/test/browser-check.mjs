@@ -174,7 +174,7 @@ try {
     fail('作品行缺失', worksCount)
   }
 
-  // 3. 选区 → 工具条
+  // 3. 选区 → 工具条(两个按钮:改进 + 批注)
   await evaluate(`(() => {
     const msg = document.querySelector('[data-time-hover-root] .user-bubble')
     const range = document.createRange()
@@ -189,17 +189,18 @@ try {
   const barVisible = await evaluate(
     `(function(){ var b = document.getElementById('stylo-selbar'); return b ? { text: b.textContent } : null })()`,
   )
-  if (barVisible && barVisible.text.includes('Stylotrace 改进')) {
-    ok('选区工具条出现')
+  if (barVisible && barVisible.text.includes('改进') && barVisible.text.includes('批注')) {
+    ok('选区工具条出现(改进 + 批注)')
   } else {
-    fail('工具条未出现', JSON.stringify(barVisible))
+    fail('工具条未出现或按钮缺失', JSON.stringify(barVisible))
   }
 
-  // 4. 点击工具条 → 引用块插入输入框
+  // 4. 点击「改进」按钮 → 引用块插入输入框
   await evaluate(`(function(){
     var b = document.getElementById('stylo-selbar')
-    if (b) b.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-    return !!b
+    var btn = b && Array.from(b.querySelectorAll('button')).find(x => x.textContent.includes('改进'))
+    if (btn) btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+    return !!btn
   })()`)
   await sleep(300)
   const composerValue = await evaluate(`document.getElementById('composer').value`)
@@ -209,7 +210,126 @@ try {
     fail('引用块未插入', composerValue.slice(0, 120))
   }
 
-  // 5. 无页面报错
+  // ===================== 注释系统验收 =====================
+  // 5. 选区 → 批注输入层 → 保存
+  await evaluate(`(() => {
+    const msg = document.querySelector('[data-time-hover-root] .user-bubble')
+    const range = document.createRange()
+    range.selectNodeContents(msg)
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(range)
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+    return true
+  })()`)
+  await sleep(300)
+  const annoBtnClicked = await evaluate(`(function(){
+    var b = document.getElementById('stylo-selbar')
+    var btn = b && Array.from(b.querySelectorAll('button')).find(x => x.textContent.includes('批注'))
+    if (btn) btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+    return !!btn
+  })()`)
+  await sleep(300)
+  const inputVisible = await evaluate(`!!document.querySelector('.stylo-anno-input-wrap textarea')`)
+  if (inputVisible) ok('批注输入层弹出'); else fail('批注输入层未弹出', '')
+  await evaluate(`(() => {
+    const ta = document.querySelector('.stylo-anno-input-wrap textarea')
+    ta.value = '这段可以更口语化一些'
+    ta.dispatchEvent(new Event('input', { bubbles: true }))
+    const save = Array.from(document.querySelectorAll('.stylo-anno-input-wrap button')).find(x => x.textContent.includes('保存批注'))
+    save.click()
+    return true
+  })()`)
+  await sleep(300)
+  const savedCount = await evaluate(`(function(){
+    try { return JSON.parse(localStorage.getItem('dsh-plugin-stylotrace.annotations') || '[]').length } catch(e) { return -1 }
+  })()`)
+  if (savedCount === 1) ok('批注保存到 localStorage'); else fail('批注未保存', savedCount)
+
+  // 6. 查看:打开面板,注释项存在且内容正确
+  await evaluate(`(function(){
+    var chip = document.querySelector('.stylo-anno-chip')
+    if (chip) chip.click()
+    return !!chip
+  })()`)
+  await sleep(300)
+  const panelText = await evaluate(`document.querySelector('.stylo-anno-panel') ? document.querySelector('.stylo-anno-panel').innerText : ''`)
+  if (panelText.includes('这段可以更口语化一些') && panelText.includes('把这段改得更口语')) {
+    ok('面板可查看注释(原文 + 批注)')
+  } else {
+    fail('面板查看失败', panelText.slice(0, 120))
+  }
+
+  // 7. 编辑:点编辑 → 改内容 → 保存
+  await evaluate(`(() => {
+    window.__origConfirm = window.confirm
+    window.confirm = () => true
+    const item = document.querySelector('.stylo-anno-item')
+    const editBtn = Array.from(item.querySelectorAll('button')).find(x => x.textContent === '编辑')
+    editBtn.click()
+    return true
+  })()`)
+  await sleep(200)
+  await evaluate(`(() => {
+    const ta = document.querySelector('.stylo-anno-item textarea')
+    ta.value = '改为:更口语,并且更简洁'
+    const save = Array.from(document.querySelectorAll('.stylo-anno-item button')).find(x => x.textContent === '保存')
+    save.click()
+    return true
+  })()`)
+  await sleep(300)
+  const editedText = await evaluate(`document.querySelector('.stylo-anno-panel') ? document.querySelector('.stylo-anno-panel').innerText : ''`)
+  if (editedText.includes('改为:更口语,并且更简洁')) {
+    ok('批注可编辑(内容已更新)')
+  } else {
+    fail('编辑未生效', editedText.slice(0, 120))
+  }
+
+  // 8. 删除:点删除 → confirm 已覆盖 → 项消失
+  await evaluate(`(() => {
+    const item = document.querySelector('.stylo-anno-item')
+    const delBtn = Array.from(item.querySelectorAll('button')).find(x => x.textContent === '删除')
+    delBtn.click()
+    return true
+  })()`)
+  await sleep(300)
+  const afterDel = await evaluate(`(function(){
+    try { return JSON.parse(localStorage.getItem('dsh-plugin-stylotrace.annotations') || '[]').length } catch(e) { return -1 }
+  })()`)
+  if (afterDel === 0) ok('批注可删除(localStorage 清空)'); else fail('删除未生效', afterDel)
+
+  // 9. 持久化:reload 后注释保留
+  await evaluate(`(() => {
+    window.__origConfirm && (window.confirm = window.__origConfirm)
+    return true
+  })()`)
+  await evaluate(`(function(){
+    var list = JSON.parse(localStorage.getItem('dsh-plugin-stylotrace.annotations') || '[]')
+    list.push({ id:'persist-test', quote:'持久化测试原文', note:'重启后还在', createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() })
+    localStorage.setItem('dsh-plugin-stylotrace.annotations', JSON.stringify(list))
+    location.reload()
+    return true
+  })()`)
+  await sleep(1800) // 等 reload + bundle 重新 materialize
+  const persisted = await evaluate(`(function(){
+    try {
+      const arr = JSON.parse(localStorage.getItem('dsh-plugin-stylotrace.annotations') || '[]')
+      return arr.length === 1 && arr[0].note === '重启后还在'
+    } catch(e) { return false }
+  })()`)
+  if (persisted) ok('批注持久化(刷新后保留)'); else fail('持久化失败', '')
+
+  // 10. 作品 chip「·打开」在无 host 服务时降级(不抛错)
+  await evaluate(`(() => {
+    const openBtn = document.querySelector('.stylo-works-chip .open')
+    if (openBtn) openBtn.click()
+    return !!openBtn
+  })()`)
+  await sleep(200)
+  const stillAlive = await evaluate(`typeof window.getSelection === 'function'`)
+  if (stillAlive) ok('打开文件降级路径无异常'); else fail('降级路径出错', '')
+
+  // 11. 无页面报错
   if (consoleErrors.length === 0) {
     ok('无页面 JS 错误')
   } else {

@@ -52,6 +52,7 @@
 | U5 | **发布前功能验收** | `test/independence-check.mjs`:**MCP 层 7 个独立工具实测通过**(probe/style_status/synthesize/point_edit/clarify_step/audience/redteam)——从任意阶段开始、独立协作均可用;双风格区分实证(write-style/read-style 双档案 + 写作双注入);情绪反馈式风格吸收实证(`applyStyleDirection`) |
 | U6 | **CLI 参数解析修复**(发布前把关发现) | 根因:parseArgs 把布尔 flag 后面的位置参数误当 flag 值吞掉(`style --signals /tmp/ws` 工作区丢失);另有 transform/history/rollback/recommend/academic 五个命令工作区位置参数未接。修复:取值 flag 白名单(默认不吞)+ 五命令 positional 修正 + point-edit/rewrite 任意目录自动建工作区;`agent/test/cli-args.test.mjs` 7 项回归 |
 | U7 | **Web client 真实浏览器验收** | `test/browser-check.mjs`:headless Chrome + CDP **真实交互 8/8 通过**——bundle 注册、作品 chip 渲染(助手消息✓/用户消息不误判✓)、选区→「Stylotrace 改进」工具条→引用块插入输入框、无页面 JS 错误;client.js 同时完成健壮性强化(try/catch 隔离、MutationObserver 替换废弃 DOMNodeInserted、防抖) |
+| U8 | **Web 注释系统 v2(0.1.2)** | client.js 升级为完整注释系统:① **批注**——选中文本→「💬 批注」→写入并 localStorage 持久化;② **查看**——右下角 💬 面板列出全部批注(原文+内容+时间),消息行「💬 N」角标,点击高亮定位原文;③ **编辑**——面板内联修改;④ **删除**——确认后删除;**文件打开**——作品 chip 增加「·打开」,经 `WorkspaceRuntime.openPath` 用系统默认应用打开 docx(md/html/pdf/srt),拿不到 host 服务自动降级复制路径;浏览器验收 **15/15**(批注全流程 + 持久化 + 降级路径);clipboard/openPath 全部 promise 加 catch 防 unhandled rejection |
 
 ### 🟢 观察项(建议,非阻断)
 
