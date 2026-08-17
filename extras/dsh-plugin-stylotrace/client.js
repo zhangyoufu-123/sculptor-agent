@@ -101,6 +101,24 @@ window.__ModuleLoader__.load({
           '  font: 12px var(--dsw-font-family, system-ui); cursor: pointer; }',
           '.stylo-works-chip:hover { filter: brightness(1.15); }',
           '.stylo-works-chip .open { color: #7C3AED; }',
+          '.stylo-works-chip .prev { color: #22c55e; }',
+          '.stylo-preview { position: fixed; z-index: 1330; left: 50%; top: 50%; transform: translate(-50%,-50%);',
+          '  width: min(720px, 92vw); height: min(72vh, 640px); display: flex; flex-direction: column;',
+          '  border-radius: 12px; border: 1px solid var(--dsw-alias-border-inverted, #555);',
+          '  background: var(--dsw-specific-menu, #1f1f23); box-shadow: var(--dsw-shadow-lv3, 0 12px 40px rgba(0,0,0,.5));',
+          '  font: 13px var(--dsw-font-family, system-ui); color: var(--dsw-text-strong, #eee); overflow: hidden; }',
+          '.stylo-preview-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px;',
+          '  border-bottom: 1px solid var(--dsw-alias-border-inverted, #444); background: rgba(255,255,255,.04); }',
+          '.stylo-preview-head .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+          '.stylo-preview-head .name small { color: var(--dsw-text-weak, #999); font-weight: 400; margin-left: 8px; }',
+          '.stylo-preview-head button { all: unset; cursor: pointer; font-size: 15px; padding: 0 4px; }',
+          '.stylo-preview-body { flex: 1; overflow: auto; padding: 12px 14px; }',
+          '.stylo-preview-body pre { margin: 0; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;',
+          '  white-space: pre-wrap; word-break: break-all; color: var(--dsw-text-strong, #eee); }',
+          '.stylo-preview-binary { padding: 24px; text-align: center; color: var(--dsw-text-weak, #aaa); }',
+          '.stylo-preview-binary button { all: unset; cursor: pointer; margin-top: 12px; padding: 6px 16px;',
+          '  border-radius: 8px; background: #7C3AED; color: #fff; font-size: 13px; }',
+          '.stylo-preview-loading { padding: 24px; text-align: center; color: var(--dsw-text-weak, #999); }',
           '.stylo-highlight { outline: 2px solid #7C3AED; outline-offset: 2px; border-radius: 4px; }',
         ].join('\n')
         document.head.appendChild(style)
@@ -186,6 +204,67 @@ window.__ModuleLoader__.load({
         } else {
           toast('路径: ' + p)
         }
+      }
+
+      // ============================== 文件内嵌预览(Codex 式) ==============================
+      // 通过 Node 半区注册的 /stylotrace/file 路由读取文件内容，在 web 内渲染。
+      var preview = null
+
+      function closePreview() {
+        if (preview) { preview.remove(); preview = null }
+      }
+
+      function openPreview(p, label) {
+        closePreview()
+        preview = document.createElement('div')
+        preview.className = 'stylo-preview'
+        preview.innerHTML =
+          '<div class="stylo-preview-head"><span class="name"></span><button title="关闭">✕</button></div>' +
+          '<div class="stylo-preview-loading">正在读取…</div>'
+        var head = preview.querySelector('.stylo-preview-head')
+        head.querySelector('.name').textContent = label || '文件预览'
+        head.querySelector('button').addEventListener('click', closePreview)
+        var body = preview.querySelector('.stylo-preview-loading')
+        body.className = 'stylo-preview-body'
+        body.innerHTML = '<div class="stylo-preview-loading">正在读取…</div>'
+        document.body.appendChild(preview)
+
+        safe(function () {
+          var url = '/stylotrace/file?path=' + encodeURIComponent(String(p))
+          fetch(url)
+            .then(function (r) { return r.json() })
+            .then(function (data) {
+              if (!preview) return
+              if (!data || !data.ok) {
+                body.innerHTML = '<div class="stylo-preview-binary">读取失败：' + ((data && data.error) || '未知错误') +
+                  '<br><button>用系统应用打开</button></div>'
+                bindBinaryOpen(body, p, label)
+                return
+              }
+              if (data.kind === 'text') {
+                head.querySelector('.name').textContent = label || data.name
+                var pre = document.createElement('pre')
+                pre.textContent = data.content || '（空文件）'
+                body.innerHTML = ''
+                body.appendChild(pre)
+              } else {
+                body.innerHTML = '<div class="stylo-preview-binary">' + (data.hint || '二进制文件') +
+                  '<br><button>用系统应用打开</button></div>'
+                bindBinaryOpen(body, p, label)
+              }
+            })
+            .catch(function (e) {
+              if (!preview) return
+              body.innerHTML = '<div class="stylo-preview-binary">预览服务不可用（' + (e && e.message || e) + '）' +
+                '<br><button>用系统应用打开</button></div>'
+              bindBinaryOpen(body, p, label)
+            })
+        })
+      }
+
+      function bindBinaryOpen(container, p, label) {
+        var btn = container.querySelector('button')
+        if (btn) btn.addEventListener('click', function () { openPathWithFallback(p, label || String(p).split('/').pop()) })
       }
 
       // ============================== 注释系统 ==============================
@@ -542,8 +621,15 @@ window.__ModuleLoader__.load({
           var chip = document.createElement('span')
           chip.className = 'stylo-works-chip'
           chip.textContent = '📄 ' + String(p).split('/').pop()
-          chip.title = p + '（点击复制路径；·打开 用系统应用打开）'
+          chip.title = p + '（点击复制路径；·预览 在 web 内查看；·打开 用系统应用打开）'
           chip.addEventListener('click', function () { copyPath(p) })
+          var prevBtn = document.createElement('span')
+          prevBtn.className = 'prev'
+          prevBtn.textContent = '·预览'
+          prevBtn.addEventListener('click', function (e) {
+            e.stopPropagation()
+            openPreview(p, String(p).split('/').pop())
+          })
           var openBtn = document.createElement('span')
           openBtn.className = 'open'
           openBtn.textContent = '·打开'
@@ -551,6 +637,7 @@ window.__ModuleLoader__.load({
             e.stopPropagation()
             openPathWithFallback(p, String(p).split('/').pop())
           })
+          chip.appendChild(prevBtn)
           chip.appendChild(openBtn)
           row.appendChild(chip)
         })

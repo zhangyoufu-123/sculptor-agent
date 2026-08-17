@@ -329,7 +329,72 @@ try {
   const stillAlive = await evaluate(`typeof window.getSelection === 'function'`)
   if (stillAlive) ok('打开文件降级路径无异常'); else fail('降级路径出错', '')
 
-  // 11. 无页面报错
+  // ===================== 文件内嵌预览(Codex 式) =====================
+  // 11. mock fetch → 文本文件预览渲染
+  await evaluate(`(() => {
+    window.__origFetch = window.fetch
+    window.fetch = (url) => Promise.resolve({ json: () => Promise.resolve({
+      ok: true, name: 'product-demo.md', path: '/w/product-demo.md',
+      content: '# 产品介绍\\n这是预览内容示例。', kind: 'text'
+    }) })
+    return true
+  })()`)
+  await evaluate(`(() => {
+    const prevBtn = document.querySelector('.stylo-works-chip .prev')
+    if (prevBtn) prevBtn.click()
+    return !!prevBtn
+  })()`)
+  await sleep(400)
+  const previewText = await evaluate(`document.querySelector('.stylo-preview') ? document.querySelector('.stylo-preview').innerText : ''`)
+  if (previewText.includes('这是预览内容示例') && previewText.includes('product-demo.md')) {
+    ok('文件内嵌预览：文本内容渲染')
+  } else {
+    fail('预览渲染失败', previewText.slice(0, 120))
+  }
+  await evaluate(`(() => { const c = document.querySelector('.stylo-preview-head button'); if (c) c.click(); return true })()`)
+
+  // 12. binary 文件 → 提示 + 系统打开按钮
+  await evaluate(`(() => {
+    window.fetch = (url) => Promise.resolve({ json: () => Promise.resolve({
+      ok: true, name: 'report.docx', path: '/w/report.docx', binary: true,
+      hint: 'Word 文档（点击"系统打开"用 Word 打开）'
+    }) })
+    return true
+  })()`)
+  await evaluate(`(() => {
+    const prevBtn = document.querySelector('.stylo-works-chip .prev')
+    if (prevBtn) prevBtn.click()
+    return !!prevBtn
+  })()`)
+  await sleep(400)
+  const binaryText = await evaluate(`document.querySelector('.stylo-preview') ? document.querySelector('.stylo-preview').innerText : ''`)
+  if (binaryText.includes('Word 文档') && binaryText.includes('系统打开')) {
+    ok('二进制文件：显示提示 + 系统打开按钮')
+  } else {
+    fail('二进制预览失败', binaryText.slice(0, 120))
+  }
+  await evaluate(`(() => { const c = document.querySelector('.stylo-preview-head button'); if (c) c.click(); return true })()`)
+
+  // 13. fetch 失败 → 降级"系统打开"按钮,不抛错
+  await evaluate(`(() => {
+    window.fetch = (url) => Promise.reject(new Error('preview unavailable'))
+    return true
+  })()`)
+  await evaluate(`(() => {
+    const prevBtn = document.querySelector('.stylo-works-chip .prev')
+    if (prevBtn) prevBtn.click()
+    return !!prevBtn
+  })()`)
+  await sleep(400)
+  const failText = await evaluate(`document.querySelector('.stylo-preview') ? document.querySelector('.stylo-preview').innerText : ''`)
+  if (failText.includes('预览服务不可用') && failText.includes('用系统应用打开')) {
+    ok('预览服务不可用：优雅降级')
+  } else {
+    fail('降级失败', failText.slice(0, 120))
+  }
+  await evaluate(`(() => { const c = document.querySelector('.stylo-preview-head button'); if (c) c.click(); window.fetch = window.__origFetch; return true })()`)
+
+  // 14. 无页面报错
   if (consoleErrors.length === 0) {
     ok('无页面 JS 错误')
   } else {
