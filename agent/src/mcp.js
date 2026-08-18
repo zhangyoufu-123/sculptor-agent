@@ -3,12 +3,13 @@
 import readline from 'node:readline';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.js';
 import * as ws from './workspace.js';
 import { clarifyStep } from './clarify.js';
 import { generateOutline } from './outline.js';
 import { writeSection } from './write.js';
-import { redteam } from './redteam.js';
+import { redteam, diagnoseText } from './redteam.js';
 import { dissect } from './dissect.js';
 import { pointEdit } from './point-edit.js';
 import { probeTask } from './observer.js';
@@ -46,6 +47,16 @@ import { originalityScan } from './originality.js';
 import { runReview, renderReview } from './review.js';
 import { synthesize, SYNTHESIZE_RENDER } from './synthesize.js';
 import { polishLoop, POLISH_RENDER } from './polish.js';
+
+// 引擎版本：统一读 package.json（避免 doctor/version/MCP 握手版本不一致）。
+const ENGINE_VERSION = (() => {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'));
+    return pkg.version || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+})();
 
 const TOOLS = [
   {
@@ -507,6 +518,18 @@ const TOOLS = [
     },
   },
   {
+    name: 'diagnose_sentence',
+    description:
+      '单句/短文本 AI 味诊断（确定性、毫秒级、零 LLM）：检测套话/排比/句式/人类化指数，输出"哪里像 AI 味"的人话结论——供选中一句时快速定位问题。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: '要诊断的句子/文本' },
+      },
+      required: ['text'],
+    },
+  },
+  {
     name: 'probe',
     description: '生态位探测：判断任务是否值得 Stylotrace 主动介入（长文写作/风格/结构/定点修改）',
     inputSchema: {
@@ -935,6 +958,10 @@ async function callTool(name, args, cfg) {
     case 'probe': {
       return { text: JSON.stringify(probeTask(args.text || ''), null, 2) };
     }
+    case 'diagnose_sentence': {
+      const d = diagnoseText(args.text || '');
+      return { text: d.verdict + (d.issues.length ? '\n详情: ' + d.issues.join(' | ') : '') };
+    }
     default:
       throw new Error(`未知工具: ${name}`);
   }
@@ -953,7 +980,7 @@ export async function runMcpServer({ input = process.stdin, output = process.std
         result: {
           protocolVersion: '2025-03-26',
           capabilities: { tools: {} },
-          serverInfo: { name: 'stylotrace', version: '0.23.0' },
+          serverInfo: { name: 'stylotrace', version: ENGINE_VERSION },
         },
       });
     } else if (

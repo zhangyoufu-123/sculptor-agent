@@ -23,7 +23,7 @@
 dsh plugin --profile web add dsh-plugin-stylotrace
 ```
 
-安装后**重启** `dsh --profile web`,40 个写作工具以 `mcp__stylotrace__*` 出现在模型面前。
+安装后**重启** `dsh --profile web`,43 个写作工具以 `mcp__stylotrace__*` 出现在模型面前。
 
 > 支持任意 profile:把 `web` 换成 `headless` 或其他自定义 profile 即可。
 
@@ -34,13 +34,13 @@ npx stylotrace-plugin install --all      # DSH / ~/.agents / Codex / Claude Code
 npx stylotrace-plugin doctor             # 自检:MCP 握手 + 工具面清单
 ```
 
-技能包给模型完整工作流认知,MCP 桥给模型 41 个原子工具。**两者都装,体验最完整。**
+技能包给模型完整工作流认知,MCP 桥给模型 43 个原子工具。**两者都装,体验最完整。**
 
 ---
 
 ## 你会得到什么
 
-### 41 个 MCP 工具(全部可被 DSH Agent 直接调用)
+### 43 个 MCP 工具(全部可被 DSH Agent 直接调用)
 
 | 阶段 | 工具 |
 |---|---|

@@ -3,7 +3,7 @@
 > 提交地址:https://github.com/awesome-dsh-plugin/awesome-dsh-plugin
 > 标题建议:**Add Stylotrace: first writing-agent plugin (writing & style)**
 > 前置条件(已满足):仓库子包 `extras/dsh-plugin-stylotrace` 声明 `dsh.bundle` manifest;
-> 代码真实可用(40 个 MCP 工具实测注册 + Web client 增强);活跃维护;记得给主仓库打 `dsh-plugin` topic。
+> 代码真实可用(43 个 MCP 工具实测注册 + Web client 增强);活跃维护;记得给主仓库打 `dsh-plugin` topic。
 
 ## PR 描述(直接粘贴到 PR body)
 
@@ -20,7 +20,7 @@ section-by-section writing → red-team audit → 8-reader gallery → delivery 
 For developers, `synthesize` auto-extracts a project (README/docs/package.json/git
 log + conversation context + style profile) into a lab report / product intro /
 tech survey / README / blog post — no step-by-step prompting needed.
-As a DSH bundle it exposes 40 MCP tools (`mcp__stylotrace__*`: clarify_step,
+As a DSH bundle it exposes 43 MCP tools (`mcp__stylotrace__*`: clarify_step,
 outline, write_section, synthesize, redteam, audience, point_edit, rag_search,
 citations, …) through the official `@deepseek-ai/dsh-mcp-client`, ships the full
 skill bundle (zero-dependency Node engine) installable into DSH / ~/.agents /
@@ -44,7 +44,7 @@ README.md (English):
 ```markdown
 ### Writing & Style
 
-- [zhangyoufu-123/stylotrace](https://github.com/zhangyoufu-123/stylotrace) - Deep-collaboration writing agent (npm: `dsh-plugin-stylotrace`): 40 MCP writing tools with per-user style learning from your edits; auto-extracts a project into reports/articles via `synthesize`; ships a cross-host skill plus web selection-improve UI.
+- [zhangyoufu-123/stylotrace](https://github.com/zhangyoufu-123/stylotrace) - Deep-collaboration writing agent (npm: `dsh-plugin-stylotrace`): 43 MCP writing tools with per-user style learning from your edits; auto-extracts a project into reports/articles via `synthesize`; ships a cross-host skill plus web selection-improve UI.
 ```
 
 README.zh.md (中文):
@@ -52,7 +52,7 @@ README.zh.md (中文):
 ```markdown
 ### Writing & Style
 
-- [zhangyoufu-123/stylotrace](https://github.com/zhangyoufu-123/stylotrace) — 深度协作写作 Agent（npm 包：`dsh-plugin-stylotrace`）：40 个 MCP 写作工具，从你的亲手修改学习个人文风；`synthesize` 自动把项目提炼成报告/文章；附带跨宿主技能包与 Web 端选中改进。
+- [zhangyoufu-123/stylotrace](https://github.com/zhangyoufu-123/stylotrace) — 深度协作写作 Agent（npm 包：`dsh-plugin-stylotrace`）：43 个 MCP 写作工具，从你的亲手修改学习个人文风；`synthesize` 自动把项目提炼成报告/文章；附带跨宿主技能包与 Web 端选中改进。
 ```
 ```
 

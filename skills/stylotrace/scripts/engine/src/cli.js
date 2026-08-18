@@ -10,7 +10,7 @@ import * as ws from './workspace.js';
 import { clarifyOnce, clarifyInteractive } from './clarify.js';
 import { generateOutline } from './outline.js';
 import { writeSection } from './write.js';
-import { redteam, audit } from './redteam.js';
+import { redteam, audit, diagnoseText } from './redteam.js';
 import { dissect } from './dissect.js';
 import { runMcpServer } from './mcp.js';
 import { runSetup } from './setup.js';
@@ -1508,6 +1508,15 @@ export async function runCli(argv, io = {}) {
         const w = ws.resolveWorkspace(cfg, workspace);
         const fp = ws.refreshFingerprint(w);
         console.log(`风格指纹已刷新: ${fp.highConfidenceDimensions.length} 个高置信度维度`);
+        break;
+      }
+      case 'diagnose-sentence': {
+        // 用法: stylotrace diagnose-sentence "句子" 或 --text "句子"(单句 AI 味诊断,确定性)
+        const text = flags.text || positional.join(' ') || '';
+        if (!text) throw new Error('用法: stylotrace diagnose-sentence "要诊断的句子" 或 --text "..."');
+        const d = diagnoseText(text);
+        console.log(d.verdict);
+        if (d.issues.length) console.log('  详情: ' + d.issues.join(' | '));
         break;
       }
       case 'doctor':

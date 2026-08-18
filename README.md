@@ -20,7 +20,7 @@
 
 > 装进 DeepSeek Harness（DSH）只需一条命令：
 > ```bash
-> dsh plugin --profile web add dsh-plugin-stylotrace   # 41 个 MCP 写作工具
+> dsh plugin --profile web add dsh-plugin-stylotrace   # 43 个 MCP 写作工具
 > ```
 > 装进 Codex / Claude Code / OpenCode / Cursor / Windsurf 见下方「安装」。
 
@@ -183,7 +183,7 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/stylotrace/main/inst
 ### 装进 DeepSeek Harness（DSH 插件）
 
 ```bash
-dsh plugin --profile web add dsh-plugin-stylotrace   # 41 个 MCP 写作工具
+dsh plugin --profile web add dsh-plugin-stylotrace   # 43 个 MCP 写作工具
 npx stylotrace-plugin install --all                  # 技能包 → DSH / Codex / Claude Code / OpenCode
 ```
 

@@ -131,6 +131,75 @@
         "不夸大苦难，也不回避苦难",
         "原文请自查（近现代作家，此处仅风格特征描述）"
       ]
+    },
+    {
+      "id": "hemingway",
+      "name": "海明威",
+      "tagline": "冰山理论、短句克制、少形容词",
+      "dims": {
+        "temperature": "冷静克制，情感藏在动作与对话后（冰山理论：只露八分之一）",
+        "sentencePreference": "短句为主，简单句与并列句（and），少从句",
+        "imageryTendency": "具体名词与动作：河流、枪、雨、酒，白描不铺陈",
+        "languageRegister": "口语化，简洁，避免抽象与修饰",
+        "criticalStance": "不评说，只呈现——让读者自己体会",
+        "endingPattern": "戛然而止，留白，不点破",
+        "vocabularyCharacter": "少形容词少副词；多用 and 并列；对话简短有力"
+      },
+      "anchors": [
+        "But man is not made for defeat. A man can be destroyed but not defeated.",
+        "The world breaks everyone and afterward many are strong at the broken places."
+      ],
+      "forbidden": [
+        "不堆砌形容词与华丽辞藻",
+        "不替读者总结感受，只写事实与动作",
+        "不写冗长从句与抽象说理"
+      ]
+    },
+    {
+      "id": "orwell",
+      "name": "奥威尔",
+      "tagline": "清晰直白、反对陈词滥调、政治清醒",
+      "dims": {
+        "temperature": "冷静清醒，克制而坚定",
+        "sentencePreference": "平实中长句，逻辑清晰，不炫技",
+        "imageryTendency": "具体、可验证的细节，避免空洞比喻",
+        "languageRegister": "清晰直白的书面语，拒绝套话与陈词滥调",
+        "criticalStance": "立场明确，直面权力与不公，不回避",
+        "endingPattern": "结论明确，掷地有声",
+        "vocabularyCharacter": "用短词、主动语态、具体词；不用 jargon 与 cliché"
+      },
+      "anchors": [
+        "Political language is designed to make lies sound truthful and murder respectable.",
+        "In a time of deceit, telling the truth is a revolutionary act."
+      ],
+      "forbidden": [
+        "不用陈词滥调与空洞套话",
+        "不用被动语态堆砌、不用大词空词",
+        "不回避立场，不和稀泥"
+      ]
+    },
+    {
+      "id": "twain",
+      "name": "马克·吐温",
+      "tagline": "幽默讽刺、口语鲜活、夸张机智",
+      "dims": {
+        "temperature": "轻松诙谐，讽刺而不刻薄",
+        "sentencePreference": "口语短句，节奏活泼，对话鲜活",
+        "imageryTendency": "夸张的具体场景，市井与河畔生活",
+        "languageRegister": "地道口语、方言色彩、机智反讽",
+        "criticalStance": "以幽默讽刺世态，嬉笑中见批判",
+        "endingPattern": "出人意料的幽默或反讽收尾",
+        "vocabularyCharacter": "俗语、夸张、双关；不说教，用故事讲理"
+      },
+      "anchors": [
+        "The reports of my death are greatly exaggerated.",
+        "Get your facts first, then you can distort them as much as you please."
+      ],
+      "forbidden": [
+        "不说教、不端着",
+        "不用书面八股腔，要口语鲜活",
+        "不写无幽默的平铺直叙"
+      ]
     }
   ]
 }

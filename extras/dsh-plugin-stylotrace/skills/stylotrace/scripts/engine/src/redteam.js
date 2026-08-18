@@ -439,6 +439,24 @@ export function audit(text, opts = {}) {
   return report;
 }
 
+/**
+ * 单句/短文本 AI 味诊断（确定性，毫秒级，零 LLM）。
+ * 复用 audit 的套话/排比/句式/人类化指数，输出人话结论——
+ * 供"选中一句 → 智能诊断哪里像 AI 味"使用。
+ */
+export function diagnoseText(text) {
+  const report = audit(text);
+  const issues = [];
+  for (const h of report.blacklistHits.slice(0, 4)) issues.push(`套话「${h.phrase}」`);
+  for (const p of report.repeatedPatterns.slice(0, 2)) issues.push(`句式「${p.pattern}」×${p.count}`);
+  for (const m of report.repeatedMetaphors.slice(0, 2)) issues.push(`重复比喻「${m.vehicle}」`);
+  for (const s of (report.structuralSignals || []).slice(0, 2)) issues.push(s);
+  const verdict = issues.length
+    ? `AI 味偏重（人类化指数 ${report.humanizationScore}/100）：${issues.join('；')}`
+    : `较自然（人类化指数 ${report.humanizationScore}/100），无明显套话/排比痕迹`;
+  return { verdict, humanizationScore: report.humanizationScore, issues, metrics: report.metrics, report };
+}
+
 function collectIssues(report) {
   const issues = [];
   for (const h of report.blacklistHits) issues.push(`黑名单「${h.phrase}」`);
