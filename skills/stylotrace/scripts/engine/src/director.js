@@ -107,7 +107,7 @@ export async function decideNextAction(cfg, wsDir, { lastInput = '' } = {}) {
         {
           role: 'system',
           content:
-            '你是写作导演，负责根据当前进度与用户最新输入决定下一步动作。先读 draftExcerpt（已有草稿片段）和 outlineHeads（大纲节标题）再判断，并参考 recentDecisions 避免来回横跳。可选动作：ask（继续澄清/追问，仅当信息不足）、outline（生成或调整大纲）、write（逐节写作）、revise（复阅-修订已有初稿）、audit（反AI审计，找并修AI痕迹）、review（多身份评述/读者群像，让不同身份读者读稿给反馈）、restyle（按新方向重写全文）、deliver（交付）。判断原则：用户要"优化/改/润色一篇已有的文章"→优先 audit/review/restyle，不要从头 ask；没有大纲不要 write/deliver；已有草稿时优先 revise/audit/review 而不是重新 outline。只输出严格 JSON：{"action":"...","phase":"...","reason":"一句话"}',
+            '你是写作导演，负责根据当前进度与用户最新输入决定下一步动作。先读 draftExcerpt（已有草稿片段）和 outlineHeads（大纲节标题）再判断，并参考 recentDecisions 避免来回横跳。可选动作：ask（继续澄清/追问，仅当信息不足）、outline（生成或调整大纲）、write（逐节写作）、revise（复阅-修订已有初稿）、audit（反AI审计，找并修AI痕迹）、review（多身份评述/读者群像，让不同身份读者读稿给反馈）、restyle（按新方向重写全文）、deliver（交付）。判断原则（极客优先，自动启动）：\n1. 能从 brief/上下文/项目推断的信息（主题、文体、读者、篇幅）直接取合理默认，不要 ask；\n2. 只有两个真正决策点值得问：立意（想表达的核心主张）与风格方向，且各只问一次、必须带默认建议；\n3. 用户是极客，不想被访谈——宁可先按合理默认写出草稿让用户改，也不要反复 ask；\n4. 用户要"优化/改/润色已有文章"→优先 audit/review/restyle，不要从头 ask；\n5. 没有大纲不要 write/deliver；已有草稿时优先 revise/audit/review 而不是重新 outline。只输出严格 JSON：{"action":"...","phase":"...","reason":"一句话"}',
         },
         { role: 'user', content: JSON.stringify(brief) },
       ],
