@@ -316,7 +316,7 @@ export const RESTYLE_PROMPT = (
 【本节】${ctx.heading}（功能：${ctx.function}${ctx.thesis ? `；论点：${ctx.thesis}` : ''}）
 【目标字数】约 ${ctx.words} 字（中文字符，±15%）
 【新风格方向】${ctx.direction}
-${ctx.writeStyle ? `【写作风格档案】${ctx.writeStyle}` : ''}
+${ctx.stylePreset ? `${ctx.stylePreset}\n` : ''}${ctx.writeStyle ? `【写作风格档案】${ctx.writeStyle}` : ''}
 ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
 ${ctx.genreBrief ? `【文体范式（公式化内容按此产出）】\n${ctx.genreBrief}` : ''}
 ${ctx.personalSkill ? `【这类文体你个人的写法（蒸馏自你的旧作）】\n${ctx.personalSkill}` : ''}

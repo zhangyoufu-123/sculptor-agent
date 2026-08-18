@@ -130,6 +130,7 @@ import {
 import { runReview, renderReview } from './review.js';
 import { synthesize, SYNTHESIZE_RENDER } from './synthesize.js';
 import { polishLoop, POLISH_RENDER } from './polish.js';
+import { listPresets, viewPreset, PRESET_LIST_RENDER, PRESET_VIEW_RENDER } from './preset.js';
 
 const HELP = `Stylotrace Agent v0.23 — 完整写作 Agent（导演模式 · 四层复合风格向量 · 个人知识库 · 多 Agent 协作 · 多模态）
 
@@ -176,6 +177,8 @@ const HELP = `Stylotrace Agent v0.23 — 完整写作 Agent（导演模式 · �
   stylotrace polish [--rounds 3] [--threshold 60] [--force] [工作区]
                                       质量自动循环：审计 draft 的人类化指数+红队，不达标按你的风格
                                       自动人性化重写并复检，最多 N 轮——分数说了算，循环自动收敛
+  stylotrace preset list|view <id>    内置名家风格预设：鲁迅/老舍/朱自清/徐志摩/郁达夫/史铁生
+                                      开箱即用；restyle --direction "学鲁迅" 即可按名家风格改写
   stylotrace hook <工作区> [payload]    宿主生命周期钩子 → 观察日志 + 压缩守卫
   stylotrace checklist <工作区>         渲染需求访谈确认清单（不消耗 LLM）
   stylotrace style [--memory 查询] [--export] [--backfill] [--extract] [工作区]
@@ -1516,6 +1519,21 @@ export async function runCli(argv, io = {}) {
           force: Boolean(flags.force),
         });
         console.log(POLISH_RENDER(r));
+        break;
+      }
+      case 'preset': {
+        const sub = positional[0] || 'list';
+        if (sub === 'list') {
+          console.log('内置名家风格预设（开箱即用）：\n' + PRESET_LIST_RENDER(listPresets()));
+          console.log('\n用法: stylotrace preset view <id>（查看某位名家风格卡）');
+          console.log('改写: stylotrace restyle --direction "学鲁迅" [工作区]');
+        } else if (sub === 'view') {
+          const p = viewPreset(positional[1] || '');
+          if (!p) throw new Error(`未知预设「${positional[1] || ''}」。可用: ${listPresets().map((x) => x.id).join(' / ')}`);
+          console.log(PRESET_VIEW_RENDER(p));
+        } else {
+          throw new Error(`用法: stylotrace preset list|view <id>`);
+        }
         break;
       }
       case 'mcp':

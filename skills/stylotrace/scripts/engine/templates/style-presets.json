@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "note": "内置风格预设库：从公版名家笔墨蒸馏出的可执行风格指纹（9 轴 + 锚点 + 雷区）。锚点均为极短公版引用（合理引用范围），供模型模仿句式与语气；版权已过保护期的作家原文可放心学，近现代作家仅做特征描述、原文请自查。",
+  "presets": [
+    {
+      "id": "luxun",
+      "name": "鲁迅",
+      "tagline": "冷峻犀利、白描反讽、半文半白",
+      "dims": {
+        "temperature": "冷峻克制，不煽情",
+        "sentencePreference": "短句为主，顿挫有力，长句也紧",
+        "imageryTendency": "白描少喻，借景言志，意象硬朗（路、血、夜、铁屋）",
+        "languageRegister": "半文半白，文言虚词与白话交融（大约、其实、然而、罢了）",
+        "criticalStance": "立场外显，反讽与批判，冷眼观世",
+        "endingPattern": "收束有力，常有余味，不点破",
+        "vocabularyCharacter": "转折词多用；善用否定句；称呼带戏谑（阿Q、孔乙己）"
+      },
+      "anchors": [
+        "其实地上本没有路，走的人多了，也便成了路。",
+        "我向来是不惮以最坏的恶意，来推测中国人的。"
+      ],
+      "forbidden": [
+        "不用网络流行语与轻浮调侃",
+        "不堆砌成语、不写空泛抒情",
+        "不替人代言苦难，保持冷峻旁观"
+      ]
+    },
+    {
+      "id": "laoshe",
+      "name": "老舍",
+      "tagline": "京味口语、幽默自嘲、市井烟火",
+      "dims": {
+        "temperature": "平和温暖，幽默自嘲",
+        "sentencePreference": "短句节奏，口语断句，儿化音",
+        "imageryTendency": "市井日常，胡同、茶馆、吃食，具体可触",
+        "languageRegister": "京味口语，俗语、歇后语、儿化，平实不文绉",
+        "criticalStance": "温和讽刺，对底层有体温",
+        "endingPattern": "平实收束，常带一丝怅然",
+        "vocabularyCharacter": "口语化；爱用“咱们”“甭”“着哩”；自嘲口吻"
+      },
+      "anchors": [
+        "雨下给富人，也下给穷人；下给义人，也下给不义的人。"
+      ],
+      "forbidden": [
+        "不写书面腔、不堆辞藻",
+        "不居高临下地怜悯，要贴着人物写",
+        "不用欧化长句"
+      ]
+    },
+    {
+      "id": "zhuiziqing",
+      "name": "朱自清",
+      "tagline": "温润细腻、叠词写景、散文意境",
+      "dims": {
+        "temperature": "温润内敛，情感克制",
+        "sentencePreference": "舒缓长句为主，偶有短句点睛",
+        "imageryTendency": "写景抒情，月、荷塘、背影，细腻白描",
+        "languageRegister": "书面雅致，善用叠词（悄悄、静静、蓊蓊郁郁）",
+        "criticalStance": "不批判，重在个人感受与意境",
+        "endingPattern": "由景入情，收在一点深情",
+        "vocabularyCharacter": "叠词密集；比喻清丽；节奏如散文诗"
+      },
+      "anchors": [
+        "盼望着，盼望着，东风来了，春天的脚步近了。"
+      ],
+      "forbidden": [
+        "不写激烈情绪、不堆砌华丽形容词",
+        "不空洞说理，要落在具体景物与感受"
+      ]
+    },
+    {
+      "id": "xuzhimo",
+      "name": "徐志摩",
+      "tagline": "浪漫抒情、意象浓烈、诗化语言",
+      "dims": {
+        "temperature": "情感浓烈，浪漫外放",
+        "sentencePreference": "诗化长句，排比与感叹，欧化句式",
+        "imageryTendency": "意象密集：云、波光、星辉、康桥、爱",
+        "languageRegister": "诗化书面语，感叹与设问，柔美",
+        "criticalStance": "不批判，歌颂美、爱与自由",
+        "endingPattern": "余韵悠长，常以意象收束",
+        "vocabularyCharacter": "叠用形容词；反复；轻灵比喻"
+      },
+      "anchors": [
+        "轻轻的我走了，正如我轻轻的来；我轻轻的招手，作别西天的云彩。"
+      ],
+      "forbidden": [
+        "不写冷硬现实、不做犀利批判",
+        "不堆砌空洞大词，意象要轻灵可感"
+      ]
+    },
+    {
+      "id": "yudafu",
+      "name": "郁达夫",
+      "tagline": "感伤自叙、细腻心理、颓废美感",
+      "dims": {
+        "temperature": "感伤低沉，情绪浓而郁结",
+        "sentencePreference": "长句为主，低回婉转，一唱三叹",
+        "imageryTendency": "景物烘托心境：秋风、落叶、孤灯、寒星",
+        "languageRegister": "书面自叙，直抒胸臆，略带文言",
+        "criticalStance": "向内自省，写个人的苦闷与漂泊",
+        "endingPattern": "情绪收束，余愁未散",
+        "vocabularyCharacter": "自叙口吻；爱与愁并置；细腻心理描摹"
+      },
+      "anchors": [
+        "秋天，无论在什么地方的秋天，总是好的。"
+      ],
+      "forbidden": [
+        "不写欢快明亮、不故作轻松",
+        "不回避内心，要诚实面对苦闷"
+      ]
+    },
+    {
+      "id": "shitiesheng",
+      "name": "史铁生",
+      "tagline": "哲思克制、苦难见希望、短句留白",
+      "dims": {
+        "temperature": "克制深沉，苦而不怨",
+        "sentencePreference": "短句留白，对话平实却深刻",
+        "imageryTendency": "地坛、轮椅、四季、园子，日常中见哲思",
+        "languageRegister": "平实书面，不炫技，字字有重量",
+        "criticalStance": "向死而生，与命运和解",
+        "endingPattern": "留白收束，余味绵长",
+        "vocabularyCharacter": "设问与自答；“但是”“其实”带出转折；意象轮回"
+      },
+      "anchors": [
+        "死是一件不必急于求成的事，死是一个必然会降临的节日。"
+      ],
+      "forbidden": [
+        "不写廉价的励志与口号",
+        "不夸大苦难，也不回避苦难",
+        "原文请自查（近现代作家，此处仅风格特征描述）"
+      ]
+    }
+  ]
+}

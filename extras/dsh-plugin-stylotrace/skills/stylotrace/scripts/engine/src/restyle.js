@@ -9,6 +9,7 @@ import * as ws from './workspace.js';
 import { styleSummary } from './outline.js';
 import { buildStyleShot } from './style-memory.js';
 import { latestStyleDirection, applyStyleDirection } from './style.js';
+import { findPresetByPhrase, renderPreset } from './preset.js';
 import { genreBrief, genreToCategory } from './genre.js';
 import { loadPersonalSkill } from './library.js';
 import { loadStyleAdapter } from './style-adapter.js';
@@ -46,6 +47,9 @@ export async function restyle(cfg, wsDir, { direction = '', section = null, forc
   snapshot(workspace, 'restyle');
   const stored = latestStyleDirection(workspace);
   const dirText = String(direction || '').trim() || stored?.phrase || '';
+  // 命中内置名家预设（"学鲁迅" / "鲁迅的风格" / "luxun"）→ 注入风格卡
+  const preset = findPresetByPhrase(dirText);
+  const stylePreset = preset ? renderPreset(preset) : '';
   if (!dirText) {
     throw new Error(
       '没有可用的风格方向：请用 --direction 给出一句话（如"更克制一点"），或先在对话里告诉 AI 你想怎么改',
@@ -86,6 +90,7 @@ export async function restyle(cfg, wsDir, { direction = '', section = null, forc
       thesis: s.thesis,
       words: s.words,
       direction: dirText,
+      stylePreset,
       writeStyle: styleSummary(path.join(workspace, 'vault', 'write-style.json')),
       styleShot: buildStyleShot(workspace, {
         topic: outline.title || state.confirmed?.topic || '',
