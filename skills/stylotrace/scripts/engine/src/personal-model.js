@@ -11,7 +11,33 @@ import * as stylo from './stylometry.js';
 const ORDER = 4;
 const MIN_CORPUS = 80; // 至少 80 字符才有统计意义
 
-/** 收集作者语料：风格样本 + 成稿 + 亲手修改后的文本（不含知识库/检索内容）。 */
+/** 收集用户对话原话（protocol/context.jsonl），并入作者语料——"每一轮对话、每一个回答也是风格"。 */
+function collectDialogue(workspace, { maxChars = 300 } = {}) {
+  const file = path.join(workspace, 'protocol', 'context.jsonl');
+  const out = [];
+  try {
+    const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
+    for (const line of lines) {
+      try {
+        const rec = JSON.parse(line);
+        const summary = String(rec.summary || '');
+        const m = summary.match(/→\s*(.+)$/);
+        const text = rec.event === 'user' ? summary : m ? m[1] : '';
+        const clean = String(text || '').trim();
+        if (clean.length >= 12 && !/^(对|好|可以|嗯|ok|是的|就这样|继续|你决定|行|好的|没问题|收到|嗯嗯)$/i.test(clean)) {
+          out.push(clean.slice(0, maxChars));
+        }
+      } catch {}
+    }
+  } catch {}
+  return out;
+}
+
+/**
+ * 收集作者语料：风格样本 + 亲手修改后的文本 + 成稿库 + 对话原话。
+ * 注意：不把 AI 生成的 draft.md 当作者语料——那会污染个人模型，让 p_personal 偏向 AI 腔；
+ * 作者真正的"怎么写"来自：贴的样本、亲手改后的文字、成稿、以及每一轮对话里他自己的措辞。
+ */
 export function collectPersonalCorpus(workspace) {
   const texts = [];
   const push = (t) => {
@@ -27,10 +53,6 @@ export function collectPersonalCorpus(workspace) {
     }
   } catch {}
   try {
-    const draft = path.join(workspace, 'draft.md');
-    if (fs.existsSync(draft)) push(fs.readFileSync(draft, 'utf8'));
-  } catch {}
-  try {
     const edits = path.join(workspace, 'vault', 'edits.jsonl');
     if (fs.existsSync(edits)) {
       for (const line of fs.readFileSync(edits, 'utf8').split('\n').filter(Boolean)) {
@@ -41,6 +63,8 @@ export function collectPersonalCorpus(workspace) {
       }
     }
   } catch {}
+  // 每一轮对话都是作者风格信号：把用户自己的原话并进个人语料，供 p_personal 学习。
+  for (const t of collectDialogue(workspace)) push(t);
   try {
     const lib = path.join(workspace, 'vault', 'library');
     const walk = (d) => {
@@ -70,7 +94,7 @@ export function corpusSignature(workspace) {
   };
   collect(path.join(workspace, 'vault', 'style-samples'));
   collect(path.join(workspace, 'vault', 'library'));
-  for (const f of ['draft.md', path.join('vault', 'edits.jsonl')]) {
+  for (const f of [path.join('vault', 'edits.jsonl'), path.join('protocol', 'context.jsonl')]) {
     const p = path.join(workspace, f);
     try {
       files.push([p, fs.statSync(p).size, fs.statSync(p).mtimeMs]);

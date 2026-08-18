@@ -5,9 +5,12 @@
 **一个会先读懂你、再陪你写好的深度协作写作 Agent（v1.0）。**
 
 装上它之后，你不需要会写提示词——说出一个念头，剩下的澄清、大纲、成稿、修改、审计，它陪你走完。
-装进 Codex / Claude Code / OpenCode，它是你的写作合伙人；打开 Web 工作台，它是你的伴随式写作台。
+装进 Codex / Claude Code / OpenCode 是写作合伙人；接进 Cursor / Windsurf / Claude Desktop / Hermes 等
+任意 MCP 宿主是写作子 agent；在终端用 `stylotrace agent` 是独立导演。三种形态，同一个决策内核。
 
 > **通用写作的下限由模型能力决定，上限由系统对"作者"的理解决定。**
+
+> 跨宿主接入方式（skill / MCP / CLI 的配置片段与规则适配）见 [adapters/README.md](adapters/README.md)。
 
 ## 为什么会有它
 
@@ -119,9 +122,12 @@ cd web && npm start        # → http://localhost:5177
 cd web && npm run mock     # 离线 mock 模式，无 API 也能体验
 ```
 
-Web 端同样支持 **BYOK**：页面右上角粘贴你自己的 LLM API Key（只存本地浏览器），服务端就用这个
-key 调 LLM、并按 key 隔离会话——不烧服务端额度。不填 key 时回退到服务端环境变量里的凭据
-（适合本地自用）。对外部署时建议不要配 `STYLOTRACE_LLM_API_KEY`，强制用户自带 key。
+Web 端采用 **BYOK（自带 Key）**，形态借鉴 DeepSeek Harness 的「下载到本地 + 浏览器里自己填 Key」：
+右上角点「🔑 模型与 API Key」，选服务商（DeepSeek / OpenAI / OpenRouter / Moonshot / Qwen / GLM /
+Gemini / 自定义 OpenAI 兼容网关）→ 粘 Key → 选模型 → 保存。Key 只写进本机浏览器的
+`localStorage`，每次请求以 `Authorization: Bearer` 直达 LLM，服务端不留存、不代付，并按 key 隔离会话。
+首次打开若本机和服务端都没有 Key，会主动弹一次引导。留空 Key 时回退到服务端环境变量里的凭据
+（适合本地自用）；对外部署时建议不要配 `STYLOTRACE_LLM_API_KEY`，强制用户自带 key。
 
 ## 公开 API（FastAPI + BYOK）
 
@@ -185,8 +191,8 @@ npx stylotrace-plugin install --all                  # 技能包 → DSH / Codex
 ## 仓库结构
 
 本仓库只保留产品本体：`agent/`（核心引擎）、`skills/`（可安装技能）、`web/`（写作工作台）、
-`scripts/`（实验与工具）、`install.sh`、`README.md`；论文本体与支撑报告随版本提交在
-`docs/competition/`，比赛过程档案与个人分析材料不提交（见 `.gitignore`）。
+`scripts/`（实验与工具）、`install.sh`、`README.md`；论文与竞赛材料为个人成果，不随仓库发布
+（见 `.gitignore`）。
 - [Web 人机交互规划](docs/UX-PLAN.md)
 - [Web 接口自检报告](docs/WEB-API-AUDIT.md)
 - [Web 演示版部署指南](docs/DEPLOY.md)
@@ -215,7 +221,7 @@ npx stylotrace-plugin install --all                  # 技能包 → DSH / Codex
 姿态层细读 posture 前置，推理时调制；学习曲线显示几十次修改即可学到稳定方向）、
 导演状态机与多 Agent 协作、
 Web 伴随式工作台（选区 AI/候选卡/版本回滚/并排/图谱）、真实 LLM 可靠性修复、翻译方法论、
-数学可视化与参赛论文。
+数学可视化。
 接下来：意图分流训练、状态向量化、姿态层 LLM 细读精读特征（可选）、
 V2 logprobs / V3 本地 DExperts 与激活转向、第三方盲评样本收集、跨语言语料验证。
 

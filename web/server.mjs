@@ -205,8 +205,10 @@ function userNamespace(req, url) {
 function cfgForRequest(req, url) {
   const key = byokKeyOf(req, url);
   if (!key) return serverCfg;
-  const model = String(url.searchParams.get('model') || '').trim();
-  const baseUrl = String(url.searchParams.get('baseUrl') || '').trim();
+  const model =
+    String(req.headers['x-llm-model'] || url.searchParams.get('model') || '').trim();
+  const baseUrl =
+    String(req.headers['x-llm-base-url'] || url.searchParams.get('baseUrl') || '').trim();
   return loadConfig({
     ...process.env,
     STYLOTRACE_LLM_API_KEY: key,
@@ -473,6 +475,7 @@ async function runStepAndRespond(res, id, message) {
       phase: r.phase,
       outline: r.outline,
       progress: r.progress,
+      decision: state.decision || null,
       audience: r.audience,
       draftFile: r.draftFile,
       meta: stateBrief(state, meta),
@@ -569,6 +572,7 @@ async function handleRequest(req, res, url) {
       id,
       phase: state.phase || 'clarify',
       stage: state.director?.stage || '',
+      decision: state.decision || null,
       status: meta.status,
       title: meta.title,
       category: meta.category,

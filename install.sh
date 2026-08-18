@@ -14,6 +14,7 @@
 #   --update          pull latest from GitHub (when the repo is a clone), then refresh all chosen points
 #   --cli             also symlink the standalone CLI to ~/.local/bin/stylotrace (optional)
 #   --mcp-codex       print Codex MCP config snippet (never modifies host config on its own)
+#   --mcp-all         print MCP snippets for Codex/Claude Desktop/Claude Code/Cursor/Windsurf
 #   --no-setup        skip auto-register after install (default: auto-register project Codex)
 #   --setup-all       also register Claude Code / OpenCode after install (auto-detected)
 #   --dry-run         only show what would be done
@@ -27,6 +28,7 @@ MIRROR_DIR=""
 UPDATE=0
 WITH_CLI=0
 MCP_CODEX=0
+MCP_ALL=0
 AUTO_SETUP=1
 SETUP_ALL=0
 REPO_URL="${STYLOTRACE_REPO_URL:-https://github.com/zhangyoufu-123/stylotrace}"
@@ -51,6 +53,7 @@ while [ $# -gt 0 ]; do
     --update) UPDATE=1; shift ;;
     --cli) WITH_CLI=1; shift ;;
     --mcp-codex) MCP_CODEX=1; shift ;;
+    --mcp-all) MCP_ALL=1; shift ;;
     --no-setup) AUTO_SETUP=0; shift ;;
     --setup-all) SETUP_ALL=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
@@ -159,7 +162,7 @@ sync_translator() { # dest label
 sync_mirror() { # dest
   local dest="$1"
   step "3/5 sync mirror -> $dest (selective, preserves .git/node_modules/.env.local/…)"
-  for d in agent skills scripts examples extras .github .claude-plugin .codex-plugin; do
+  for d in agent skills scripts examples extras adapters .github .claude-plugin .codex-plugin; do
     [ -d "$REPO_DIR/$d" ] || continue
     if [ "$DRY_RUN" -eq 1 ]; then
       echo "[dry-run] rsync -a --delete $REPO_DIR/$d/ $dest/$d/"
@@ -216,14 +219,33 @@ else
   echo "  export STYLOTRACE_LLM_API_KEY=sk-xxx"
   echo "  # optional: export STYLOTRACE_LLM_BASE_URL=...  export STYLOTRACE_LLM_MODEL=..."
 fi
-if [ "$MCP_CODEX" -eq 1 ]; then
+if [ "$MCP_CODEX" -eq 1 ] || [ "$MCP_ALL" -eq 1 ]; then
   echo
-  echo "Codex MCP config snippet (append to project .codex/config.toml or ~/.codex/config.toml):"
+  echo "MCP 统一命令：node \"$SRC_SKILL/scripts/stylotrace.mjs\" mcp"
+  echo
+  echo "--- Codex（追加到 ~/.codex/config.toml 或项目 .codex/config.toml）---"
   cat <<EOF
 [mcp_servers.stylotrace]
 command = "node"
 args = ["$SRC_SKILL/scripts/stylotrace.mjs", "mcp"]
 EOF
+  if [ "$MCP_ALL" -eq 1 ]; then
+    echo
+    echo "--- Claude Desktop / Claude Code / Cursor / Windsurf（mcpServers 键）---"
+    cat <<EOF
+{
+  "mcpServers": {
+    "stylotrace": {
+      "command": "node",
+      "args": ["$SRC_SKILL/scripts/stylotrace.mjs", "mcp"]
+    }
+  }
+}
+EOF
+    echo
+    echo "Claude Code 也可用命令： claude mcp add stylotrace -- node \"$SRC_SKILL/scripts/stylotrace.mjs\" mcp"
+    echo "Cursor 规则/Windsurf 规则/Hermes 适配见仓库 adapters/ 目录。"
+  fi
 fi
 if [ "$WITH_CLI" -eq 1 ]; then
   step "optional: symlink standalone CLI to ${HOME}/.local/bin/stylotrace"

@@ -24,7 +24,8 @@ stylotrace-profile.json
 __pycache__/
 *.pyc
 
-# 比赛过程档案与个人分析材料不入仓库（论文本体与支撑报告随版本提交）
+# 论文与全部竞赛材料（论文本体、支撑报告、实验数据、过程档案）均为个人成果，不入仓库
+docs/competition/
 docs/competition/PROCESS.md
 docs/competition/COMPETITION.md
 docs/competition/BEYOND-PLAN.md
