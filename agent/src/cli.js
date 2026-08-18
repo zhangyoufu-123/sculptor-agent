@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { loadConfig } from './config.js';
 import { chat } from './llm.js';
 import * as ws from './workspace.js';
@@ -1513,6 +1513,16 @@ export async function runCli(argv, io = {}) {
       case 'doctor':
         await doctor(cfg, { ping: Boolean(flags.ping) });
         break;
+      case 'version': {
+        const pkgPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+        let ver = 'unknown';
+        try { ver = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || 'unknown'; } catch {}
+        console.log(`Stylotrace 引擎 v${ver}`);
+        console.log('更新: dsh plugin --profile web add dsh-plugin-stylotrace@latest');
+        console.log('      （检查提示、不自动执行——供应链安全，由你显式确认后更新）');
+        console.log(`凭据来源: ${cfg.credentialsSource || (cfg.apiKey ? '显式 STYLOTRACE_LLM_API_KEY' : '（未配置）')}`);
+        break;
+      }
       case 'synthesize': {
         const w = ws.resolveWorkspace(cfg, workspace);
         const r = await synthesize(cfg, w, {

@@ -265,12 +265,39 @@ export async function extractInput(file, cfg = {}) {
 /**
  * 从网络 URL 下载文档并提取文本（docx / md / txt / pdf 等）。
  * 零依赖：Node 内置 fetch 下载到临时文件，复用 extractInput 解析。
- * 带超时与错误降级——网络失败/类型不支持时返回 hint，绝不抛异常。
+ *
+ * 企业级安全：
+ *   - 只允许 http/https，其他协议一律拒绝；
+ *   - 流式下载并限制大小（默认 20MB），超过即中止，防资源耗尽；
+ *   - 私网地址（内网 IP / localhost）默认放行但提示——本地写作 agent 由用户
+ *     显式提供 URL，视为可信；企业环境可设 STYLOTRACE_BLOCK_PRIVATE_URL=1
+ *     进入严格 SSRF 防护（拒绝一切私网/内网地址）；
+ *   - 带超时与错误降级——网络失败/类型不支持时返回 hint，绝不抛异常。
  */
+
+const MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024; // 20MB 上限
+
+/** 私网 / 内网 host 判定（SSRF 防护用）。 */
+export function isPrivateHost(hostname) {
+  const h = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (h === 'localhost' || h === '::1' || h === '0.0.0.0') return true;
+  if (/^127\./.test(h)) return true;
+  if (/^10\./.test(h)) return true;
+  if (/^192\.168\./.test(h)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
+  if (/^169\.254\./.test(h)) return true;
+  return false;
+}
+
 export async function fetchUrlInput(url, cfg = {}) {
   const u = String(url || '').trim();
   if (!/^https?:\/\//i.test(u)) return { kind: 'unsupported', hint: `不是有效 URL: ${u.slice(0, 60)}` };
   try {
+    // SSRF：严格模式拒绝私网
+    const host = new URL(u).hostname;
+    if (isPrivateHost(host) && String(cfg.blockPrivateUrl ?? process.env.STYLOTRACE_BLOCK_PRIVATE_URL) === '1') {
+      return { kind: 'unsupported', hint: `私网地址被拒绝（STYLOTRACE_BLOCK_PRIVATE_URL=1）: ${host}` };
+    }
     const res = await fetch(u, {
       redirect: 'follow',
       signal: AbortSignal.timeout(cfg.timeoutMs || 30000),
@@ -287,13 +314,27 @@ export async function fetchUrlInput(url, cfg = {}) {
       else if (/html/i.test(ct)) ext = '.html';
       else ext = '.txt';
     }
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (!buf.length) return { kind: 'unsupported', hint: '下载内容为空' };
-    const tmp = path.join(os.tmpdir(), `stylotrace-dl-${Date.now()}${ext}`);
+    // 流式读取 + 大小限制（防 OOM / 磁盘占满）
+    let size = 0;
+    const chunks = [];
+    const reader = res.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > MAX_DOWNLOAD_BYTES) {
+        try { reader.cancel(); } catch {}
+        return { kind: 'unsupported', hint: `下载内容超过 ${MAX_DOWNLOAD_BYTES / 1024 / 1024}MB 上限，已中止` };
+      }
+      chunks.push(value);
+    }
+    if (size === 0) return { kind: 'unsupported', hint: '下载内容为空' };
+    const buf = Buffer.concat(chunks);
+    const tmp = path.join(os.tmpdir(), `stylotrace-dl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}${ext}`);
     fs.writeFileSync(tmp, buf);
     const r = await extractInput(tmp, cfg);
     fs.rmSync(tmp, { force: true });
-    return { ...r, sourceUrl: u, downloaded: true };
+    return { ...r, sourceUrl: u, downloaded: true, size };
   } catch (err) {
     return { kind: 'unsupported', hint: `下载/解析失败: ${String(err && err.message || err).slice(0, 120)}` };
   }

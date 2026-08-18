@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fetchUrlInput, isUrl } from '../src/io.js';
+import { fetchUrlInput, isUrl, isPrivateHost } from '../src/io.js';
 import * as ws from '../src/workspace.js';
 import { audit, isEnglishText, EN_BLACKLIST } from '../src/redteam.js';
 
@@ -40,6 +40,22 @@ const bad = await fetchUrlInput('not-a-url', {});
 assert.equal(bad.kind, 'unsupported');
 assert.ok(bad.hint.includes('不是有效 URL'));
 ok('fetchUrlInput 非 URL 优雅降级');
+
+// 3b. SSRF 防护:私网判定
+assert.equal(isPrivateHost('127.0.0.1'), true);
+assert.equal(isPrivateHost('localhost'), true);
+assert.equal(isPrivateHost('10.0.0.1'), true);
+assert.equal(isPrivateHost('192.168.1.1'), true);
+assert.equal(isPrivateHost('172.16.0.1'), true);
+assert.equal(isPrivateHost('example.com'), false);
+assert.equal(isPrivateHost('registry.npmjs.org'), false);
+ok('isPrivateHost 私网判定(127/10/192.168/172.16/localhost vs 公网)');
+
+// 3c. 严格模式:STYLOTRACE_BLOCK_PRIVATE_URL=1 拒绝私网
+const blocked = await fetchUrlInput(`http://127.0.0.1:${port}/doc.md`, { blockPrivateUrl: '1', timeoutMs: 5000 });
+assert.equal(blocked.kind, 'unsupported');
+assert.ok(blocked.hint.includes('私网地址被拒绝'));
+ok('严格模式拒绝私网地址(SSRF 防护)');
 
 // 4. absorbSample:文段进风格样本
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'st-abs-'));
