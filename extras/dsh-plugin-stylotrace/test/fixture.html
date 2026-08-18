@@ -35,13 +35,35 @@
   <!-- 输入框 -->
   <textarea id="composer" placeholder="输入消息…"></textarea>
 
-  <!-- 预置 ModuleLoader mock:load 后立即 materialize(等价 DSH 的 lazy 执行) -->
+  <!-- 预置 ModuleLoader mock:忠实模拟 DSH loader——factory 返回 {inject, apply}，
+       校验 apply 存在(缺了就是 "invalid plugin" 回归)并调用之(等价宿主注入服务后激活) -->
   <script>
     window.__ModuleLoader__ = {
       load(entry) {
         window.__stylotraceBundleLoaded = entry && entry.id
         if (entry && entry.factory) {
-          try { entry.factory(function () { throw new Error('测试环境无其他模块') }) } catch (e) {
+          try {
+            // 测试环境无真实 cordis 服务,require 一律抛错(插件侧 safe 兜底降级)
+            var plugin = entry.factory(function () { throw new Error('测试环境无其他模块') })
+            if (plugin && typeof plugin.apply === 'function') {
+              // 守卫:纯 DOM 插件不得声明必需服务依赖。exports.inject 非空会触发
+              // 宿主 boot 的 "pending (waiting for service: ...)" 回归(0.1.4 修复)。
+              var inj = plugin.inject
+              var injLen = Array.isArray(inj) ? inj.length : (inj ? Object.keys(inj).length : 0)
+              if (injLen > 0) {
+                window.__stylotraceFactoryError =
+                  'invalid plugin: inject 非空 ' + JSON.stringify(inj) +
+                  '（纯 DOM 插件不得声明必需服务依赖,会卡在 pending 导致 boot 失败）'
+              } else {
+                try { plugin.apply({}) } catch (e) {
+                  window.__stylotraceFactoryError = String(e && e.message || e)
+                }
+              }
+            } else {
+              window.__stylotraceFactoryError =
+                'invalid plugin: 缺少 apply 方法 (received ' + (plugin === null ? 'null' : typeof plugin) + ')'
+            }
+          } catch (e) {
             window.__stylotraceFactoryError = String(e && e.message || e)
           }
         }

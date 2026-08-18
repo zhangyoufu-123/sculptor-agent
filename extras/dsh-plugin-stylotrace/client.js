@@ -1,8 +1,8 @@
 // dsh-plugin-stylotrace — 浏览器半区 v2（client bundle，零构建、纯 DOM）。
 //
 // 与 omdsh-dev/dsh-annotation 同模式：手写 CJS + window.__ModuleLoader__ 注册，
-// 无任何 @deepseek-ai 值导入（bundle purity gate 合规），cordis 服务经
-// exports.inject 的字符串名接入（sessions / conversation / workspaceRuntime）。
+// 无任何 @deepseek-ai 值导入（bundle purity gate 合规），纯 DOM 功能、不注入
+// 任何 cordis 服务（exports.inject = []，见下方注释）。
 //
 // 能力：
 //   1. 「Stylotrace 改进」选区工具条 —— 选中一句 → 引用块插入输入框，
@@ -26,8 +26,13 @@ window.__ModuleLoader__.load({
     var module = { exports: {} }
     var exports = module.exports
 
-    // 可选服务注入（只声明实际用到的；require 失败不影响其他功能）
-    exports.inject = ['sessions', 'conversation', 'workspaceRuntime']
+    // 纯 DOM 插件，不注入任何 cordis 服务。
+    // 注意：exports.inject 数组里的每个名字都是「必需依赖」——一旦声明了不存在的
+    // 服务（曾误写 workspaceRuntime；真实服务名是 workspaces，且它没有 openPath
+    // 方法），插件会永远停在 pending，host boot 直接报
+    //   "did not activate (waiting for service: workspaceRuntime)"。
+    // 可选服务应改用 apply(ctx) 内的 ctx.inject(['name'], cb)（见 index.js 的 webServer）。
+    exports.inject = []
 
     function safe(fn) {
       try { return fn() } catch (e) {
@@ -38,7 +43,7 @@ window.__ModuleLoader__.load({
       }
     }
 
-    safe(function init() {
+    function init() {
       // ============================== 样式 ==============================
       var STYLE_ID = 'dsh-plugin-stylotrace-style'
       if (document.getElementById(STYLE_ID) === null) {
@@ -175,26 +180,10 @@ window.__ModuleLoader__.load({
         return false
       }
 
-      // 尝试拿到 WorkspaceRuntime（打开文件用）；失败返回 null
-      function tryWorkspaceRuntime() {
-        return safe(function () {
-          try { return require('workspaceRuntime') } catch (_) { return null }
-        })
-      }
-
-      function openPathWithFallback(p, label) {
-        var ws = tryWorkspaceRuntime()
-        if (ws && typeof ws.openPath === 'function') {
-          safe(function () {
-            Promise.resolve(ws.openPath(p)).then(function () {
-              toast('已在系统中打开: ' + label)
-            }).catch(function () {
-              copyPath(p)
-            })
-          })
-        } else {
-          copyPath(p)
-        }
+      // 「用系统默认应用打开」：当前 harness 未暴露 openPath 能力（workspaces
+      // 服务没有 openPath 方法），故一律降级为复制路径，不再引用不存在的服务。
+      function openPathWithFallback(p) {
+        copyPath(p)
       }
 
       function copyPath(p) {
@@ -681,7 +670,14 @@ window.__ModuleLoader__.load({
       loadAnnotations()
       safe(scanMessages)
       safe(attachChips)
-    })
+    }
+
+    // cordis 插件契约：浏览器 bundle 必须导出 apply（否则 loader 收到空对象报
+    // "invalid plugin ... received object"）。纯 DOM 功能，无需 cordis 服务注入。
+    // apply 由宿主在注入服务后调用，内部 safe 包裹的 init 执行全部 DOM 挂载。
+    exports.apply = function apply(ctx) {
+      safe(init)
+    }
 
     module.exports = exports
     return module.exports

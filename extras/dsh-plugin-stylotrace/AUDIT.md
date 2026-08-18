@@ -53,6 +53,7 @@
 | U6 | **CLI 参数解析修复**(发布前把关发现) | 根因:parseArgs 把布尔 flag 后面的位置参数误当 flag 值吞掉(`style --signals /tmp/ws` 工作区丢失);另有 transform/history/rollback/recommend/academic 五个命令工作区位置参数未接。修复:取值 flag 白名单(默认不吞)+ 五命令 positional 修正 + point-edit/rewrite 任意目录自动建工作区;`agent/test/cli-args.test.mjs` 7 项回归 |
 | U7 | **Web client 真实浏览器验收** | `test/browser-check.mjs`:headless Chrome + CDP **真实交互 8/8 通过**——bundle 注册、作品 chip 渲染(助手消息✓/用户消息不误判✓)、选区→「Stylotrace 改进」工具条→引用块插入输入框、无页面 JS 错误;client.js 同时完成健壮性强化(try/catch 隔离、MutationObserver 替换废弃 DOMNodeInserted、防抖) |
 | U8 | **Web 注释系统 v2(0.1.2)** | client.js 升级为完整注释系统:① **批注**——选中文本→「💬 批注」→写入并 localStorage 持久化;② **查看**——右下角 💬 面板列出全部批注(原文+内容+时间),消息行「💬 N」角标,点击高亮定位原文;③ **编辑**——面板内联修改;④ **删除**——确认后删除;**文件打开**——作品 chip 增加「·打开」,经 `WorkspaceRuntime.openPath` 用系统默认应用打开 docx(md/html/pdf/srt),拿不到 host 服务自动降级复制路径;浏览器验收 **15/15**(批注全流程 + 持久化 + 降级路径);clipboard/openPath 全部 promise 加 catch 防 unhandled rejection |
+| U9 | **Codex 式文件内嵌预览(0.1.3)+ Humanizer 借鉴(0.1.4)** | **文件预览**:Node 半区注册 `/stylotrace/file` 只读路由(条件注入 webServer,headless 自动跳过;文本返回内容、docx/pdf 返回 binary 提示、300KB 上限、非本机 Host 403),client 作品 chip「·预览」fetch 渲染——**实测真实 GUI 路由返回 JSON 内容**;node-route.test 7 项 + browser-check 18 项。**Humanizer 借鉴**:① `transform humanize` preset(全局去 AI 味:句长错落/打破排比/连接词自然化,按个人风格收束——从"通用像人"到"像你");② redteam `humanizationScore`(0-100 AI 味综合评分:黑名单 35 + 结构/假思考 25 + 重复 10 + 节奏 10 + 句首 8 + TTR 7 + 段落 5;新增**逗号子句同构排比**与**路标式连接词链**检测——实测自然 88 vs AI 味 48 vs 假思考 68,区分度 40 分);humanize.test.mjs 6 项 |
 
 ### 🟢 观察项(建议,非阻断)
 

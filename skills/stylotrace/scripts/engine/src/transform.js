@@ -59,6 +59,12 @@ export const PRESETS = {
     ratio: 1,
     mode: 'rewrite',
   },
+  humanize: {
+    label: '人性化(去 AI 味)',
+    hint: '全局去 AI 味（Humanizer 式）：句长故意错落（拆长句、并碎句），打破排比/对仗/路标式转折的套路，把"首先/其次/最后"式连接换成自然过渡，在合适处注入口语化与个人经验质感；最终按你的风格档案收束——从"通用像人"到"像你本人"',
+    ratio: 1,
+    mode: 'rewrite',
+  },
   desensitize: {
     label: '脱敏改写',
     hint: '把真实经历/真实人名地名机构改写为虚构，保留情感内核与细节质感，适合公开发布',

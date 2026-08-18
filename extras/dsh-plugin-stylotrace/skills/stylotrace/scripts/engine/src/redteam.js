@@ -236,6 +236,35 @@ export function audit(text, opts = {}) {
     if (n >= 3) structural.push(`重复动作模板："数…，数到…" ${n} 次（同一种细节手法反复用）`);
   }
 
+  // 逗号子句同构排比："创新是发展的动力，创新是进步的源泉，创新是未来的希望"
+  // （AI 排比常用逗号串联在同一句里，按"句"检测会漏——按逗号子句检测；
+  //   前缀取前 3 字容错"创新是发/进/未"这类变化，排除常见虚词开头防误报）
+  {
+    const clauses = all.split(/[，。；！？、]/).map((s) => s.trim()).filter((s) => s.length >= 5);
+    const prefixCount = {};
+    const STOP_PREFIX = /^(我们|这个|一个|这些|那些|就是|因为|所以|但是|然而|不过|只是|首先|其次|最后|随着|通过|为了|在当|在未|在现|让更|需要|必须|能够|可以)/;
+    for (const c of clauses) {
+      const p = c.slice(0, 3);
+      if (!p || STOP_PREFIX.test(p)) continue;
+      prefixCount[p] = prefixCount[p] || { count: 0, example: '' };
+      prefixCount[p].count += 1;
+      if (!prefixCount[p].example) prefixCount[p].example = c.slice(0, 16);
+    }
+    for (const [p, info] of Object.entries(prefixCount)) {
+      if (info.count >= 3) {
+        structural.push(
+          `逗号子句同构排比：${info.count} 个子句以"${p}…"开头（如"${info.example}…"）——模板化堆砌`,
+        );
+      }
+    }
+  }
+
+  // 路标式连接词链："首先…其次…最后…"（AI 模板过渡，Humanizer 重点打击对象）
+  {
+    const n = (all.match(/首先[^。！？]{2,40}(?:其次|然后)[^。！？]{2,40}(?:最后|再次|最终)/g) || []).length;
+    if (n >= 1) structural.push(`路标式连接词链 ${n} 处（"首先…其次…最后…"——AI 模板过渡）`);
+  }
+
   // 内心话"不出口"收束："这句话我没有说出口" / "我没有告诉任何人"
   {
     const n =
@@ -304,6 +333,29 @@ export function audit(text, opts = {}) {
 
   report.structuralSignals = structural;
   for (const s of structural.slice(0, 5)) report.suggestions.push(s);
+
+  // ── 人类化指数（Humanizer 式"AI 味"综合评分，0-100）────────────────
+  // 权重设计（对照 Humanizer 检测维度）：AI 味主要来自"套话堆积 + 模板结构"，
+  // 而非字面统计——现代 LLM 已会伪装句长错落/词汇丰富，所以黑名单与结构痕迹
+  // 必须主导，字面健康指标只作次级佐证：
+  //   黑名单(35) + 结构痕迹/假思考(25) + 重复比喻句式(10) + 节奏(10)
+  //   + 句首去重(8) + TTR(7) + 段落呼吸(5)
+  const mm = report.metrics;
+  const sBlack = Math.min(35, Math.max(0, 35 - report.blacklistHits.length * 9));
+  const sStruct = Math.min(25, Math.max(0, 25 - structural.length * 9));
+  const sRepeat = Math.min(10, Math.max(0, 10 - (report.repeatedMetaphors.length + report.repeatedPatterns.length) * 4));
+  const sRhythm = Math.min(10, Math.max(0, ((Math.min(mm.sentenceLengthStddev, 20) - 4) / 16) * 10));
+  const sStart = Math.min(8, Math.max(0, (mm.sentenceStartDedup / 90) * 8));
+  const sTtr = Math.min(7, Math.max(0, ((Math.min(mm.bigramTtr, 0.8) - 0.4) / 0.4) * 7));
+  const sPcv = Math.min(5, Math.max(0, (Math.min(mm.paragraphCv, 0.5) / 0.5) * 5));
+  report.humanizationScore = Math.round(
+    sBlack + sStruct + sRepeat + sRhythm + sStart + sTtr + sPcv,
+  );
+  if (report.humanizationScore < 60) {
+    report.suggestions.push(
+      `人类化指数 ${report.humanizationScore}/100 偏低（AI 味偏重），建议: stylotrace transform humanize（按你的风格全局去 AI 味）`,
+    );
+  }
 
   // 困惑度签名对照：作者基线均值 vs 本文 surprisal（软提示，不计入硬失败）
   const sig = perplexityProxy(all);

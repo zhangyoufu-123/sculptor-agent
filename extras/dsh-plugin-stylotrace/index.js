@@ -28,7 +28,7 @@ export const description =
   '先读懂作者再动笔——四层风格向量 + 外层调制器、澄清→大纲→逐节写作→红队审计→' +
   '读者群像→交付、项目/上下文自动提炼成文。'
 
-export const version = '0.1.3'
+export const version = '0.1.4'
 
 /** Skill bundle shipped inside this package (`<pkg>/skills/stylotrace`). */
 export const bundledSkill = 'skills/stylotrace'
