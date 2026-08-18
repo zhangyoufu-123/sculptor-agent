@@ -163,12 +163,13 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/stylotrace/main/inst
 ### 装进 DeepSeek Harness（DSH 插件）
 
 ```bash
-dsh plugin --profile web add dsh-plugin-stylotrace   # 39 个 MCP 写作工具
+dsh plugin --profile web add dsh-plugin-stylotrace   # 41 个 MCP 写作工具
 npx stylotrace-plugin install --all                  # 技能包 → DSH / Codex / Claude Code / OpenCode
 ```
 
 插件包位于 `extras/dsh-plugin-stylotrace/`，安装后 DSH Agent 立即获得
-`mcp__stylotrace__*` 全流程写作工具（澄清/大纲/写作/红队/读者群像/定点修改/风格学习），
+`mcp__stylotrace__*` 全流程写作工具（澄清/大纲/写作/红队/读者群像/定点修改/风格学习/
+项目提炼 synthesize / 质量循环 polish），Web 端还有选中批注与文件内嵌预览（Codex 式），
 并自动复用 DSH 的 `$DSH_HOME/.credentials.yaml` 凭据（`STYLOTRACE_LLM_API_KEY` 显式配置永远优先）。
 详细说明见 [extras/dsh-plugin-stylotrace/README.md](extras/dsh-plugin-stylotrace/README.md)。
 

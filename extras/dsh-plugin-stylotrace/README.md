@@ -34,18 +34,19 @@ npx stylotrace-plugin install --all      # DSH / ~/.agents / Codex / Claude Code
 npx stylotrace-plugin doctor             # 自检:MCP 握手 + 工具面清单
 ```
 
-技能包给模型完整工作流认知,MCP 桥给模型 40 个原子工具。**两者都装,体验最完整。**
+技能包给模型完整工作流认知,MCP 桥给模型 41 个原子工具。**两者都装,体验最完整。**
 
 ---
 
 ## 你会得到什么
 
-### 40 个 MCP 工具(全部可被 DSH Agent 直接调用)
+### 41 个 MCP 工具(全部可被 DSH Agent 直接调用)
 
 | 阶段 | 工具 |
 |---|---|
 | 生态位判断 | `probe` / `agent_step` / `interview_step` / `clarify_step` |
 | 项目自动提炼 | `synthesize`(项目 → 实验报告/产品介绍/综述/README/博客) |
+| **质量自动循环** | `polish`(审计人类化指数+红队 → 不达标按你的风格自动重写复检,≤3 轮收敛) |
 | 大纲与结构 | `outline` / `outline_review` / `review` / `dissect` |
 | 写作 | `write_section` / `write_all` / `restyle` / `transform` / `point_edit` / `quote` |
 | 质量门 | `redteam` / `proofread` / `fact_check` / `originality` / `style_eval` / `fake-thinking` |
@@ -68,6 +69,20 @@ npx stylotrace-plugin doctor             # 自检:MCP 握手 + 工具面清单
 ```
 
 支持文体:实验报告 `report` / 产品介绍 `product` / 技术综述 `review` / README / 技术博客 `blog` / 通用文章 `article`。LLM 不可用时**确定性兜底**,绝不崩溃。
+
+### 质量自动循环:`polish`(Reflection/Critic 模式)
+
+**"写完了,但总觉得有 AI 味。"** 让分数说话,循环自动收敛:
+
+```
+成稿 → 审计(人类化指数 0-100 + 红队硬伤)
+  → 不达标(<60 或黑名单命中) → 按你的风格整篇人性化重写 → 复检
+  → 最多 3 轮,收敛为止("检测即修复")
+```
+
+- 人类化指数 = 黑名单 35 + 结构/假思考痕迹 25 + 重复比喻句式 10 + 节奏 10 + 句首 8 + TTR 7 + 段落 5;
+- 能抓到"逗号子句同构排比"("创新是…,创新是…")与"首先/其次/最后"路标式连接——Humanizer 研究的核心打击对象;
+- LLM 不可用只报告分数,绝不空转/崩溃;外部修改过 draft 自动让路不覆盖。
 
 ### 为什么"风格学习"是硬能力,不是提示词
 

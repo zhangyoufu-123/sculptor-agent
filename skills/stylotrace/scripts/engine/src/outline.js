@@ -21,18 +21,29 @@ import { outlineProgress, nextOutlineGap } from './outline-state.js';
 import { requiredMissing } from './clarify.js';
 import { thinkingBrief } from './thinking.js';
 
-export function styleSummary(file) {
+/**
+ * 风格档案摘要（token 轻量版，借鉴"精简版优先"原则）。
+ *
+ * 只输出置信度最高的 Top-N 维（默认 6），阈值 0.35，去掉置信度百分比——
+ * 14+7 维全量注入会白白吃掉 token，而模型真正需要的是"最确定的几条
+ * 偏好"（wjs-distilling-style：风格不是形容词，是指纹；几条高置信规则
+ * 胜过一堆低置信描述）。无档案/空档案返回空串，不注入占位。
+ *
+ * @param file 档案 JSON 路径（write-style.json / read-style.json）
+ * @param opts { max=6, minConfidence=0.35 }
+ */
+export function styleSummary(file, { max = 6, minConfidence = 0.35 } = {}) {
   try {
     const obj = ws.readJson(file);
     const dims = obj.dimensions || obj.structure || {};
-    return (
-      Object.entries(dims)
-        .filter(([, d]) => d && (d.confidence || 0) >= 0.3)
-        .map(([k, d]) => `${k}: ${d.value}（${(d.confidence * 100).toFixed(0)}%）`)
-        .join('\n') || '（未采集）'
-    );
+    return Object.entries(dims)
+      .filter(([, d]) => d && (d.confidence || 0) >= minConfidence)
+      .sort((a, b) => (b[1].confidence || 0) - (a[1].confidence || 0))
+      .slice(0, max)
+      .map(([k, d]) => `${k}: ${d.value}`)
+      .join('\n');
   } catch {
-    return '（未采集）';
+    return '';
   }
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-stylotrace",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Stylotrace 深度协作写作 Agent 的 DeepSeek Harness 插件：40 个 MCP 写作工具 + 完整技能包。风格学习（四层向量+外层调制器）、澄清→大纲→逐节写作→红队审计→读者群像，全流程可被 DSH Agent 调用。",
   "type": "module",
   "main": "index.js",
