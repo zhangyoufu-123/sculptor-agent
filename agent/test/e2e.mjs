@@ -1431,7 +1431,7 @@ try {
       .map((l) => [JSON.parse(l).id, JSON.parse(l)]),
   );
   check('MCP initialize', byId[1]?.result?.serverInfo?.name === 'stylotrace');
-  check('MCP tools/list 40 个工具', byId[2]?.result?.tools?.length === 40);
+  check('MCP tools/list 41 个工具', byId[2]?.result?.tools?.length === 41);
   check('MCP status 调用', byId[3]?.result?.content?.[0]?.text?.includes('Stylotrace 工作区'));
   check('MCP clarify_step 返回问题', byId[4]?.result?.content?.[0]?.text?.includes('question'));
   const mcpInput2 = Readable.from([

@@ -129,6 +129,7 @@ import {
 } from './credentials.js';
 import { runReview, renderReview } from './review.js';
 import { synthesize, SYNTHESIZE_RENDER } from './synthesize.js';
+import { polishLoop, POLISH_RENDER } from './polish.js';
 
 const HELP = `Stylotrace Agent v0.23 — 完整写作 Agent（导演模式 · 四层复合风格向量 · 个人知识库 · 多 Agent 协作 · 多模态）
 
@@ -169,9 +170,12 @@ const HELP = `Stylotrace Agent v0.23 — 完整写作 Agent（导演模式 · �
   stylotrace doc restyle <文件> [--style 旧稿|方向] [--out out] [工作区]
                                      文档风格重写：把成品文档按作者风格重写 → md/docx/html 导出
   stylotrace quote "<原句>"             生成可粘贴的「Stylotrace 引用」块
-  stylotrace synthesize [--project 目录] [--target report|product|review|readme|blog|article] [--topic 主题] [--format md|docx|html|both] [工作区]
+  stylotrace synthesize [--project 目录] [--target report|product|review|readme|blog|article] [--format md|docx|html|both] [工作区]
                                       项目/上下文自动提炼写作：从项目与对话上下文提炼作者想表达的内容，
                                       生成实验报告/产品介绍/技术综述/README/技术博客——无需逐项交代要求
+  stylotrace polish [--rounds 3] [--threshold 60] [--force] [工作区]
+                                      质量自动循环：审计 draft 的人类化指数+红队，不达标按你的风格
+                                      自动人性化重写并复检，最多 N 轮——分数说了算，循环自动收敛
   stylotrace hook <工作区> [payload]    宿主生命周期钩子 → 观察日志 + 压缩守卫
   stylotrace checklist <工作区>         渲染需求访谈确认清单（不消耗 LLM）
   stylotrace style [--memory 查询] [--export] [--backfill] [--extract] [工作区]
@@ -1502,6 +1506,16 @@ export async function runCli(argv, io = {}) {
           format: flags.format || 'md',
         });
         console.log(SYNTHESIZE_RENDER(r));
+        break;
+      }
+      case 'polish': {
+        const w = ws.resolveWorkspace(cfg, workspace);
+        const r = await polishLoop(cfg, w, {
+          maxRounds: flags.rounds !== undefined ? Number(flags.rounds) : 3,
+          threshold: flags.threshold !== undefined ? Number(flags.threshold) : 60,
+          force: Boolean(flags.force),
+        });
+        console.log(POLISH_RENDER(r));
         break;
       }
       case 'mcp':

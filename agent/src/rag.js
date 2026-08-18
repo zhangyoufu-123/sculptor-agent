@@ -35,6 +35,25 @@ export function buildSearchQueries(text, { factReport = null, topic = '', limit 
     push(m[1] + m[2]);
   }
   if (topic) push(topic);
+
+  // ── 多角度查询（吸纳 Deep Research 的"分支搜索/查询编码"思路）────
+  // 单一 "topic+片段" 查询只覆盖一个角度；写作场景需要多面素材：
+  // 背景现状 / 案例实例 / 数据统计 / 对比差异 / 争议局限 / 最新进展。
+  // 确定性模板生成（零 LLM 开销），在事实查询之后按需补齐到 limit。
+  if (topic) {
+    const angles = [
+      `${topic} 背景 现状 发展`,
+      `${topic} 案例 实例 应用`,
+      `${topic} 数据 统计 报告`,
+      `${topic} 对比 区别 优劣 方案`,
+      `${topic} 争议 局限 问题 批评`,
+      `${topic} 最新 进展 趋势`,
+    ];
+    for (const q of angles) {
+      if (queries.length >= limit) break;
+      push(q);
+    }
+  }
   return queries.slice(0, limit);
 }
 

@@ -45,6 +45,7 @@ import {
 import { originalityScan } from './originality.js';
 import { runReview, renderReview } from './review.js';
 import { synthesize, SYNTHESIZE_RENDER } from './synthesize.js';
+import { polishLoop, POLISH_RENDER } from './polish.js';
 
 const TOOLS = [
   {
@@ -476,6 +477,20 @@ const TOOLS = [
     },
   },
   {
+    name: 'polish',
+    description:
+      '质量自动循环（Reflection/Critic 模式）：审计 draft.md 的人类化指数与红队硬伤，不达标时按作者风格自动人性化重写并复检，最多 N 轮——"检测即修复"，分数收敛为止。LLM 不可用时只报告分数与剩余问题，不崩溃。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        rounds: { type: 'number', description: '最大重写轮数；缺省 3' },
+        threshold: { type: 'number', description: '人类化指数收敛阈值；缺省 60' },
+        force: { type: 'boolean', description: 'draft 被外部修改时是否强制重写；缺省 false' },
+      },
+    },
+  },
+  {
     name: 'probe',
     description: '生态位探测：判断任务是否值得 Stylotrace 主动介入（长文写作/风格/结构/定点修改）',
     inputSchema: {
@@ -876,6 +891,15 @@ async function callTool(name, args, cfg) {
         format: args.format || 'md',
       });
       return { text: SYNTHESIZE_RENDER(r) };
+    }
+    case 'polish': {
+      const w = wsDir(args, cfg);
+      const r = await polishLoop(cfg, w, {
+        maxRounds: args.rounds !== undefined ? Number(args.rounds) : 3,
+        threshold: args.threshold !== undefined ? Number(args.threshold) : 60,
+        force: Boolean(args.force),
+      });
+      return { text: POLISH_RENDER(r) };
     }
     case 'probe': {
       return { text: JSON.stringify(probeTask(args.text || ''), null, 2) };
