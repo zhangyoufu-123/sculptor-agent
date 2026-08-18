@@ -491,6 +491,22 @@ const TOOLS = [
     },
   },
   {
+    name: 'absorb_sample',
+    description:
+      '吸收一段喜欢的文段（网络读到/他人文章/某作家的好句）进风格样本库——"借笔法、存引用"：之后写作会自动检索为风格少样本，从中提取可复现的风格。支持标记作者/出处/备注。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workspace: { type: 'string' },
+        text: { type: 'string', description: '要吸收的文段原文' },
+        author: { type: 'string', description: '作者（可选）' },
+        source: { type: 'string', description: '出处/URL（可选）' },
+        note: { type: 'string', description: '备注：为什么喜欢/借鉴什么（可选）' },
+      },
+      required: ['text'],
+    },
+  },
+  {
     name: 'probe',
     description: '生态位探测：判断任务是否值得 Stylotrace 主动介入（长文写作/风格/结构/定点修改）',
     inputSchema: {
@@ -865,6 +881,17 @@ async function callTool(name, args, cfg) {
       const r = ws.absorbEdit(w, args);
       return {
         text: `write ${r.writeUpdated} 维 + read ${r.readUpdated} 维已更新`,
+      };
+    }
+    case 'absorb_sample': {
+      const w = wsDir(args, cfg);
+      const file = ws.absorbSample(w, args.text || '', {
+        author: args.author || '',
+        source: args.source || '',
+        note: args.note || '',
+      });
+      return {
+        text: `已吸收文段进风格样本 → ${file}\n之后写作自动检索为风格少样本（"借笔法/存引用"落点）。`,
       };
     }
     case 'fingerprint': {

@@ -3,6 +3,7 @@
 // 图片识别走视觉模型（STYLOTRACE_VISION_MODEL），音频转录走 whisper（STYLOTRACE_WHISPER_CMD），
 // 未配置时给出明确降级提示。所有外部进程带超时，绝不阻塞主流程。
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -259,6 +260,48 @@ export async function extractInput(file, cfg = {}) {
     kind: 'unsupported',
     hint: `暂不支持 ${ext} 文件。支持：md / txt / docx / xlsx / 图片。`,
   };
+}
+
+/**
+ * 从网络 URL 下载文档并提取文本（docx / md / txt / pdf 等）。
+ * 零依赖：Node 内置 fetch 下载到临时文件，复用 extractInput 解析。
+ * 带超时与错误降级——网络失败/类型不支持时返回 hint，绝不抛异常。
+ */
+export async function fetchUrlInput(url, cfg = {}) {
+  const u = String(url || '').trim();
+  if (!/^https?:\/\//i.test(u)) return { kind: 'unsupported', hint: `不是有效 URL: ${u.slice(0, 60)}` };
+  try {
+    const res = await fetch(u, {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(cfg.timeoutMs || 30000),
+      headers: { 'user-agent': 'stylotrace/1.0 (document reader)' },
+    });
+    if (!res.ok) return { kind: 'unsupported', hint: `下载失败 HTTP ${res.status}` };
+    // 类型：优先 URL 扩展名，其次 Content-Type
+    let ext = path.extname(new URL(u).pathname).toLowerCase();
+    const ct = String(res.headers.get('content-type') || '');
+    if (!ext) {
+      if (/word|officedocument|openxml/i.test(ct)) ext = '.docx';
+      else if (/pdf/i.test(ct)) ext = '.pdf';
+      else if (/markdown/i.test(ct)) ext = '.md';
+      else if (/html/i.test(ct)) ext = '.html';
+      else ext = '.txt';
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (!buf.length) return { kind: 'unsupported', hint: '下载内容为空' };
+    const tmp = path.join(os.tmpdir(), `stylotrace-dl-${Date.now()}${ext}`);
+    fs.writeFileSync(tmp, buf);
+    const r = await extractInput(tmp, cfg);
+    fs.rmSync(tmp, { force: true });
+    return { ...r, sourceUrl: u, downloaded: true };
+  } catch (err) {
+    return { kind: 'unsupported', hint: `下载/解析失败: ${String(err && err.message || err).slice(0, 120)}` };
+  }
+}
+
+/** 判断输入是 URL 还是本地路径。 */
+export function isUrl(input) {
+  return /^https?:\/\//i.test(String(input || '').trim());
 }
 
 /** 把 draft（markdown）导出为 docx。 */

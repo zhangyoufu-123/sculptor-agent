@@ -59,6 +59,56 @@ export const BLACKLIST = [
   '思维模型',
 ];
 
+/**
+ * 英文 AI 味套话黑名单（多语言优化）。
+ * 与中文黑名单同一套检测逻辑：命中即计入 blacklistHits，拉低人类化指数。
+ * 覆盖英文 AI 生成的高频套路：In today's world / It's worth noting /
+ * Moreover / Furthermore / delve into / leverage / robust / seamless 等。
+ */
+export const EN_BLACKLIST = [
+  'In today\'s world',
+  'In today\'s fast-paced world',
+  'It\'s worth noting',
+  'It is worth noting',
+  'It\'s important to note',
+  'It is important to note',
+  'Needless to say',
+  'As we all know',
+  'In conclusion',
+  'In summary',
+  'To sum up',
+  'delve into',
+  'delve deeper',
+  'game-changer',
+  'game changer',
+  'cutting-edge',
+  'cutting edge',
+  'in the realm of',
+  'a testament to',
+  'a tapestry of',
+  'unlock the potential',
+  'leverage the power',
+  'seamless',
+  'robust',
+  'holistic',
+  'furthermore',
+  'moreover',
+  'additionally',
+  'overall',
+  'ultimately',
+];
+
+/**
+ * 判断文本是否英文为主（拉丁字母占比 > 60%），决定启用英文套话检测。
+ */
+export function isEnglishText(text) {
+  const t = String(text || '').replace(/\s/g, '');
+  if (!t) return false;
+  const latin = (t.match(/[A-Za-z]/g) || []).length;
+  const cjk = (t.match(/[\u4e00-\u9fff]/g) || []).length;
+  return latin > cjk && latin / t.length > 0.5;
+}
+
 const SENT_SPLIT = /[。！？.!?]+/;
 
 function sentences(text) {
@@ -88,14 +138,19 @@ export function audit(text, opts = {}) {
   };
   const all = paragraphs(text).join('\n');
 
-  for (const phrase of BLACKLIST) {
-    let idx = 0;
-    while ((idx = all.indexOf(phrase, idx)) !== -1) {
-      report.blacklistHits.push({
-        phrase,
-        context: all.slice(Math.max(0, idx - 20), idx + phrase.length + 20),
-      });
-      idx += phrase.length;
+  // 中文黑名单 + 英文黑名单（英文文本为主时启用英文套话检测）
+  const blacklists = [BLACKLIST];
+  if (isEnglishText(all)) blacklists.push(EN_BLACKLIST);
+  for (const list of blacklists) {
+    for (const phrase of list) {
+      let idx = 0;
+      while ((idx = all.indexOf(phrase, idx)) !== -1) {
+        report.blacklistHits.push({
+          phrase,
+          context: all.slice(Math.max(0, idx - 20), idx + phrase.length + 20),
+        });
+        idx += phrase.length;
+      }
     }
   }
 

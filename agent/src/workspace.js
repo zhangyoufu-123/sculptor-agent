@@ -119,6 +119,28 @@ export function styleDimSummary(file) {
   }
 }
 
+/**
+ * 吸收一段喜欢的文段进风格样本库（vault/style-samples/*.md）。
+ * 用途：读到网络/他人的好文段（"喜欢这段的文风/引用"）时保存下来，
+ * 供 extractStyleFromSamples 提取 14 维风格、供 buildStyleShot 检索为少样本。
+ * 这是"借别人笔法"与"收藏引用"的落点——存样即学。
+ */
+export function absorbSample(ws, text, { author = '', source = '', note = '' } = {}) {
+  const t = String(text || '').trim();
+  if (!t) throw new Error('文段为空');
+  const dir = path.join(ws, 'vault', 'style-samples');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `sample-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.md`);
+  const head = [
+    '# 风格样本',
+    author ? `> 作者：${author}` : '',
+    source ? `> 出处：${source}` : '',
+    note ? `> 备注：${note}` : '',
+  ].filter(Boolean).join('\n');
+  fs.writeFileSync(file, `${head}\n\n${t}\n`, 'utf8');
+  return file;
+}
+
 export function absorbEdit(ws, edit) {
   if (!edit.target && !edit.changed) throw new Error('edit 至少需要 target 或 changed');
   const vaultDir = path.join(ws, 'vault');

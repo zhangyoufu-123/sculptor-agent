@@ -486,7 +486,9 @@ window.__ModuleLoader__.load({
       // ============================== 选区工具条 ==============================
       var selTimer = null
       function onSelectionChange() {
-        if (selTimer) return
+        // 延迟 180ms 再显示：让快速拖选/点击的瞬间不弹出（"无感"——
+        // 只有选区稳定了才出现工具条，对标 Codex 的安静感），且每次选区重置计时。
+        if (selTimer) clearTimeout(selTimer)
         selTimer = setTimeout(function () {
           selTimer = null
           safe(function () {
@@ -537,7 +539,7 @@ window.__ModuleLoader__.load({
             bar.style.left = Math.max(4, Math.min(rect.left, window.innerWidth - 190)) + 'px'
             bar.style.top = Math.max(4, rect.top - 34) + 'px'
           })
-        }, 0)
+        }, 180)
       }
 
       function copyQuote(block) {

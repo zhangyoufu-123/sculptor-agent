@@ -50,6 +50,8 @@ import {
 } from './character.js';
 import {
   extractInput,
+  fetchUrlInput,
+  isUrl,
   exportDocx,
   exportOfficialDocx,
   exportAcademicDocx,
@@ -1304,10 +1306,11 @@ export async function runCli(argv, io = {}) {
         const state = ws.readState(w);
         state.materials = state.materials || [];
         for (const f of positional) {
-          const r = await extractInput(f, cfg);
+          const r = isUrl(f) ? await fetchUrlInput(f, cfg) : await extractInput(f, cfg);
           if (r.kind === 'text') {
-            state.materials.push(`[文件 ${path.basename(f)}] ${r.text.slice(0, 2000)}`);
-            console.log(`✓ ${f}（${r.source}，${r.text.length} 字）→ 素材`);
+            const label = r.sourceUrl || path.basename(f);
+            state.materials.push(`[文件 ${label}] ${r.text.slice(0, 2000)}`);
+            console.log(`✓ ${label}（${r.source}，${r.text.length} 字）→ 素材${r.downloaded ? '（网络下载）' : ''}`);
           } else {
             console.log(`✗ ${f}: ${r.hint || '无法提取'}`);
           }
@@ -1489,6 +1492,16 @@ export async function runCli(argv, io = {}) {
         const edit = JSON.parse(fs.readFileSync(positional[1], 'utf8'));
         const r = ws.absorbEdit(w, edit);
         console.log(`write ${r.writeUpdated} 维 + read ${r.readUpdated} 维已更新`);
+        break;
+      }
+      case 'absorb-sample': {
+        // 用法: stylotrace absorb-sample "文段" [--author 鲁迅] [--source 出处] [--note 备注] [工作区]
+        const text = flags.text || positional[0] || '';
+        if (!text) throw new Error('用法: stylotrace absorb-sample "文段" [--author 作者] [--source 出处] [工作区]');
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, flags.workspace || positional[1] || ''), { create: true });
+        const file = ws.absorbSample(w, text, { author: flags.author || '', source: flags.source || '', note: flags.note || '' });
+        console.log(`已吸收文段进风格样本 → ${file}`);
+        console.log('之后写作会自动检索为风格少样本；可用 stylotrace style --memory 查询预览');
         break;
       }
       case 'fingerprint': {
