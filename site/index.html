@@ -106,17 +106,34 @@
 
   <main>
     <div class="hero wrap">
-      <div class="eyebrow">深度协作写作 Agent · 开源 · v0.24</div>
-      <h1>会先读懂你，<br />再替你写好的写作 Agent。</h1>
+      <div class="eyebrow">写作子 agent · 装进 DSH / Codex / Claude Code / OpenCode · 开源</div>
+      <h1>给你的 AI Agent 装一个<br />会写、还会学你风格的写作子 agent。</h1>
       <p class="lead">
         大多数 AI 写作工具只做一件事：你把题目丢给它，它把文章吐给你，结果像模像样，却一眼假。
-        Stylotrace 换个思路——先花时间了解作者，再动笔。
+        Stylotrace 换个思路——从你的每一次修改里学会你的文风，先读懂你，再动笔。
       </p>
       <div class="cta">
         <a class="btn primary" href="https://github.com/zhangyoufu-123/stylotrace" target="_blank" rel="noopener">GitHub 开源仓库</a>
-        <a class="btn ghost" href="#install">一键安装</a>
+        <a class="btn ghost" href="#demo">30 秒看它怎么用</a>
       </div>
     </div>
+
+    <section id="demo" style="padding:48px 0;">
+      <div class="wrap">
+        <h2>30 秒用法</h2>
+        <p class="sub">装进你的 agent 后，你不需要写提示词——直接说，剩下的它自己推进。</p>
+        <pre><span class="c"># 在 Codex / DSH / Claude Code / OpenCode 新对话里直接说：</span>
+"帮我把这段周报改得像我写的，太官方了"
+
+<span class="c"># 它会：</span>
+1. 先读懂你的写作风格（从你贴过的旧稿 / 亲手改过的句子 / 每轮对话里学）
+2. 给你 3 个候选改写，并说清"为什么这么改"
+3. 你选一个，或再说一句"结尾再收一点"——它吸收进你的风格档案，越用越像你
+
+<span class="c"># 长文也一样：</span>
+"写一篇关于故乡的散文，要有我的风格" → 澄清 → 大纲 → 逐段写 → 反 AI 审计 → 交付导出</pre>
+      </div>
+    </section>
 
     <section id="why">
       <div class="wrap">
@@ -209,21 +226,22 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/stylotrace/main/inst
         <div>
           <h2>不是玩具，是研究</h2>
           <p class="sub">
-            337 项自动化断言覆盖从澄清到交付的全链路；真实任务的红队审计能检出并自动修复重复比喻与句式复用；
-            成稿人类化指标（句长标准差 14.4、段落变异系数 0.45、句首去重率 81%、二元 TTR 0.78）处于真人写作区间。
+            40 个自动化测试文件覆盖从澄清到交付的全链路（一次一问、实时大纲、字数达标、红队压测、
+            长文端到端、回译校验、全格式导出）；真实任务的红队审计能检出并自动修复重复比喻与句式复用，
+            交付前人类化指标（句长/段落/句首/词汇 TTR）把关。
           </p>
           <p class="sub">
-            配套研究论文给出"风格 = 个体表达对完美表达的结构化偏离"的差异弥补模型、
-            四层风格表征与三个实证实验设计；实验工具已内置，数据回填后即为完整实证研究。
+            配套研究给出"风格 = 作者相对中性基线的条件选择偏差"的模型、四层风格表征与实证实验；
+            改迹调制把作者的每次修改当作偏好标注，几十次修改即可学到稳定方向。
           </p>
         </div>
         <div>
           <h2>快速上手</h2>
           <ul class="docs">
-            <li><a href="https://github.com/zhangyoufu-123/stylotrace/blob/main/docs/competition/RESEARCH-PAPER.md">研究论文（理论框架 + 实验设计）</a><span class="d">风格差异弥补模型 · 四层表征 · 认知写作流程</span></li>
-            <li><a href="https://github.com/zhangyoufu-123/stylotrace/blob/main/docs/competition/PRODUCT-README.md">产品介绍</a><span class="d">给评审/用户看的产品叙事</span></li>
+            <li><a href="https://github.com/zhangyoufu-123/stylotrace/blob/main/docs/THEORY.md">理论架构</a><span class="d">Agent / 人工智能 / 数学 / 工程四维</span></li>
+            <li><a href="https://github.com/zhangyoufu-123/stylotrace/blob/main/docs/MODULATOR.md">外层调制器</a><span class="d">把签名升级为可学习模型</span></li>
             <li><a href="https://github.com/zhangyoufu-123/stylotrace/blob/main/docs/GUIDE.md">使用手册</a><span class="d">安装、命令大全、协作协议、开发维护</span></li>
-            <li><a href="https://github.com/zhangyoufu-123/stylotrace/blob/main/docs/experiments/EXECUTION-GUIDE.md">实验执行手册</a><span class="d">伦理声明 · 样本规范 · 盲评流程</span></li>
+            <li><a href="https://github.com/zhangyoufu-123/stylotrace/blob/main/adapters/README.md">跨宿主接入</a><span class="d">skill / MCP / CLI 配置片段</span></li>
           </ul>
         </div>
       </div>
@@ -233,7 +251,10 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/stylotrace/main/inst
       <div class="wrap">
         <h2>开箱即用</h2>
         <p class="sub">未配置 API 密钥时自动读取宿主已配置的密钥；不覆盖你的稿子；密钥绝不打印。</p>
-        <pre><span class="c"># 一行命令，装好全部</span>
+        <pre><span class="c"># DeepSeek Harness 插件（43 个 MCP 写作工具）</span>
+dsh plugin --profile web add dsh-plugin-stylotrace
+
+<span class="c"># Codex / Claude Code / OpenCode / Cursor / Windsurf（skill + MCP + CLI）</span>
 curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/stylotrace/main/install.sh | bash -s -- --all</pre>
       </div>
     </section>
@@ -245,9 +266,9 @@ curl -fsSL https://raw.githubusercontent.com/zhangyoufu-123/stylotrace/main/inst
       <p>如果 AI 写作差了一口气，欢迎来一起把它补上。</p>
       <div class="badges">
         <span class="badge">零依赖引擎</span>
-        <span class="badge">337+ 断言</span>
+        <span class="badge">40 测试文件</span>
         <span class="badge">MIT License</span>
-        <span class="badge">v0.24</span>
+        <span class="badge">插件 0.1.13</span>
       </div>
     </div>
   </footer>
