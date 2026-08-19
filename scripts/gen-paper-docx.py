@@ -479,6 +479,12 @@ while i < len(lines):
         p.paragraph_format.space_after = Pt(3)
         p.paragraph_format.left_indent = Pt(18)
         add_rich_text(p, line[2:].strip(), size=12)
+    elif re.match(r'^\d+\. ', line):
+        p = doc.add_paragraph()
+        p.paragraph_format.line_spacing = 1.4
+        p.paragraph_format.space_after = Pt(3)
+        p.paragraph_format.left_indent = Pt(18)
+        add_rich_text(p, line.strip(), size=12)
     else:
         para(line.strip())
     i += 1

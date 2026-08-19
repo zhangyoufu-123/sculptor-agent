@@ -218,6 +218,7 @@ ${ctx.readStyle || '（未知，默认：节奏错落、信息密度适中、开
 ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
 ${ctx.styleDirection ? `【最新风格方向】${ctx.styleDirection}——按这个方向写，让整篇文章口吻统一。` : ''}
 ${ctx.steering ? `【你的风格约束（硬约束，生成时就遵守，不是写完再改）】\n${ctx.steering}` : ''}
+${ctx.governance ? `【作者长期意图与当前聚焦】（写的时候始终记住这个方向，但不要在正文里说出来）\n${ctx.governance}` : ''}
 ${ctx.genreBrief ? `【文体范式（公式化内容按此产出）】\n${ctx.genreBrief}` : ''}
 ${ctx.personalSkill ? `【这类文体你个人的写法（蒸馏自你的旧作）】\n${ctx.personalSkill}` : ''}
 ${ctx.styleAdapter ? `【风格适配卡（压缩自你的全部样本，最高优先级）】\n${ctx.styleAdapter}` : ''}
@@ -340,6 +341,7 @@ export const REDTEAM_FIX_PROMPT = (
 
 【问题】${ctx.issues}
 【写作风格】${ctx.writeStyle || '（具体、克制、有个人痕迹）'}
+${ctx.governance ? `【作者长期意图与当前聚焦】（改写时守住这个方向，别为消除 AI 腔反而改丢作者本意）\n${ctx.governance}` : ''}
 ${ctx.styleShot ? STYLE_SHOT(ctx.styleShot) : ''}
 【原文】
 ${ctx.text}

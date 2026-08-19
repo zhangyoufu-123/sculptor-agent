@@ -141,3 +141,239 @@ export function permutationTestPaired(predA, predB, truth) {
     discordant: m,
   };
 }
+
+// ============================================================================
+// 以下为盲评任务 2（单段打分）与多模型一致性（Fleiss' κ）所需补充统计。
+// 零依赖、确定性、可单测。
+// ============================================================================
+
+/** 标准正态 CDF（Abramowitz-Stegun erf 近似）。 */
+export function normalCdf(z) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989422804014327 * Math.exp(-(z * z) / 2);
+  let p =
+    d *
+    t *
+    (0.31938153 +
+      t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return z > 0 ? 1 - p : p;
+}
+
+export function mean(arr) {
+  if (!arr.length) return 0;
+  return arr.reduce((s, x) => s + x, 0) / arr.length;
+}
+
+export function sd(arr) {
+  const n = arr.length;
+  if (n < 2) return 0;
+  const m = mean(arr);
+  return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / (n - 1));
+}
+
+/** 均值±SD 报告。 */
+export function meanSd(arr) {
+  return { mean: Number(mean(arr).toFixed(4)), sd: Number(sd(arr).toFixed(4)), n: arr.length };
+}
+
+/**
+ * Wilcoxon 符号秩检验（配对）。返回 n、W（较小一侧秩和）、z、双侧 p、是否精确。
+ * n<=20 用秩分配的精确枚举；否则正态近似（含结校正）。
+ */
+export function wilcoxonSignedRank(a, b) {
+  const diffs = [];
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    const d = a[i] - b[i];
+    if (d !== 0) diffs.push(d);
+  }
+  const n = diffs.length;
+  if (n === 0) return { n: 0, W: 0, z: 0, p: 1, exact: false };
+  const abs = diffs.map(Math.abs);
+  const ranks = rankWithTies(abs);
+  let Wpos = 0;
+  let Wneg = 0;
+  diffs.forEach((d, i) => {
+    if (d > 0) Wpos += ranks[i];
+    else Wneg += ranks[i];
+  });
+  const W = Math.min(Wpos, Wneg);
+  if (n <= 20) {
+    // 精确枚举 2^n 个符号分配，统计秩和 <= W 的个数。
+    let count = 0;
+    const total = 1 << n;
+    for (let mask = 0; mask < total; mask++) {
+      let s = 0;
+      for (let i = 0; i < n; i++) s += mask & (1 << i) ? ranks[i] : 0;
+      if (s <= W) count++;
+    }
+    const p = (2 * Math.min(count, total - count)) / total;
+    return { n, W: Number(W.toFixed(3)), z: null, p: Number(Math.min(1, p).toFixed(4)), exact: true };
+  }
+  // 正态近似（结校正）。
+  const tie = tieCorrection(ranks);
+  const sigma = Math.sqrt((n * (n + 1) * (2 * n + 1)) / 6 - tie);
+  const z = (W - 0.5) / sigma;
+  const p = 2 * (1 - normalCdf(Math.abs(z)));
+  return { n, W: Number(W.toFixed(3)), z: Number(z.toFixed(3)), p: Number(Math.min(1, p).toFixed(4)), exact: false };
+}
+
+/**
+ * Mann-Whitney U（独立两样本）。
+ * n1*n2<=50000 用精确枚举（小样本、离散评分、强结都可靠）；否则正态近似（含结校正）。
+ */
+export function wilcoxonRankSum(a, b) {
+  const n1 = a.length;
+  const n2 = b.length;
+  if (n1 === 0 || n2 === 0) return { U: 0, z: 0, p: 1 };
+  const merged = [...a.map((x) => ({ v: x, g: 0 })), ...b.map((x) => ({ v: x, g: 1 }))].sort(
+    (x, y) => x.v - y.v,
+  );
+  const ranks = rankWithTies(merged.map((m) => m.v));
+  let r1 = 0;
+  merged.forEach((m, i) => {
+    if (m.g === 0) r1 += ranks[i];
+  });
+  const U1act = r1 - (n1 * (n1 + 1)) / 2;
+  const total = n1 * n2;
+  const Uobs = Math.min(U1act, total - U1act);
+  const N = n1 + n2;
+  const ncomb = combCount(N, n1);
+  if (ncomb <= 50000) {
+    let count = 0;
+    const combo = [];
+    const rec = (start, depth) => {
+      if (depth === n1) {
+        let s = 0;
+        for (const i of combo) s += ranks[i];
+        const U1 = s - (n1 * (n1 + 1)) / 2;
+        const U = Math.min(U1, total - U1);
+        if (U <= Uobs + 1e-9) count++;
+        return;
+      }
+      for (let i = start; i <= N - (n1 - depth); i++) {
+        combo.push(i);
+        rec(i + 1, depth + 1);
+        combo.pop();
+      }
+    };
+    rec(0, 0);
+    const p = (2 * Math.min(count, ncomb - count)) / ncomb;
+    return { U: Number(Uobs.toFixed(3)), z: null, p: Number(Math.min(1, p).toFixed(4)), exact: true };
+  }
+  // 正态近似（结校正）
+  const tie = tieCorrection(ranks);
+  const sigma = Math.sqrt((n1 * n2 * (n1 + n2 + 1)) / 12 - (n1 * n2 * tie) / (12 * (n1 + n2 - 1)));
+  const z = sigma > 0 ? (Uobs - 0.5) / sigma : 0;
+  const p = 2 * (1 - normalCdf(Math.abs(z)));
+  return { U: Number(Uobs.toFixed(3)), z: Number(z.toFixed(3)), p: Number(Math.min(1, p).toFixed(4)), exact: false };
+}
+
+/** Cohen's d（独立，合并 SD）。 */
+export function cohensD(a, b) {
+  const na = a.length;
+  const nb = b.length;
+  if (na < 2 || nb < 2) return 0;
+  const va = sd(a) ** 2;
+  const vb = sd(b) ** 2;
+  const pooled = Math.sqrt(((na - 1) * va + (nb - 1) * vb) / (na + nb - 2));
+  if (pooled === 0) return 0;
+  return Number(((mean(a) - mean(b)) / pooled).toFixed(3));
+}
+
+/** Cohen's d_z（配对，diff 的标准差）。 */
+export function cohensDz(diff) {
+  const s = sd(diff);
+  if (s === 0) return 0;
+  return Number((mean(diff) / s).toFixed(3));
+}
+
+/**
+ * Fleiss' κ（多评分者一致性）。
+ * @param ratings 数组，每个元素是一道题的评分者类别数组（类别可取值 0..k-1 或字符串）。
+ * @returns {kappa, nItems, nRaters, pe} pe 为偶然一致率。
+ */
+export function fleissKappa(ratings) {
+  const N = ratings.length;
+  if (N === 0) return { kappa: 0, nItems: 0, nRaters: 0, pe: 0 };
+  // 收集类别集合（支持每题评分者数不同）
+  const cats = new Set();
+  ratings.forEach((r) => r.forEach((c) => cats.add(String(c))));
+  const catList = [...cats];
+  const k = catList.length;
+  if (k < 2) return { kappa: 1, nItems: N, nRaters: ratings.reduce((s, r) => s + r.length, 0), pe: 1 };
+  let Pbar = 0;
+  const catCount = new Array(k).fill(0);
+  let total = 0;
+  for (const r of ratings) {
+    const ni = r.length;
+    total += ni;
+    const nij = new Array(k).fill(0);
+    for (const c of r) nij[catList.indexOf(String(c))] += 1;
+    let sumSq = 0;
+    for (let j = 0; j < k; j++) {
+      sumSq += (nij[j] / ni) ** 2;
+      catCount[j] += nij[j];
+    }
+    Pbar += sumSq / N;
+  }
+  let Pe = 0;
+  for (let j = 0; j < k; j++) {
+    const pj = catCount[j] / total;
+    Pe += pj * pj;
+  }
+  if (Pe >= 1) return { kappa: 0, nItems: N, nRaters: total, pe: Number(Pe.toFixed(4)) };
+  const kappa = (Pbar - Pe) / (1 - Pe);
+  return { kappa: Number(kappa.toFixed(4)), nItems: N, nRaters: total, pe: Number(Pe.toFixed(4)) };
+}
+
+/**
+ * 单段打分报告（配对比较两候选的打分分布）。
+ * @param a 候选 A 的打分（同题、跨模型/评审对齐）
+ * @param b 候选 B 的打分
+ * @returns mean±SD、配对 Wilcoxon、Cohen's d_z
+ */
+export function scoringReport(a, b) {
+  const diffs = [];
+  for (let i = 0; i < Math.min(a.length, b.length); i++) diffs.push(a[i] - b[i]);
+  const wx = wilcoxonSignedRank(a, b);
+  return {
+    a: meanSd(a),
+    b: meanSd(b),
+    meanDiff: Number(mean(diffs).toFixed(4)),
+    wilcoxon: wx,
+    cohensDz: cohensDz(diffs),
+  };
+}
+
+/** 带结的平均秩。 */
+function rankWithTies(values) {
+  const n = values.length;
+  const order = [...values.keys()].sort((i, j) => values[i] - values[j]);
+  const ranks = new Array(n).fill(0);
+  let i = 0;
+  while (i < n) {
+    let j = i;
+    while (j + 1 < n && values[order[j + 1]] === values[order[i]]) j++;
+    const avg = (i + 1 + j + 1) / 2;
+    for (let t = i; t <= j; t++) ranks[order[t]] = avg;
+    i = j + 1;
+  }
+  return ranks;
+}
+
+/** 结校正项 = sum (t^3 - t) / 12。 */
+function tieCorrection(ranks) {
+  const counts = {};
+  for (const r of ranks) counts[r] = (counts[r] || 0) + 1;
+  let tie = 0;
+  for (const c of Object.values(counts)) if (c > 1) tie += (c ** 3 - c) / 12;
+  return tie;
+}
+
+/** 组合数 C(n, k)（小整数，防溢出用 BigInt 再转回）。 */
+function combCount(n, k) {
+  k = Math.min(k, n - k);
+  let r = 1n;
+  for (let i = 0; i < k; i++) r = (r * BigInt(n - i)) / BigInt(i + 1);
+  return Number(r);
+}

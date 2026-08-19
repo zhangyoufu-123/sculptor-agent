@@ -28,6 +28,7 @@ import { personaBrief } from './persona.js';
 import { registerClues } from './consistency.js';
 import { readAvoidance } from './avoidance.js';
 import { readEditTransform } from './edit-transform.js';
+import { governanceBrief } from './governance.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -182,6 +183,7 @@ export async function writeSection(cfg, wsDir, { index = null, force = false } =
         ? academicStyleNote()
         : '',
       persona: personaBrief(workspace),
+      governance: governanceBrief(workspace),
       characterShot,
       recentPulse: prevPulse
         ? `上一节「${prevPulse.section}」的风格脉搏建议：${prevPulse.suggestion || '（无）'}`
