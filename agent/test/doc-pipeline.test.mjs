@@ -71,7 +71,13 @@ const cfg = { ...loadConfig(), apiKey: 'mock' };
 }
 
 // 4) docx 块级翻译：run 级格式保留（真实 docx → 翻译回填 → 验证样式/加粗/表格）
-{
+//    需本机 python-docx；CI/无 docx 环境跳过（与 e2e 的 pyDocxCheck 容错一致）
+let hasDocx = false;
+try {
+  execFileSync('python3', ['-c', 'import docx'], { encoding: 'utf8' });
+  hasDocx = true;
+} catch {}
+if (hasDocx) {
   const src = path.join(tmp, 'sample.docx');
   py(
     'import sys\nfrom docx import Document\n' +
@@ -102,17 +108,21 @@ const cfg = { ...loadConfig(), apiKey: 'mock' };
   console.log('PASS docx 块级翻译（run 级格式保留：标题样式/加粗/表格）');
 }
 
-// 5) docx 块级风格重写：同样保留格式
-{
-  const r = await docRestyle(cfg, w, { file: path.join(tmp, 'sample.docx'), style: '克制短句', out: path.join(tmp, 'docx-style') });
-  assert(r.ok && r.mode === 'docx-block', '应走 docx 块级管线');
-  const info = JSON.parse(py(
-    'import json,sys\nfrom docx import Document\n' +
-    'd=Document(sys.argv[1])\nprint(json.dumps({"p":d.paragraphs[1].text,"style":d.paragraphs[0].style.name,"cell":d.tables[0].cell(0,0).text},ensure_ascii=False))',
-    [path.join(tmp, 'docx-style.docx')],
-  ));
-  assert(info.p === 'RS:加粗内容' && info.style === 'Title' && info.cell === 'RS:A1', '重写回填且格式保留');
-  console.log('PASS docx 块级风格重写（格式保留）');
+if (hasDocx) {
+  // 5) docx 块级风格重写：同样保留格式
+  {
+    const r = await docRestyle(cfg, w, { file: path.join(tmp, 'sample.docx'), style: '克制短句', out: path.join(tmp, 'docx-style') });
+    assert(r.ok && r.mode === 'docx-block', '应走 docx 块级管线');
+    const info = JSON.parse(py(
+      'import json,sys\nfrom docx import Document\n' +
+      'd=Document(sys.argv[1])\nprint(json.dumps({"p":d.paragraphs[1].text,"style":d.paragraphs[0].style.name,"cell":d.tables[0].cell(0,0).text},ensure_ascii=False))',
+      [path.join(tmp, 'docx-style.docx')],
+    ));
+    assert(info.p === 'RS:加粗内容' && info.style === 'Title' && info.cell === 'RS:A1', '重写回填且格式保留');
+    console.log('PASS docx 块级风格重写（格式保留）');
+  }
+} else {
+  console.log('SKIP docx 块级测试（本机无 python-docx，CI 容错）');
 }
 
 delete globalThis.fetch;
