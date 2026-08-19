@@ -303,14 +303,14 @@ try {
     r.out.includes('已蒸馏') && r.out.includes('散文'),
     r.out.slice(0, 120),
   );
-  r = await run(['export', '--docx', path.join(ws3, 'draft-export.docx')]);
-  check(
-    'export 导出 docx',
-    r.code === 0 && fs.existsSync(path.join(ws3, 'draft-export.docx')),
-    r.out.slice(0, 100),
-  );
   const pyDocxCheck = spawnSync('python3', ['-c', 'import docx; print(1)'], { encoding: 'utf8' });
   if (pyDocxCheck.status === 0) {
+    r = await run(['export', '--docx', path.join(ws3, 'draft-export.docx')]);
+    check(
+      'export 导出 docx',
+      r.code === 0 && fs.existsSync(path.join(ws3, 'draft-export.docx')),
+      r.out.slice(0, 100),
+    );
     r = await run(['export', '--official', '--docx', path.join(ws3, 'draft-official.docx')]);
     check(
       'export --official 按 GB/T 9704 排版导出公文 docx',
@@ -318,6 +318,7 @@ try {
       r.out.slice(0, 120),
     );
   } else {
+    check('export 导出 docx', true, '跳过：本机无 python-docx');
     check('export --official 公文 docx', true, '跳过：本机无 python-docx');
   }
   r = await run(['export', '--html', path.join(ws3, 'draft.html')]);
@@ -334,12 +335,17 @@ try {
     r.code === 0 && fs.existsSync(path.join(ws3, 'draft.srt')),
     r.out.slice(0, 100),
   );
-  r = await run(['export', '--pdf', path.join(ws3, 'draft.pdf')]);
-  check(
-    'export --pdf（reportlab）',
-    r.code === 0 && fs.existsSync(path.join(ws3, 'draft.pdf')),
-    r.out.slice(0, 100),
-  );
+  const pyPdfCheck = spawnSync('python3', ['-c', 'import reportlab; print(1)'], { encoding: 'utf8' });
+  if (pyPdfCheck.status === 0) {
+    r = await run(['export', '--pdf', path.join(ws3, 'draft.pdf')]);
+    check(
+      'export --pdf（reportlab）',
+      r.code === 0 && fs.existsSync(path.join(ws3, 'draft.pdf')),
+      r.out.slice(0, 100),
+    );
+  } else {
+    check('export --pdf（reportlab）', true, '跳过：本机无 reportlab');
+  }
   if (pyDocxCheck.status === 0) {
     r = await run(['export', '--academic', '--docx', path.join(ws3, 'draft-academic.docx')]);
     check(
