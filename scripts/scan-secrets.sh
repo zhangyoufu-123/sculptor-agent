@@ -48,7 +48,8 @@ if [ "${1:-}" = "--all-refs" ]; then
   echo "== 扫描全部 git 历史 =="
   revs="$(git rev-list --all 2>/dev/null)"
   if [ -n "$revs" ]; then
-    git grep -I -n -i -E "$JOINED" $revs 2>/dev/null && fail=1
+    # 排除守卫自身(scripts/scan-secrets.sh)——其模式清单含已知 key 串，否则全历史扫描误报自己
+    git grep -I -n -i -E "$JOINED" $revs -- . ":(exclude)$SELF" 2>/dev/null && fail=1
   else
     echo "（无提交，跳过）"
   fi
