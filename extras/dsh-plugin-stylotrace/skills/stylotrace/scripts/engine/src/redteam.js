@@ -8,6 +8,7 @@ import { buildStyleShot } from './style-memory.js';
 import { readVector, perplexityProxy } from './style-vector.js';
 import { snapshot } from './history.js';
 import { diagnoseFakeThinking } from './fake-thinking.js';
+import { governanceBrief } from './governance.js';
 
 function fileHash(text) {
   return createHash('sha1').update(text).digest('hex').slice(0, 16);
@@ -524,7 +525,7 @@ export async function redteam(cfg, wsDir, { fix = false } = {}) {
         },
         {
           role: 'user',
-          content: REDTEAM_FIX_PROMPT({ issues, text, writeStyle, styleShot }),
+          content: REDTEAM_FIX_PROMPT({ issues, text, writeStyle, styleShot, governance: governanceBrief(workspace) }),
         },
       ],
       { temperature: 0.7, maxTokens: 6000 },

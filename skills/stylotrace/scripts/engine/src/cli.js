@@ -28,6 +28,7 @@ import { restyle } from './restyle.js';
 import { runHook } from './hook.js';
 import { renderChecklist } from './interview.js';
 import { agentStep, agentInteractive } from './director.js';
+import { readGovernance, updateGovernance, governanceBrief } from './governance.js';
 import { listLibrary, viewCategory, addPiece, distillAll } from './library.js';
 import {
   listEntries,
@@ -246,6 +247,8 @@ const HELP = `Stylotrace Agent v0.23 — 完整写作 Agent（导演模式 · �
   stylotrace fingerprint <工作区>       刷新压缩守卫风格指纹
   stylotrace panel [state.json]         渲染玻璃面板
   stylotrace status [工作区]            工作区摘要
+  stylotrace governance [--intent 长期意图] [--focus 当前聚焦] [工作区]
+                                     查看/编辑输入治理面：长期写作身份 + 近期聚焦，回灌到导演决策与写改红队
   stylotrace doctor [--ping]            自检（可选连通性测试）
   stylotrace credentials [--ask] [--use N] [--clear] [工作区]
                                      凭据发现：自动读取 Codex/Claude/OpenCode/env 已配置的 API；
@@ -402,6 +405,22 @@ export async function runCli(argv, io = {}) {
       case 'status': {
         const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, workspace));
         console.log(ws.statusReport(w));
+        break;
+      }
+      case 'governance': {
+        const w = ws.ensureWorkspace(ws.resolveWorkspace(cfg, workspace));
+        if (flags.intent !== undefined || flags.focus !== undefined) {
+          const patch = {};
+          if (flags.intent !== undefined) patch.authorIntent = flags.intent;
+          if (flags.focus !== undefined) patch.currentFocus = flags.focus;
+          updateGovernance(w, patch, { source: 'manual' });
+        }
+        const g = readGovernance(w);
+        console.log(
+          `作者长期意图: ${g.authorIntent || '（未设置，用 --intent "…" 设置）'}\n` +
+            `当前聚焦: ${g.currentFocus || '（未设置，用 --focus "…" 设置）'}\n` +
+            `来源: ${g.source} · 更新: ${g.updatedAt || '—'}`,
+        );
         break;
       }
       case 'clarify': {

@@ -32,6 +32,7 @@ import { exportDocx } from './io.js';
 import { roundtripCheck } from './roundtrip.js';
 import { checkConsistency } from './consistency.js';
 import { chatWithRetry } from './llm.js';
+import { governanceBrief, maybeUpdateGovernanceFromInput, seedGovernanceFromClarify } from './governance.js';
 
 const OUTLINE_CONFIRM_RE = /^(对|对的|可以|可以的|没问题|就是这样|好的?|同意|ok|嗯|是|就这样)$/i;
 const OUTLINE_CORRECT_RE =
@@ -98,6 +99,7 @@ export async function decideNextAction(cfg, wsDir, { lastInput = '' } = {}) {
     outlineHeads: outlineHeads || '',
     draftExcerpt: draftExcerpt || '',
     recentDecisions: recentDecisions || '',
+    governance: governanceBrief(workspace),
     lastInput,
   };
   try {
@@ -107,7 +109,7 @@ export async function decideNextAction(cfg, wsDir, { lastInput = '' } = {}) {
         {
           role: 'system',
           content:
-            '你是写作导演，负责根据当前进度与用户最新输入决定下一步动作。先读 draftExcerpt（已有草稿片段）和 outlineHeads（大纲节标题）再判断，并参考 recentDecisions 避免来回横跳。可选动作：ask（继续澄清/追问，仅当信息不足）、outline（生成或调整大纲）、write（逐节写作）、revise（复阅-修订已有初稿）、audit（反AI审计，找并修AI痕迹）、review（多身份评述/读者群像，让不同身份读者读稿给反馈）、restyle（按新方向重写全文）、deliver（交付）。判断原则（极客优先，自动启动）：\n1. 能从 brief/上下文/项目推断的信息（主题、文体、读者、篇幅）直接取合理默认，不要 ask；\n2. 只有两个真正决策点值得问：立意（想表达的核心主张）与风格方向，且各只问一次、必须带默认建议；\n3. 用户是极客，不想被访谈——宁可先按合理默认写出草稿让用户改，也不要反复 ask；\n4. 用户要"优化/改/润色已有文章"→优先 audit/review/restyle，不要从头 ask；\n5. 没有大纲不要 write/deliver；已有草稿时优先 revise/audit/review 而不是重新 outline。只输出严格 JSON：{"action":"...","phase":"...","reason":"一句话"}',
+            '你是写作导演，负责根据当前进度与用户最新输入决定下一步动作。先读 draftExcerpt（已有草稿片段）和 outlineHeads（大纲节标题）再判断，并参考 recentDecisions 避免来回横跳。governance（长期意图/当前聚焦）是用户最重要的方向锚，做决定时始终优先对齐它，但不要在回复里复述它。可选动作：ask（继续澄清/追问，仅当信息不足）、outline（生成或调整大纲）、write（逐节写作）、revise（复阅-修订已有初稿）、audit（反AI审计，找并修AI痕迹）、review（多身份评述/读者群像，让不同身份读者读稿给反馈）、restyle（按新方向重写全文）、deliver（交付）。判断原则（极客优先，自动启动）：\n1. 能从 brief/上下文/项目推断的信息（主题、文体、读者、篇幅）直接取合理默认，不要 ask；\n2. 只有两个真正决策点值得问：立意（想表达的核心主张）与风格方向，且各只问一次、必须带默认建议；\n3. 用户是极客，不想被访谈——宁可先按合理默认写出草稿让用户改，也不要反复 ask；\n4. 用户要"优化/改/润色已有文章"→优先 audit/review/restyle，不要从头 ask；\n5. 没有大纲不要 write/deliver；已有草稿时优先 revise/audit/review 而不是重新 outline。只输出严格 JSON：{"action":"...","phase":"...","reason":"一句话"}',
         },
         { role: 'user', content: JSON.stringify(brief) },
       ],
@@ -236,6 +238,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
       applyStyleSignals(workspace, lastInput);
       recordImplicitSignals(workspace, lastInput);
       await refreshStyleVector(cfg, workspace, { text: lastInput, kind: 'turn', evidence: '每轮输入' });
+      maybeUpdateGovernanceFromInput(workspace, lastInput);
     } catch {}
     ({ state, d } = load());
   }
@@ -324,6 +327,7 @@ export async function agentStep(cfg, wsDir, { lastInput = '' } = {}) {
     // 让没贴旧稿的用户也能在进入大纲前建立高层次风格档案；失败静默，不阻塞。
     try {
       await understandIntent(cfg, workspace, state);
+      seedGovernanceFromClarify(workspace, state);
       await extractStyleFromConversation(cfg, workspace);
       await refreshStyleVector(cfg, workspace, { kind: 'conversation', evidence: '澄清收尾整体提炼' });
     } catch {}

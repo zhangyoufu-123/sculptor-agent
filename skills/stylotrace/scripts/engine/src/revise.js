@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chatWithRetry, parseJsonContent } from './llm.js';
 import * as ws from './workspace.js';
+import { governanceBrief } from './governance.js';
 
 export const REVISE_PROMPT = (ctx) => `你是严格的编辑。复查这篇初稿，找出必须修的问题：
 1) 偏题：有没有节脱离了核心立意/论点；
@@ -17,6 +18,7 @@ export const REVISE_PROMPT = (ctx) => `你是严格的编辑。复查这篇初�
 【论点】${ctx.arguments || ''}
 【素材】${ctx.materials || ''}
 【大纲】${ctx.outline || ''}
+${ctx.governance ? `【作者长期意图与当前聚焦】（判断偏题时以此为锚）\n${ctx.governance}` : ''}
 【全文】
 ${ctx.text}
 
@@ -40,6 +42,7 @@ export async function reviseScan(cfg, workspace) {
     arguments: (state.confirmed?.arguments || []).join('；'),
     materials: (state.materials || []).slice(0, 12).join('；'),
     outline,
+    governance: governanceBrief(workspace),
     text: text.slice(0, 9000),
   };
   if (!cfg?.apiKey) return { score: 100, issues: [], direction: '', skipped: true };
