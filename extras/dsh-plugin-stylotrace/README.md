@@ -1,6 +1,6 @@
 # 🖋️ dsh-plugin-stylotrace
 
-> **越写越像你。** Stylotrace 是 DSH 生态第一个写作 Agent:先读懂你的文风,再陪你写好——从你的旧稿、每一句话、每一次亲手修改里学习个人风格,带着这份"你的签名"跑完 澄清 → 大纲 → 逐节写作 → 红队审计 → 读者群像 → 交付。
+> **越写越像你。** Stylotrace 是 DSH 生态里的写作子 agent：先读懂你的文风，再陪你写好——从你的旧稿、每一句话、每一次亲手修改里学习个人风格，带着这份“你的签名”跑完 澄清 → 大纲 → 逐节写作 → 红队审计 → 读者群像 → 交付。
 
 [![MIT](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 [![npm](https://img.shields.io/npm/v/dsh-plugin-stylotrace?style=flat-square&color=0891b2)](https://www.npmjs.com/package/dsh-plugin-stylotrace)
@@ -94,7 +94,7 @@ npx stylotrace-plugin doctor             # 自检:MCP 握手 + 工具面清单
 
 ### 量化证据
 
-风格向量可视化实测:Stylotrace 作者 ↔ 史铁生 **1.11**、↔ ChatGPT **1.46**、↔ 模板公文 **1.98**;两个通用模型互距仅 **0.65**——AI 腔互相趋同,人类各有面目。风格注入真实改变写法(同题三风格对照:句长σ 3.7/8.3/5.0)。词级文体计量作者识别 46%→**76%**。
+风格向量可视化实测:Stylotrace 作者与通用基线(ChatGPT **1.46**、模板公文 **1.98**)的距离,明显大于两个通用模型之间的互距(**0.65**)——AI 腔互相趋同,人类各有面目。风格注入真实改变写法(同题三风格对照:句长σ 3.7/8.3/5.0)。词级文体计量作者识别 46%→**76%**。
 
 ---
 
